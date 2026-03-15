@@ -10,27 +10,21 @@ export default function EmptyState({
   onRetry,
 }: Props) {
   return (
-    <div
-      style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}
-    >
-      <div style={{ textAlign: 'center', padding: 24 }}>
-        <div style={{ fontSize: 56, marginBottom: 12 }}>🌐</div>
-        <h3 style={{ margin: 0 }}>{title}</h3>
-        <p style={{ color: '#9fb9d6' }}>{description}</p>
-        <div style={{ marginTop: 12 }}>
+    <div className="flex items-center justify-center h-full">
+      <div className="text-center p-6">
+        <div className="w-14 h-14 mx-auto mb-4 border border-ob-border rounded-full flex items-center justify-center animate-pulse-slow">
+          <div className="w-6 h-6 border-t border-r border-ob-cyan animate-spin" />
+        </div>
+        <h3 className="ob-heading text-sm mb-2">{title}</h3>
+        <p className="ob-label text-ob-text-dim mb-4">{description}</p>
+        {onRetry && (
           <button
             onClick={onRetry}
-            style={{
-              background: '#06b6d4',
-              color: '#021025',
-              border: 'none',
-              padding: '8px 12px',
-              borderRadius: 8,
-            }}
+            className="ob-label px-4 py-2 border border-ob-cyan text-ob-cyan hover:bg-ob-cyan/10 transition-colors"
           >
-            Retry
+            RETRY
           </button>
-        </div>
+        )}
       </div>
     </div>
   );

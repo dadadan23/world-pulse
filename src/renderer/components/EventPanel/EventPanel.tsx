@@ -1,12 +1,19 @@
 import { useAppStore } from '../../store/useAppStore';
 import type { Event, EventType } from '@shared/types';
 
-function formatTimestamp(timestamp: number): string {
-  return new Date(timestamp).toLocaleTimeString('en-US', {
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  });
+/** Staleness threshold in milliseconds (30 minutes) */
+const STALE_THRESHOLD_MS = 30 * 60 * 1000;
+
+function formatRelativeTime(timestamp: number): string {
+  const diff = Date.now() - timestamp;
+  if (diff < 60_000) return 'now';
+  if (diff < 3_600_000) return `${Math.floor(diff / 60_000)}m ago`;
+  if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)}h ago`;
+  return `${Math.floor(diff / 86_400_000)}d ago`;
+}
+
+function isStale(timestamp: number): boolean {
+  return Date.now() - timestamp > STALE_THRESHOLD_MS;
 }
 
 function getEventTypeLabel(type: EventType): string {
@@ -45,6 +52,7 @@ interface EventItemProps {
 
 function EventItem({ event, isFeatured, onClick }: EventItemProps) {
   const severity = getSeverityColor(event.severity);
+  const stale = isStale(event.timestamp);
 
   return (
     <div
@@ -54,6 +62,7 @@ function EventItem({ event, isFeatured, onClick }: EventItemProps) {
         bg-ob-bg-elevated/50 cursor-pointer
         ob-transition-snap hover:bg-ob-bg-elevated hover:translate-x-1
         ${isFeatured ? 'bg-ob-amber/10 border-l-ob-amber translate-x-1' : ''}
+        ${stale ? 'opacity-50' : ''}
       `}
       onClick={onClick}
     >
@@ -62,13 +71,14 @@ function EventItem({ event, isFeatured, onClick }: EventItemProps) {
         <div className="flex items-center gap-2">
           <span className={`ob-label ${severity.text}`}>{getEventTypeLabel(event.type)}</span>
           {isFeatured && (
-            <span className="ob-label text-ob-amber px-1.5 py-0.5 border border-ob-amber/40 text-[9px]">
+            <span className="ob-label text-ob-amber px-1.5 py-0.5 border border-ob-amber/40">
               FEATURED
             </span>
           )}
+          {stale && <span className="ob-label text-ob-text-dim">STALE</span>}
         </div>
         <span className="ob-label text-ob-text-dim tabular-nums">
-          {formatTimestamp(event.timestamp)}
+          {formatRelativeTime(event.timestamp)}
         </span>
       </div>
 
@@ -77,12 +87,12 @@ function EventItem({ event, isFeatured, onClick }: EventItemProps) {
 
       {/* Description */}
       {event.description && (
-        <div className="text-ob-text-dim text-[11px] mb-1">{event.description}</div>
+        <div className="text-ob-text-dim text-xs mb-1">{event.description}</div>
       )}
 
       {/* Location */}
       {event.location && (
-        <div className="text-ob-text-dim text-[10px] flex items-center gap-1">
+        <div className="text-ob-text-dim text-xs flex items-center gap-1">
           <span className="text-ob-cyan/60">LOC</span>
           <span>
             {event.location.name ||
@@ -100,7 +110,7 @@ function EventItem({ event, isFeatured, onClick }: EventItemProps) {
               style={{ width: `${Math.min(event.severity * 10, 100)}%` }}
             />
           </div>
-          <span className="ob-label text-[9px]">MAG {event.severity.toFixed(1)}</span>
+          <span className="ob-label">MAG {event.severity.toFixed(1)}</span>
         </div>
       )}
     </div>
@@ -121,7 +131,7 @@ export function EventPanel() {
           </div>
           <div className="flex items-center gap-1">
             <div className="w-1.5 h-1.5 rounded-full bg-ob-success animate-pulse" />
-            <span className="ob-label text-[9px] text-ob-text-dim">LIVE</span>
+            <span className="ob-label text-ob-text-dim">LIVE</span>
           </div>
         </div>
 

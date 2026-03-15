@@ -5,6 +5,9 @@ import type { Event } from '@shared/types';
 
 const SERVER_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:3000';
 
+/** Dormant retry interval after Socket.io exhausts its reconnection attempts */
+const DORMANT_RETRY_MS = 30_000;
+
 interface EventsPayload {
   events: Event[];
   timestamp: number;
@@ -12,6 +15,7 @@ interface EventsPayload {
 
 export function useSocket() {
   const socketRef = useRef<Socket | null>(null);
+  const dormantTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const { setConnectionStatus, setServerStatus, setEvents, addEvents, setInitialized } =
     useAppStore();
 
@@ -32,6 +36,27 @@ export function useSocket() {
       }
     };
 
+    const clearDormantTimer = () => {
+      if (dormantTimerRef.current) {
+        clearInterval(dormantTimerRef.current);
+        dormantTimerRef.current = null;
+      }
+    };
+
+    /** Enter dormant-retry: periodically try to reconnect via a fresh connect() */
+    const startDormantRetry = (socket: Socket) => {
+      clearDormantTimer();
+      setConnectionStatus('dormant-reconnecting');
+      console.warn('[Socket] Entering dormant-retry mode (every 30s)');
+
+      dormantTimerRef.current = setInterval(() => {
+        console.warn('[Socket] Dormant retry attempt');
+        // Reset Socket.io internal reconnection state and try again
+        socket.io.opts.reconnectionAttempts = 10;
+        socket.connect();
+      }, DORMANT_RETRY_MS);
+    };
+
     // Initialize socket connection
     const socket = io(SERVER_URL, {
       transports: ['websocket', 'polling'],
@@ -44,6 +69,7 @@ export function useSocket() {
 
     socket.on('connect', () => {
       console.warn('[Socket] Connected to server');
+      clearDormantTimer();
       setConnectionStatus('connected');
       checkServerStatus();
     });
@@ -56,6 +82,12 @@ export function useSocket() {
     socket.on('connect_error', (error) => {
       console.error('[Socket] Connection error:', error);
       setConnectionStatus('error');
+    });
+
+    // When Socket.io exhausts all reconnection attempts, enter dormant retry
+    socket.io.on('reconnect_failed', () => {
+      console.warn('[Socket] Reconnection attempts exhausted');
+      startDormantRetry(socket);
     });
 
     // Handle initial events on connection
@@ -73,6 +105,7 @@ export function useSocket() {
 
     // Cleanup on unmount
     return () => {
+      clearDormantTimer();
       socket.disconnect();
       socketRef.current = null;
     };

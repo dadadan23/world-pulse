@@ -38,7 +38,23 @@ export function createApp(options?: { corsOrigin?: string }) {
 
   let eventCache: Event[] = [];
   const MAX_EVENTS = 100;
+  /** Maximum event age in milliseconds (default: 60 minutes) */
+  const EVENT_TTL_MS = 60 * 60 * 1000;
+  /** Sweep interval in milliseconds (default: 60 seconds) */
+  const SWEEP_INTERVAL_MS = 60 * 1000;
   let collectors: BaseCollector[] = [];
+  let sweepTimer: ReturnType<typeof setInterval> | null = null;
+
+  /** Remove events older than EVENT_TTL_MS and notify clients */
+  function sweepStaleEvents() {
+    const cutoff = Date.now() - EVENT_TTL_MS;
+    const before = eventCache.length;
+    eventCache = eventCache.filter((e) => e.timestamp >= cutoff);
+    const expired = before - eventCache.length;
+    if (expired > 0) {
+      io.emit('events:expired', { count: expired, timestamp: Date.now() });
+    }
+  }
 
   // Middleware
   app.use(express.json());
@@ -122,6 +138,17 @@ export function createApp(options?: { corsOrigin?: string }) {
     },
     setCollectors(c: BaseCollector[]) {
       collectors = c;
+    },
+    startSweep() {
+      if (!sweepTimer) {
+        sweepTimer = setInterval(sweepStaleEvents, SWEEP_INTERVAL_MS);
+      }
+    },
+    stopSweep() {
+      if (sweepTimer) {
+        clearInterval(sweepTimer);
+        sweepTimer = null;
+      }
     },
   };
 }

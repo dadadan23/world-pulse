@@ -6,7 +6,7 @@ interface StatusBadgeProps {
 }
 
 export const StatusBadge: React.FC<StatusBadgeProps> = ({ state, children }) => {
-  const base = 'px-2 py-0.5 text-[10px] rounded uppercase ob-label';
+  const base = 'px-2 py-0.5 text-xs rounded uppercase ob-label';
   switch (state) {
     case 'nominal':
       return (
