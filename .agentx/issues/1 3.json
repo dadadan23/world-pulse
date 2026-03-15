@@ -1,9 +1,0 @@
-{
-  "id": 1,
-  "title": "[PRD] World Pulse — Phase 1 PRD",
-  "labels": ["type:epic", "priority:p0"],
-  "status": "Backlog",
-  "created_by": "agentx",
-  "created_at": "2026-02-22T00:00:00Z",
-  "body": "PRD created at docs/prd/PRD-world-pulse.md.\n\nSummary: Phase-1 MVP for World Pulse: reliable backend event aggregation + frontend globe renderer with live updates.\n\nSee docs/prd/PRD-world-pulse.md for full details."
-}

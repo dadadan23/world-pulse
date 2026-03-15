@@ -1,8 +1,0 @@
-{
-  "id": 4,
-  "title": "Tests & CI: coverage, socket integration test, validate script",
-  "labels": ["type:task", "priority:p2"],
-  "status": "Backlog",
-  "created_by": "agentx",
-  "created_at": "2026-02-22T00:00:00Z",
-  "body": "Deliverables:\n- Add/increase unit and integration tests to meet coverage targets.\n- Add an integration test for Socket.io and API endpoints.\n- Ensure `npm run validate` passes on CI for these changes.\n\nReferences: vitest.config.ts, src/test, docs/prd/PRD-world-pulse.md"}
