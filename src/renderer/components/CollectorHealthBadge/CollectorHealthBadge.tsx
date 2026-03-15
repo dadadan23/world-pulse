@@ -6,25 +6,18 @@ type Props = {
   reason?: string | null;
 };
 
-export default function CollectorHealthBadge({ name, status, reason }: Props) {
-  const color = status === 'healthy' ? '#10b981' : status === 'degraded' ? '#f59e0b' : '#ef4444';
+function statusColor(status: Status): string {
+  if (status === 'healthy') return 'bg-ob-success';
+  if (status === 'degraded') return 'bg-ob-amber';
+  return 'bg-ob-danger';
+}
 
+export default function CollectorHealthBadge({ name, status, reason }: Props) {
   return (
-    <div
-      style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}
-      title={reason ?? undefined}
-    >
-      <span
-        style={{
-          width: 10,
-          height: 10,
-          borderRadius: 20,
-          background: color,
-          display: 'inline-block',
-        }}
-      />
-      <span style={{ color: '#cfe8ff' }}>{name}</span>
-      <span style={{ color: '#9fb9d6', marginLeft: 8, fontSize: 12 }}>{status}</span>
+    <div className="inline-flex items-center gap-2" title={reason ?? undefined}>
+      <span className={`w-2.5 h-2.5 rounded-full ${statusColor(status)}`} />
+      <span className="text-ob-text text-xs">{name}</span>
+      <span className="ob-label text-ob-text-dim ml-2">{status}</span>
     </div>
   );
 }

@@ -2,6 +2,14 @@ import { Fragment } from 'react';
 import { useAppStore } from '../../store/useAppStore';
 import StatusBadge from '../StatusBadge/StatusBadge';
 
+function formatRelativeTime(timestamp: number): string {
+  const diff = Date.now() - timestamp;
+  if (diff < 60_000) return 'now';
+  if (diff < 3_600_000) return `${Math.floor(diff / 60_000)}m ago`;
+  if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)}h ago`;
+  return `${Math.floor(diff / 86_400_000)}d ago`;
+}
+
 function getEventIndicator(type: string, severity?: number): { color: string; symbol: string } {
   // Color based on severity
   let color = 'text-ob-cyan';
@@ -51,8 +59,8 @@ export function Ticker() {
                       <span className="text-ob-text text-[13px] truncate max-w-[36ch]">
                         {event.title}
                       </span>
-                      <span className="ob-label text-ob-text-dim text-[11px] tabular-nums">
-                        {new Date(event.timestamp).toLocaleTimeString()}
+                      <span className="ob-label text-ob-text-dim text-xs tabular-nums">
+                        {formatRelativeTime(event.timestamp)}
                       </span>
                     </div>
                     <span className="text-ob-border px-2">|</span>
@@ -98,7 +106,7 @@ export function Ticker() {
         {/* Version - right aligned */}
         <div className="ml-auto flex items-center gap-2">
           <span className="ob-label text-ob-text-dim">SYS</span>
-          <span className="text-ob-text-dim text-[10px]">WORLD PULSE v0.2.0</span>
+          <span className="ob-label text-ob-text-dim">WORLD PULSE v0.2.0</span>
         </div>
       </div>
     </div>
