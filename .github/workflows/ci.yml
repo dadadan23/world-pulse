@@ -101,6 +101,7 @@ jobs:
     name: Electron Build (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     needs: [lint, typecheck, test]
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:

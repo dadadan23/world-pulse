@@ -2,14 +2,7 @@ import { Fragment } from 'react';
 import { useAppStore } from '../../store/useAppStore';
 import StatusBadge from '../StatusBadge/StatusBadge';
 import { prioritizeTickerEvents } from '../../store/eventPrioritizer';
-
-function formatRelativeTime(timestamp: number): string {
-  const diff = Date.now() - timestamp;
-  if (diff < 60_000) return 'now';
-  if (diff < 3_600_000) return `${Math.floor(diff / 60_000)}m ago`;
-  if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)}h ago`;
-  return `${Math.floor(diff / 86_400_000)}d ago`;
-}
+import { formatRelativeTime } from '../../utils/time';
 
 function getEventIndicator(type: string, severity?: number): { color: string; symbol: string } {
   // Color based on severity
@@ -40,7 +33,8 @@ export function Ticker() {
 
   // Prioritize by severity, recency, and type diversity
   const tickerEvents = prioritizeTickerEvents(events).slice(0, 10);
-  const activeCollectors = serverStatus?.collectors.filter((c) => c.running).length || 0;
+  const activeCollectors =
+    serverStatus?.collectors.filter((c) => c.isEnabled && c.status !== 'disabled').length || 0;
 
   return (
     <div className="ob-panel">

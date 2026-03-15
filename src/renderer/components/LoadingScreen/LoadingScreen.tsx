@@ -31,7 +31,8 @@ export function LoadingScreen() {
     }
   };
 
-  const activeCollectors = serverStatus?.collectors.filter((c) => c.running).length ?? 0;
+  const activeCollectors =
+    serverStatus?.collectors.filter((c) => c.isEnabled && c.status !== 'disabled').length ?? 0;
 
   return (
     <div className="w-screen h-screen bg-ob-bg-primary flex items-center justify-center font-mono ob-dot-grid">

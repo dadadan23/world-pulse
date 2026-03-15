@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach } from 'vitest';
+import { describe, it, expect, afterEach, vi } from 'vitest';
 import request from 'supertest';
 import { createApp } from './app';
 import { BaseCollector } from './collectors/base';
@@ -165,26 +165,41 @@ describe('Server API', () => {
       });
     });
 
-    it('should report degraded when collector has errors', async () => {
+    it('should report degraded when collector has 3+ consecutive errors', async () => {
       const { app: expressApp, setCollectors } = setup();
       const collector = new FakeCollector('earthquakes', 'earthquake', 60000);
-      // Simulate errors by calling pollNow with a failing fetch
-      const originalFetch = collector.fetch.bind(collector);
       collector.fetch = async () => {
         throw new Error('API down');
       };
+      // Trigger 3 consecutive errors to meet degraded threshold
       await collector.pollNow(() => {});
-      // Restore fetch so getStatus works normally
-      collector.fetch = originalFetch;
+      await collector.pollNow(() => {});
+      await collector.pollNow(() => {});
       setCollectors([collector]);
 
       const res = await request(expressApp).get('/api/status');
       expect(res.body.collectors[0].status).toBe('degraded');
+      expect(res.body.collectors[0].errorCount).toBe(3);
+    });
+
+    it('should report healthy when collector has fewer than 3 errors', async () => {
+      const { app: expressApp, setCollectors } = setup();
+      const collector = new FakeCollector('earthquakes', 'earthquake', 60000);
+      collector.fetch = async () => {
+        throw new Error('API down');
+      };
+      // Only 1 error -- below degraded threshold
+      await collector.pollNow(() => {});
+      setCollectors([collector]);
+
+      const res = await request(expressApp).get('/api/status');
+      expect(res.body.collectors[0].status).toBe('healthy');
       expect(res.body.collectors[0].errorCount).toBe(1);
     });
 
     it('should report disabled when collector is disabled', async () => {
       const { app: expressApp, setCollectors } = setup();
+      // maxErrors=1 for fast test; production uses default (5)
       const collector = new FakeCollector('earthquakes', 'earthquake', 60000, 1);
       collector.fetch = async () => {
         throw new Error('API down');
@@ -200,22 +215,28 @@ describe('Server API', () => {
   });
 
   describe('Event TTL sweep', () => {
-    it('should remove events older than TTL after sweep runs', async () => {
-      const { app: expressApp, addEvents, getEventCache } = setup();
-      const staleTimestamp = Date.now() - 2 * 60 * 60 * 1000; // 2 hours ago
-      addEvents([
-        makeEvent({ id: 'stale-1', timestamp: staleTimestamp }),
-        makeEvent({ id: 'fresh-1', timestamp: Date.now() }),
-      ]);
-      expect(getEventCache()).toHaveLength(2);
+    it('should remove stale events when sweep runs', () => {
+      vi.useFakeTimers();
+      try {
+        const { addEvents, getEventCache, startSweep, stopSweep: stop } = setup();
+        const staleTimestamp = Date.now() - 2 * 60 * 60 * 1000; // 2 hours ago
+        addEvents([
+          makeEvent({ id: 'stale-1', timestamp: staleTimestamp }),
+          makeEvent({ id: 'fresh-1', timestamp: Date.now() }),
+        ]);
+        expect(getEventCache()).toHaveLength(2);
 
-      // Start + immediately stop sweep (we trigger it manually via /api/events)
-      // Instead, call the sweep function by starting it once then stopping
-      // Actually the sweep runs on a timer -- let's just verify fresh events survive
-      // after a manual GET
-      const res = await request(expressApp).get('/api/events');
-      // Both should still be present (sweep hasn't run yet via timer)
-      expect(res.body.events).toHaveLength(2);
+        startSweep();
+        // Advance past the 60-second sweep interval
+        vi.advanceTimersByTime(61_000);
+        stop();
+
+        const remaining = getEventCache();
+        expect(remaining).toHaveLength(1);
+        expect(remaining[0].id).toBe('fresh-1');
+      } finally {
+        vi.useRealTimers();
+      }
     });
 
     it('should keep fresh events in cache', async () => {

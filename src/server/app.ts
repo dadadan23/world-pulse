@@ -12,7 +12,7 @@ function toCollectorHealth(collector: BaseCollector): CollectorHealth {
   let status: CollectorHealthStatus;
   if (!raw.enabled) {
     status = 'disabled';
-  } else if (raw.errorCount > 0) {
+  } else if (raw.errorCount >= 3) {
     status = 'degraded';
   } else {
     status = 'healthy';

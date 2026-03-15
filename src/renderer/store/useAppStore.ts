@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { Event, ConnectionStatus } from '@shared/types';
+import type { Event, ConnectionStatus, CollectorHealth } from '@shared/types';
 import { selectFeaturedEvent } from './eventPrioritizer';
 
 interface AppState {
@@ -7,11 +7,7 @@ interface AppState {
   connectionStatus: ConnectionStatus;
   serverStatus: {
     ready: boolean;
-    collectors: Array<{
-      name: string;
-      enabled: boolean;
-      running: boolean;
-    }>;
+    collectors: CollectorHealth[];
   } | null;
 
   // Event data

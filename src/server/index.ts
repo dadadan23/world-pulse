@@ -12,7 +12,7 @@ dotenv.config();
 
 const PORT = process.env.PORT || 3000;
 
-const { httpServer, io, addEvents, setCollectors } = createApp({
+const { httpServer, io, addEvents, setCollectors, startSweep, stopSweep } = createApp({
   corsOrigin: process.env.VITE_DEV_SERVER_URL || 'http://localhost:5173',
 });
 
@@ -64,14 +64,16 @@ httpServer.listen(PORT, () => {
 
   // Start collectors after server is running
   startCollectors();
+  startSweep();
 });
 
 // Graceful shutdown
 process.on('SIGTERM', () => {
   console.warn('[Server] SIGTERM received, shutting down gracefully');
 
-  // Stop all collectors
+  // Stop all collectors and timers
   collectors.forEach((c) => c.stop());
+  stopSweep();
 
   httpServer.close(() => {
     console.warn('[Server] HTTP server closed');

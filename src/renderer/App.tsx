@@ -9,10 +9,11 @@ function App() {
   // Initialize socket connection
   useSocket();
 
-  const { isInitialized, connectionStatus, hasEverConnected } = useAppStore();
+  const { isInitialized } = useAppStore();
 
-  // First boot: show full LoadingScreen until first successful connection + data
-  if (!hasEverConnected || (!isInitialized && connectionStatus !== 'connected')) {
+  // First boot: show LoadingScreen until data is initialized
+  // After first init, use DisconnectOverlay for reconnects (never flash LoadingScreen again)
+  if (!isInitialized) {
     return <LoadingScreen />;
   }
 
