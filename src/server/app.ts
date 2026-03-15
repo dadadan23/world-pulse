@@ -1,8 +1,30 @@
 import express from 'express';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
-import type { Event } from '@shared/types';
+import type { Event, CollectorHealth, CollectorHealthStatus } from '@shared/types';
 import type { BaseCollector } from './collectors/base';
+
+/**
+ * Derive a CollectorHealth summary from the internal collector status.
+ */
+function toCollectorHealth(collector: BaseCollector): CollectorHealth {
+  const raw = collector.getStatus();
+  let status: CollectorHealthStatus;
+  if (!raw.enabled) {
+    status = 'disabled';
+  } else if (raw.errorCount > 0) {
+    status = 'degraded';
+  } else {
+    status = 'healthy';
+  }
+  return {
+    name: raw.name,
+    status,
+    lastFetchAt: raw.lastFetch || null,
+    errorCount: raw.errorCount,
+    isEnabled: raw.enabled,
+  };
+}
 
 export function createApp(options?: { corsOrigin?: string }) {
   const app = express();
@@ -44,14 +66,14 @@ export function createApp(options?: { corsOrigin?: string }) {
 
   // Status endpoint for frontend initialization
   app.get('/api/status', (_req, res) => {
-    const collectorStatuses = collectors.map((c) => c.getStatus());
-    const healthyCount = collectorStatuses.filter((c) => c.healthy).length;
+    const collectorHealth = collectors.map(toCollectorHealth);
+    const healthyCount = collectorHealth.filter((c) => c.status === 'healthy').length;
 
     res.json({
       status: 'ready',
       timestamp: new Date().toISOString(),
-      collectors: collectorStatuses,
-      collectorsTotal: collectorStatuses.length,
+      collectors: collectorHealth,
+      collectorsTotal: collectorHealth.length,
       collectorsHealthy: healthyCount,
       eventCount: eventCache.length,
     });

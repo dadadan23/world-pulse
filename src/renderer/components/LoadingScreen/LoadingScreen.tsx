@@ -6,66 +6,75 @@ export function LoadingScreen() {
   const getStatusMessage = () => {
     switch (connectionStatus) {
       case 'connecting':
-        return 'Connecting to server...';
+        return 'CONNECTING TO SERVER';
       case 'connected':
-        return serverStatus?.ready ? 'Loading data...' : 'Waiting for collectors...';
+        return serverStatus?.ready ? 'LOADING DATA' : 'WAITING FOR COLLECTORS';
       case 'disconnected':
-        return 'Disconnected. Reconnecting...';
+      case 'dormant-reconnecting':
+        return 'RECONNECTING';
       case 'error':
-        return 'Connection error. Retrying...';
+        return 'CONNECTION ERROR // RETRYING';
     }
   };
 
-  const getStatusIcon = () => {
+  const getStatusClass = () => {
     switch (connectionStatus) {
       case 'connected':
-        return '✓';
+        return 'ob-status-nominal';
       case 'connecting':
-        return '...';
+      case 'dormant-reconnecting':
+        return 'text-ob-cyan';
       case 'disconnected':
+        return 'ob-status-warning';
       case 'error':
-        return '✗';
+        return 'ob-status-critical';
     }
   };
 
+  const activeCollectors = serverStatus?.collectors.filter((c) => c.running).length ?? 0;
+
   return (
-    <div className="w-screen h-screen bg-[#0a0e1a] text-green-400 flex items-center justify-center font-mono">
-      <div className="text-center">
-        <h1 className="text-6xl font-bold mb-4">WORLD PULSE</h1>
-        <div className="text-xl opacity-70 mb-8">{getStatusMessage()}</div>
+    <div className="w-screen h-screen bg-ob-bg-primary flex items-center justify-center font-mono ob-dot-grid">
+      <div className="ob-panel p-10 min-w-[360px]" role="status" aria-live="polite">
+        <div className="ob-panel-inner">
+          {/* Title */}
+          <h1 className="ob-heading text-4xl text-center mb-2 ob-text-glow motion-reduce:![animation:none]">
+            WORLD PULSE
+          </h1>
+          <div className="ob-label text-center mb-8">SYSTEM INITIALIZATION</div>
 
-        {/* Loading animation */}
-        <div className="flex justify-center gap-2 mb-8">
-          {[0, 1, 2].map((i) => (
-            <div
-              key={i}
-              className="w-3 h-3 bg-green-400 rounded-full animate-bounce"
-              style={{ animationDelay: `${i * 0.15}s` }}
-            />
-          ))}
-        </div>
-
-        {/* Status indicators */}
-        <div className="text-sm opacity-50 space-y-2">
-          <div className="flex items-center justify-center gap-2">
-            <span
-              className={connectionStatus === 'connected' ? 'text-green-400' : 'text-yellow-400'}
-            >
-              {getStatusIcon()}
-            </span>
-            <span>Backend: {connectionStatus}</span>
+          {/* Pulse indicators */}
+          <div className="flex justify-center gap-3 mb-8" aria-hidden="true">
+            {[0, 1, 2].map((i) => (
+              <div
+                key={i}
+                className="w-2 h-2 bg-ob-cyan rounded-full animate-pulse-slow motion-reduce:animate-none"
+                style={{ animationDelay: `${i * 0.4}s` }}
+              />
+            ))}
           </div>
-          {serverStatus && (
-            <div className="flex items-center justify-center gap-2">
-              <span className="text-green-400">✓</span>
-              <span>
-                Collectors: {serverStatus.collectors.filter((c) => c.running).length} active
+
+          {/* Status line */}
+          <div className="ob-label text-center mb-6">{getStatusMessage()}</div>
+
+          {/* Status indicators */}
+          <div className="space-y-2 text-xs">
+            <div className="flex items-center justify-between px-2">
+              <span className="ob-label">BACKEND</span>
+              <span className={getStatusClass()}>
+                {connectionStatus === 'connected' ? '[ONLINE]' : '[OFFLINE]'}
               </span>
             </div>
-          )}
+            {serverStatus && (
+              <div className="flex items-center justify-between px-2">
+                <span className="ob-label">COLLECTORS</span>
+                <span className={activeCollectors > 0 ? 'ob-status-nominal' : 'ob-status-warning'}>
+                  {activeCollectors} ACTIVE
+                </span>
+              </div>
+            )}
+          </div>
         </div>
-
-        <div className="mt-8 text-xs opacity-30">Phase 1 - MVP Development</div>
       </div>
     </div>
   );

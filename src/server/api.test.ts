@@ -1,6 +1,8 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import request from 'supertest';
 import { createApp } from './app';
+import { BaseCollector } from './collectors/base';
+import type { Event } from '@shared/types';
 
 describe('Server API', () => {
   let app: ReturnType<typeof createApp>;
@@ -118,6 +120,69 @@ describe('Server API', () => {
       const { app: expressApp } = setup();
       const res = await request(expressApp).get('/unknown');
       expect(res.status).toBe(404);
+    });
+  });
+
+  describe('GET /api/status CollectorHealth contract', () => {
+    class FakeCollector extends BaseCollector {
+      async fetch(): Promise<Event[]> {
+        return [];
+      }
+      validate(): boolean {
+        return true;
+      }
+    }
+
+    it('should return CollectorHealth shape for each collector', async () => {
+      const { app: expressApp, setCollectors } = setup();
+      const collector = new FakeCollector('earthquakes', 'earthquake', 60000);
+      setCollectors([collector]);
+
+      const res = await request(expressApp).get('/api/status');
+      expect(res.status).toBe(200);
+      expect(res.body.collectors).toHaveLength(1);
+
+      const c = res.body.collectors[0];
+      expect(c).toEqual({
+        name: 'earthquakes',
+        status: 'healthy',
+        lastFetchAt: null,
+        errorCount: 0,
+        isEnabled: true,
+      });
+    });
+
+    it('should report degraded when collector has errors', async () => {
+      const { app: expressApp, setCollectors } = setup();
+      const collector = new FakeCollector('earthquakes', 'earthquake', 60000);
+      // Simulate errors by calling pollNow with a failing fetch
+      const originalFetch = collector.fetch.bind(collector);
+      collector.fetch = async () => {
+        throw new Error('API down');
+      };
+      await collector.pollNow(() => {});
+      // Restore fetch so getStatus works normally
+      collector.fetch = originalFetch;
+      setCollectors([collector]);
+
+      const res = await request(expressApp).get('/api/status');
+      expect(res.body.collectors[0].status).toBe('degraded');
+      expect(res.body.collectors[0].errorCount).toBe(1);
+    });
+
+    it('should report disabled when collector is disabled', async () => {
+      const { app: expressApp, setCollectors } = setup();
+      const collector = new FakeCollector('earthquakes', 'earthquake', 60000, 1);
+      collector.fetch = async () => {
+        throw new Error('API down');
+      };
+      // One error = maxErrors so it auto-disables
+      await collector.pollNow(() => {});
+      setCollectors([collector]);
+
+      const res = await request(expressApp).get('/api/status');
+      expect(res.body.collectors[0].status).toBe('disabled');
+      expect(res.body.collectors[0].isEnabled).toBe(false);
     });
   });
 });

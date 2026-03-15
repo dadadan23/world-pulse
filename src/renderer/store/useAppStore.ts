@@ -20,6 +20,7 @@ interface AppState {
 
   // UI state
   isInitialized: boolean;
+  hasEverConnected: boolean;
 
   // Actions
   setConnectionStatus: (status: ConnectionStatus) => void;
@@ -39,9 +40,14 @@ export const useAppStore = create<AppState>((set, get) => ({
   featuredEvent: null,
   selectedEvent: null,
   isInitialized: false,
+  hasEverConnected: false,
 
   // Actions
-  setConnectionStatus: (status) => set({ connectionStatus: status }),
+  setConnectionStatus: (status) =>
+    set((state) => ({
+      connectionStatus: status,
+      hasEverConnected: state.hasEverConnected || status === 'connected',
+    })),
 
   setServerStatus: (status) => set({ serverStatus: status }),
 
