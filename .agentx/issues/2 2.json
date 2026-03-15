@@ -1,8 +1,0 @@
-{
-  "id": 2,
-  "title": "Stabilize server & collectors: health endpoints + auto-disable",
-  "labels": ["type:story", "priority:p1"],
-  "status": "Backlog",
-  "created_by": "agentx",
-  "created_at": "2026-02-22T00:00:00Z",
-  "body": "Deliverables:\n- Add server health endpoint `/health` and `/api/status`.\n- Implement collector auto-disable after configurable consecutive errors.\n- Expose collector health metrics/logging.\n- Add unit tests for the `BaseCollector` error/circuit logic.\n\nReferences: docs/prd/PRD-world-pulse.md, src/server/collectors/base.ts"}

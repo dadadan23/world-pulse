@@ -1,8 +1,0 @@
-{
-  "id": 5,
-  "title": "Electron packaging & smoke test",
-  "labels": ["type:task", "priority:p2"],
-  "status": "Backlog",
-  "created_by": "agentx",
-  "created_at": "2026-02-22T00:00:00Z",
-  "body": "Deliverables:\n- Build Electron packaging script (`npm run build:electron`).\n- Add smoke test that boots the Electron app and verifies socket connectivity.\n- Document build requirements in README.\n\nReferences: electron.vite.config.ts, docs/prd/PRD-world-pulse.md"}

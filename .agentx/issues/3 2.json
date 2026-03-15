@@ -1,8 +1,0 @@
-{
-  "id": 3,
-  "title": "Frontend integration: socket flow and event rendering",
-  "labels": ["type:story", "priority:p1"],
-  "status": "Backlog",
-  "created_by": "agentx",
-  "created_at": "2026-02-22T00:00:00Z",
-  "body": "Deliverables:\n- Verify `events:initial` is consumed and displayed.\n- Ensure incremental `events:new` updates render within 1-3s.\n- Add fallback UI for empty state and connection loss.\n- Add integration test for socket → renderer flow.\n\nReferences: docs/prd/PRD-world-pulse.md, src/renderer, src/shared/types.ts"}
