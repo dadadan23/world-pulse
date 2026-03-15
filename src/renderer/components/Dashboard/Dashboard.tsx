@@ -4,9 +4,11 @@ import { Globe } from '../Globe/Globe';
 import { SkyMap } from '../SkyMap/SkyMap';
 import { EventPanel } from '../EventPanel/EventPanel';
 import { Ticker } from '../Ticker/Ticker';
+import { useAutoRotation } from '../../hooks/useAutoRotation';
 
 export function Dashboard() {
   const [isBooted, setIsBooted] = useState(false);
+  useAutoRotation();
 
   useEffect(() => {
     // Trigger boot sequence after mount

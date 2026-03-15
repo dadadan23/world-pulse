@@ -1,6 +1,7 @@
 import { Fragment } from 'react';
 import { useAppStore } from '../../store/useAppStore';
 import StatusBadge from '../StatusBadge/StatusBadge';
+import { prioritizeTickerEvents } from '../../store/eventPrioritizer';
 
 function formatRelativeTime(timestamp: number): string {
   const diff = Date.now() - timestamp;
@@ -37,8 +38,8 @@ function getEventIndicator(type: string, severity?: number): { color: string; sy
 export function Ticker() {
   const { events, serverStatus } = useAppStore();
 
-  // Get the 10 most recent events for the ticker
-  const tickerEvents = events.slice(0, 10);
+  // Prioritize by severity, recency, and type diversity
+  const tickerEvents = prioritizeTickerEvents(events).slice(0, 10);
   const activeCollectors = serverStatus?.collectors.filter((c) => c.running).length || 0;
 
   return (
