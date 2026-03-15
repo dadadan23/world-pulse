@@ -181,6 +181,19 @@ export interface DataCollector {
 }
 
 /**
+ * Collector health status for API responses
+ */
+export type CollectorHealthStatus = 'healthy' | 'degraded' | 'disabled';
+
+export interface CollectorHealth {
+  name: string;
+  status: CollectorHealthStatus;
+  lastFetchAt: number | null;
+  errorCount: number;
+  isEnabled: boolean;
+}
+
+/**
  * Application state shape
  */
 export interface AppState {

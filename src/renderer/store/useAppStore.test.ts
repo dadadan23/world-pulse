@@ -25,6 +25,7 @@ describe('useAppStore', () => {
       featuredEvent: null,
       selectedEvent: null,
       isInitialized: false,
+      hasEverConnected: false,
     });
   });
 
@@ -36,6 +37,7 @@ describe('useAppStore', () => {
       expect(state.featuredEvent).toBeNull();
       expect(state.selectedEvent).toBeNull();
       expect(state.isInitialized).toBe(false);
+      expect(state.hasEverConnected).toBe(false);
     });
   });
 
@@ -211,6 +213,26 @@ describe('useAppStore', () => {
       };
       useAppStore.getState().setServerStatus(status);
       expect(useAppStore.getState().serverStatus).toEqual(status);
+    });
+  });
+
+  describe('hasEverConnected', () => {
+    it('should become true when status transitions to connected', () => {
+      useAppStore.getState().setConnectionStatus('connected');
+      expect(useAppStore.getState().hasEverConnected).toBe(true);
+    });
+
+    it('should stay true after subsequent disconnects', () => {
+      useAppStore.getState().setConnectionStatus('connected');
+      useAppStore.getState().setConnectionStatus('disconnected');
+      expect(useAppStore.getState().hasEverConnected).toBe(true);
+    });
+
+    it('should remain false for non-connected statuses', () => {
+      useAppStore.getState().setConnectionStatus('connecting');
+      expect(useAppStore.getState().hasEverConnected).toBe(false);
+      useAppStore.getState().setConnectionStatus('error');
+      expect(useAppStore.getState().hasEverConnected).toBe(false);
     });
   });
 });
