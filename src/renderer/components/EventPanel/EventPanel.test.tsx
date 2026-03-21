@@ -105,4 +105,22 @@ describe('EventPanel', () => {
     // New format uses 2 decimal places
     expect(screen.getByText('35.70, 139.70')).toBeInTheDocument();
   });
+
+  it('should show STALE indicator for events older than 30 minutes', () => {
+    const staleEvent = mockEvent('stale', {
+      timestamp: Date.now() - 31 * 60 * 1000, // 31 minutes ago
+    });
+    useAppStore.setState({ events: [staleEvent] });
+    render(<EventPanel />);
+    expect(screen.getByText('STALE')).toBeInTheDocument();
+  });
+
+  it('should show relative time instead of absolute time', () => {
+    const recentEvent = mockEvent('recent', {
+      timestamp: Date.now() - 5 * 60 * 1000, // 5 minutes ago
+    });
+    useAppStore.setState({ events: [recentEvent] });
+    render(<EventPanel />);
+    expect(screen.getByText('5m ago')).toBeInTheDocument();
+  });
 });
