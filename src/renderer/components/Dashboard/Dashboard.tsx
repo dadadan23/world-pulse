@@ -4,6 +4,7 @@ import { Globe } from '../Globe/Globe';
 import { SkyMap } from '../SkyMap/SkyMap';
 import { EventPanel } from '../EventPanel/EventPanel';
 import { Ticker } from '../Ticker/Ticker';
+import { WeatherWidget } from '../WeatherWidget/WeatherWidget';
 
 export function Dashboard() {
   const [isBooted, setIsBooted] = useState(false);
@@ -26,8 +27,16 @@ export function Dashboard() {
         <div className={`min-h-0 ${isBooted ? 'ob-boot-fade-in ob-boot-delay-2' : 'opacity-0'}`}>
           <Globe />
         </div>
-        <div className={`min-h-0 ${isBooted ? 'ob-boot-fade-in ob-boot-delay-3' : 'opacity-0'}`}>
-          <SkyMap />
+        {/* Middle column: SkyMap on top, WeatherWidget below */}
+        <div
+          className={`min-h-0 flex flex-col gap-4 ${isBooted ? 'ob-boot-fade-in ob-boot-delay-3' : 'opacity-0'}`}
+        >
+          <div className="flex-1 min-h-0">
+            <SkyMap />
+          </div>
+          <div className="shrink-0">
+            <WeatherWidget />
+          </div>
         </div>
         <div className={`min-h-0 ${isBooted ? 'ob-boot-fade-in ob-boot-delay-4' : 'opacity-0'}`}>
           <EventPanel />
