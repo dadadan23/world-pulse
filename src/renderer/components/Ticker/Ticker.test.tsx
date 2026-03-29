@@ -46,8 +46,20 @@ describe('Ticker', () => {
       serverStatus: {
         ready: true,
         collectors: [
-          { name: 'test', enabled: true, running: true },
-          { name: 'test2', enabled: true, running: false },
+          {
+            name: 'test',
+            status: 'healthy' as const,
+            lastFetchAt: null,
+            errorCount: 0,
+            isEnabled: true,
+          },
+          {
+            name: 'test2',
+            status: 'disabled' as const,
+            lastFetchAt: null,
+            errorCount: 5,
+            isEnabled: false,
+          },
         ],
       },
     });

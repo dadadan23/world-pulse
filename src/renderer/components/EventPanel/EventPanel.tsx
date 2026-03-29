@@ -1,16 +1,9 @@
 import { useAppStore } from '../../store/useAppStore';
 import type { Event, EventType } from '@shared/types';
+import { formatRelativeTime } from '../../utils/time';
 
 /** Staleness threshold in milliseconds (30 minutes) */
 const STALE_THRESHOLD_MS = 30 * 60 * 1000;
-
-function formatRelativeTime(timestamp: number): string {
-  const diff = Date.now() - timestamp;
-  if (diff < 60_000) return 'now';
-  if (diff < 3_600_000) return `${Math.floor(diff / 60_000)}m ago`;
-  if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)}h ago`;
-  return `${Math.floor(diff / 86_400_000)}d ago`;
-}
 
 function isStale(timestamp: number): boolean {
   return Date.now() - timestamp > STALE_THRESHOLD_MS;
