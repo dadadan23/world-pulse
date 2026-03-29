@@ -1,16 +1,13 @@
 import { create } from 'zustand';
-import type { Event, ConnectionStatus } from '@shared/types';
+import type { Event, ConnectionStatus, CollectorHealth } from '@shared/types';
+import { selectFeaturedEvent } from './eventPrioritizer';
 
 interface AppState {
   // Connection state
   connectionStatus: ConnectionStatus;
   serverStatus: {
     ready: boolean;
-    collectors: Array<{
-      name: string;
-      enabled: boolean;
-      running: boolean;
-    }>;
+    collectors: CollectorHealth[];
   } | null;
 
   // Event data
@@ -55,7 +52,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({ events });
     // Auto-select featured event if none set
     if (!get().featuredEvent && events.length > 0) {
-      set({ featuredEvent: events[0] });
+      set({ featuredEvent: selectFeaturedEvent(events) });
     }
   },
 
@@ -71,10 +68,10 @@ export const useAppStore = create<AppState>((set, get) => ({
 
     set({ events: combined });
 
-    // Update featured to newest high-severity event
-    const highSeverity = newEvents.find((e) => (e.severity ?? 0) >= 5);
-    if (highSeverity) {
-      set({ featuredEvent: highSeverity });
+    // Update featured to the highest-priority event from the new batch
+    const best = selectFeaturedEvent(newEvents);
+    if (best && (best.severity ?? 0) >= 5) {
+      set({ featuredEvent: best });
     }
   },
 

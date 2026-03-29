@@ -209,7 +209,15 @@ describe('useAppStore', () => {
     it('should set server status', () => {
       const status = {
         ready: true,
-        collectors: [{ name: 'test', enabled: true, running: true }],
+        collectors: [
+          {
+            name: 'test',
+            status: 'healthy' as const,
+            lastFetchAt: null,
+            errorCount: 0,
+            isEnabled: true,
+          },
+        ],
       };
       useAppStore.getState().setServerStatus(status);
       expect(useAppStore.getState().serverStatus).toEqual(status);
