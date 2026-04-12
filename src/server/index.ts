@@ -6,6 +6,7 @@ import { AuroraCollector } from './collectors/aurora';
 import { AsteroidCollector } from './collectors/asteroids';
 import { VolcanoCollector } from './collectors/volcanoes';
 import { PlanetCollector } from './collectors/planets';
+import { WeatherCollector } from './collectors/weather';
 
 // Load environment variables
 dotenv.config();
@@ -24,6 +25,7 @@ const collectors = [
   new AsteroidCollector(),
   new VolcanoCollector(),
   new PlanetCollector(),
+  new WeatherCollector(),
 ];
 
 // Attach disable handlers so server can react and notify clients

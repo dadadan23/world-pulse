@@ -60,16 +60,34 @@ export interface GeoLocation {
 }
 
 /**
+ * A single day's forecast summary
+ */
+export interface ForecastDay {
+  date: string; // ISO date string 'YYYY-MM-DD'
+  tempHigh: number; // Celsius
+  tempLow: number; // Celsius
+  condition: string; // e.g. 'Rain', 'Clear'
+  conditionCode: number; // OpenWeatherMap weather code
+  precipitation: number; // mm total for the day
+  windSpeed: number; // m/s
+}
+
+/**
  * Weather-specific event data
  */
 export interface WeatherEvent extends Event {
   type: 'weather';
   data: {
     temperature: number; // Celsius
-    condition: string; // 'clear', 'rain', 'storm', etc.
+    feelsLike: number; // Celsius
+    condition: string; // 'Clear', 'Rain', 'Thunderstorm', etc.
+    conditionCode: number; // OpenWeatherMap weather code
     windSpeed: number; // m/s
     humidity: number; // percentage
     pressure: number; // hPa
+    visibility: number; // meters
+    locationName: string; // resolved city name
+    forecast: ForecastDay[];
   };
 }
 
