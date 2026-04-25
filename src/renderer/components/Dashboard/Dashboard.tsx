@@ -1,52 +1,45 @@
-import { useState, useEffect } from 'react';
-import { Header } from '../Header/Header';
+import { useGeolocation } from '../../hooks/useGeolocation';
 import { Globe } from '../Globe/Globe';
-import { SkyMap } from '../SkyMap/SkyMap';
-import { EventPanel } from '../EventPanel/EventPanel';
+import { HudStatusPanel } from '../HudStatusPanel/HudStatusPanel';
+import { HudCollectorPanel } from '../HudCollectorPanel/HudCollectorPanel';
+import { HudEventPanel } from '../HudEventPanel/HudEventPanel';
+import { SkyMapModal } from '../SkyMapModal/SkyMapModal';
 import { Ticker } from '../Ticker/Ticker';
-import { WeatherWidget } from '../WeatherWidget/WeatherWidget';
 
+/**
+ * Globe-dominant layout.
+ * The Three.js Globe canvas fills 100vw x 100vh.
+ * All UI elements are fixed-position HUD overlays on top of the canvas.
+ */
 export function Dashboard() {
-  const [isBooted, setIsBooted] = useState(false);
-
-  useEffect(() => {
-    // Trigger boot sequence after mount
-    const timer = setTimeout(() => setIsBooted(true), 100);
-    return () => clearTimeout(timer);
-  }, []);
+  // Request geolocation once on mount; result stored in Zustand
+  useGeolocation();
 
   return (
-    <div className="h-screen flex flex-col bg-ob-bg-primary text-ob-text font-mono ob-dot-grid ob-scanline">
-      {/* Header */}
-      <div className={isBooted ? 'ob-boot-fade-in ob-boot-delay-1' : 'opacity-0'}>
-        <Header />
+    <div className="relative w-screen h-screen overflow-hidden bg-ob-bg-primary">
+      {/* Globe canvas -- fills entire viewport, z-0 */}
+      <div className="fixed inset-0 z-0">
+        <Globe />
       </div>
 
-      {/* Main content */}
-      <main className="flex-1 min-h-0 grid grid-cols-[1.5fr_0.5fr_0.5fr] grid-rows-[1fr] gap-4 p-4 overflow-hidden">
-        <div className={`min-h-0 ${isBooted ? 'ob-boot-fade-in ob-boot-delay-2' : 'opacity-0'}`}>
-          <Globe />
-        </div>
-        {/* Middle column: SkyMap on top, WeatherWidget below */}
-        <div
-          className={`min-h-0 flex flex-col gap-4 ${isBooted ? 'ob-boot-fade-in ob-boot-delay-3' : 'opacity-0'}`}
-        >
-          <div className="flex-1 min-h-0">
-            <SkyMap />
-          </div>
-          <div className="shrink-0">
-            <WeatherWidget />
-          </div>
-        </div>
-        <div className={`min-h-0 ${isBooted ? 'ob-boot-fade-in ob-boot-delay-4' : 'opacity-0'}`}>
-          <EventPanel />
-        </div>
-      </main>
+      {/* HUD overlays -- z-20 and above */}
 
-      {/* Ticker */}
-      <div className={isBooted ? 'ob-boot-fade-in ob-boot-delay-5' : 'opacity-0'}>
+      {/* Top-left: status + clock + location */}
+      <HudStatusPanel />
+
+      {/* Top-right: collector badges + sky map toggle */}
+      <HudCollectorPanel />
+
+      {/* Right center: event detail slide-in */}
+      <HudEventPanel />
+
+      {/* Bottom: scrolling event ticker */}
+      <div className="fixed bottom-0 left-0 right-0 z-20">
         <Ticker />
       </div>
+
+      {/* Sky Map modal (fullscreen overlay) */}
+      <SkyMapModal />
     </div>
   );
 }
