@@ -51,3 +51,14 @@ Thumbs.db
 
 # Security
 .npmrc
+
+# --- AgentX (auto-generated, do not edit this block) ---
+# AgentX runtime state
+.agentx/issues/
+.agentx/state/
+.agentx/digests/
+# --- /AgentX ---
+
+# AI agent tooling (local only)
+.claude/
+memories/
