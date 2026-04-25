@@ -23,23 +23,27 @@ export function HudCollectorPanel() {
                 <div className="flex items-center gap-1.5">
                   <div
                     className={`w-1.5 h-1.5 rounded-full ${
-                      !c.enabled
+                      !c.isEnabled || c.status === 'disabled'
                         ? 'bg-ob-text-dim'
-                        : c.running
+                        : c.status === 'healthy'
                           ? 'bg-ob-success animate-pulse'
                           : 'bg-ob-danger'
                     }`}
                   />
                   <span
                     className={`ob-label text-[9px] ${
-                      !c.enabled
+                      !c.isEnabled || c.status === 'disabled'
                         ? 'text-ob-text-dim'
-                        : c.running
+                        : c.status === 'healthy'
                           ? 'text-ob-success'
                           : 'text-ob-danger'
                     }`}
                   >
-                    {!c.enabled ? 'OFF' : c.running ? 'LIVE' : 'ERR'}
+                    {!c.isEnabled || c.status === 'disabled'
+                      ? 'OFF'
+                      : c.status === 'healthy'
+                        ? 'LIVE'
+                        : 'ERR'}
                   </span>
                 </div>
               </div>
