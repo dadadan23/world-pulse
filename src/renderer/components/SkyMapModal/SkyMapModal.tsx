@@ -4,7 +4,10 @@ import { SkyMap } from '../SkyMap/SkyMap';
 
 /** Full-screen modal overlay for the SkyMap. Opened via HudCollectorPanel toggle. */
 export function SkyMapModal() {
-  const { skyMapOpen, setSkyMapOpen, userLat, userLon } = useAppStore();
+  const skyMapOpen = useAppStore((state) => state.skyMapOpen);
+  const setSkyMapOpen = useAppStore((state) => state.setSkyMapOpen);
+  const userLat = useAppStore((state) => state.userLat);
+  const userLon = useAppStore((state) => state.userLon);
 
   useEffect(() => {
     if (!skyMapOpen) return;
@@ -27,10 +30,13 @@ export function SkyMapModal() {
         className="ob-hud-panel flex flex-col"
         style={{ width: '80vw', height: '80vh' }}
         onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="sky-map-modal-title"
       >
         {/* Modal header */}
         <div className="flex items-center justify-between mb-4 pb-3 border-b border-ob-border">
-          <span className="ob-heading text-ob-cyan tracking-ultrawide">
+          <span id="sky-map-modal-title" className="ob-heading text-ob-cyan tracking-ultrawide">
             SKY MAP -- CELESTIAL VIEW
           </span>
           <button
@@ -43,7 +49,7 @@ export function SkyMapModal() {
 
         {/* Sky Map canvas */}
         <div className="flex-1 min-h-0">
-          <SkyMap observerLat={userLat ?? 40} observerLon={userLon ?? 0} />
+          <SkyMap observerLat={userLat ?? 30} observerLon={userLon ?? -40} />
         </div>
       </div>
     </div>

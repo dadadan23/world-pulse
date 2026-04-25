@@ -20,7 +20,11 @@ function formatCoord(lat: number | null, lon: number | null): string {
 
 /** Top-left HUD: system status, UTC clock, event count, user location */
 export function HudStatusPanel() {
-  const { connectionStatus, events, userLat, userLon, geolocationStatus } = useAppStore();
+  const connectionStatus = useAppStore((state) => state.connectionStatus);
+  const events = useAppStore((state) => state.events);
+  const userLat = useAppStore((state) => state.userLat);
+  const userLon = useAppStore((state) => state.userLon);
+  const geolocationStatus = useAppStore((state) => state.geolocationStatus);
   const [time, setTime] = useState(new Date());
 
   useEffect(() => {

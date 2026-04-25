@@ -6,11 +6,13 @@ const GEOLOCATION_TIMEOUT_MS = 10_000;
 /**
  * Requests the user's geolocation once per session on mount.
  * On success: stores lat/lon and sets status 'granted'.
- * On failure/timeout: sets fallback position (lat:30, lon:-40) and status 'denied'.
- * Results are cached in the Zustand store -- safe to call multiple times.
+ * On failure/timeout: leaves lat/lon null and sets status 'denied'.
+ * Consumers apply fallback coordinates only where needed.
  */
 export function useGeolocation(): void {
-  const { geolocationStatus, setGeolocation, setGeolocationDenied } = useAppStore();
+  const geolocationStatus = useAppStore((state) => state.geolocationStatus);
+  const setGeolocation = useAppStore((state) => state.setGeolocation);
+  const setGeolocationDenied = useAppStore((state) => state.setGeolocationDenied);
 
   useEffect(() => {
     // Only request once

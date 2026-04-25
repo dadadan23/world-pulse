@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useCallback } from 'react';
 import { useAppStore } from '../../store/useAppStore';
 import type { Event } from '@shared/types';
 
@@ -132,10 +132,11 @@ function HudEventDetail({ event, onClose }: HudEventDetailProps) {
  * Renders when selectedEvent is set; auto-closes after 8 seconds.
  */
 export function HudEventPanel() {
-  const { selectedEvent, setSelectedEvent } = useAppStore();
+  const selectedEvent = useAppStore((state) => state.selectedEvent);
+  const setSelectedEvent = useAppStore((state) => state.setSelectedEvent);
   const visible = selectedEvent !== null;
 
-  const handleClose = () => setSelectedEvent(null);
+  const handleClose = useCallback(() => setSelectedEvent(null), [setSelectedEvent]);
 
   return (
     <div

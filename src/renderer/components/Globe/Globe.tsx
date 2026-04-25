@@ -224,7 +224,9 @@ function EventPulseRing({ event, isFeatured }: { event: Event; isFeatured: boole
 
 /** Pulsing home beacon at user's geolocation */
 function HomeBeacon() {
-  const { userLat, userLon, geolocationStatus } = useAppStore();
+  const userLat = useAppStore((state) => state.userLat);
+  const userLon = useAppStore((state) => state.userLon);
+  const geolocationStatus = useAppStore((state) => state.geolocationStatus);
   const ringRef = useRef<THREE.Mesh>(null);
 
   useFrame(({ clock }) => {
@@ -235,7 +237,7 @@ function HomeBeacon() {
     (ringRef.current.material as THREE.MeshBasicMaterial).opacity = 0.6 * (1 - t);
   });
 
-  if (geolocationStatus === 'pending' || userLat === null || userLon === null) return null;
+  if (geolocationStatus !== 'granted' || userLat === null || userLon === null) return null;
 
   const position = latLonToVector3(userLat, userLon, GLOBE_RADIUS + 0.005);
 
@@ -244,12 +246,17 @@ function HomeBeacon() {
       {/* Static dot */}
       <mesh>
         <sphereGeometry args={[0.012, 8, 8]} />
-        <meshBasicMaterial color="#00ff88" />
+        <meshBasicMaterial color={OB_COLORS.cyan} />
       </mesh>
       {/* Expanding pulse ring */}
       <mesh ref={ringRef}>
         <ringGeometry args={[0.02, 0.024, 24]} />
-        <meshBasicMaterial color="#00ff88" transparent opacity={0.6} side={THREE.DoubleSide} />
+        <meshBasicMaterial
+          color={OB_COLORS.cyan}
+          transparent
+          opacity={0.6}
+          side={THREE.DoubleSide}
+        />
       </mesh>
     </group>
   );
@@ -270,7 +277,10 @@ function RotatingGlobe({ children, isPaused }: { children: React.ReactNode; isPa
 
 /** All event markers as a group */
 function EventMarkers() {
-  const { events, featuredEvent, setFeaturedEvent, setSelectedEvent } = useAppStore();
+  const events = useAppStore((state) => state.events);
+  const featuredEvent = useAppStore((state) => state.featuredEvent);
+  const setFeaturedEvent = useAppStore((state) => state.setFeaturedEvent);
+  const setSelectedEvent = useAppStore((state) => state.setSelectedEvent);
 
   const eventsWithLocations = useMemo(
     () => events.filter((e) => e.location).slice(0, 30),
@@ -327,7 +337,7 @@ function Stars() {
 
 /** Track camera distance and render city labels */
 function CityLabelsWithTracking() {
-  const { featuredEvent } = useAppStore();
+  const featuredEvent = useAppStore((state) => state.featuredEvent);
   const { camera } = useThree();
   const [cameraDistance, setCameraDistance] = useState(2.4);
 

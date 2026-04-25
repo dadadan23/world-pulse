@@ -100,5 +100,5 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   setGeolocation: (lat, lon) => set({ userLat: lat, userLon: lon, geolocationStatus: 'granted' }),
 
-  setGeolocationDenied: () => set({ userLat: 30, userLon: -40, geolocationStatus: 'denied' }),
+  setGeolocationDenied: () => set({ userLat: null, userLon: null, geolocationStatus: 'denied' }),
 }));
