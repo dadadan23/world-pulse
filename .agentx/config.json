@@ -1,6 +1,17 @@
 {
+  "provider": "github",
+  "integration": "github",
   "mode": "github",
+  "enforceIssues": false,
+  "nextIssueNumber": 26,
+  "created": "2026-02-22T16:57:52.221Z",
+  "updatedAt": "2026-04-25T21:52:21.141Z",
   "repo": "goldsphere-design/world-pulse",
   "project": null,
-  "created": "2026-02-22T16:57:52.221Z"
+  "adapters": {
+    "github": {
+      "repo": "goldsphere-design/world-pulse",
+      "project": null
+    }
+  }
 }

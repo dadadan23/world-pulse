@@ -8,6 +8,16 @@ vi.mock('../Globe/Globe', () => ({
   Globe: () => <div data-testid="globe-mock">Globe</div>,
 }));
 
+// Mock SkyMap since it uses canvas APIs
+vi.mock('../SkyMap/SkyMap', () => ({
+  SkyMap: () => <div data-testid="skymap-mock">SkyMap</div>,
+}));
+
+// Mock useGeolocation so tests don't trigger browser API
+vi.mock('../../hooks/useGeolocation', () => ({
+  useGeolocation: vi.fn(),
+}));
+
 describe('Dashboard', () => {
   beforeEach(() => {
     useAppStore.setState({
@@ -17,41 +27,48 @@ describe('Dashboard', () => {
       featuredEvent: null,
       selectedEvent: null,
       isInitialized: true,
+      skyMapOpen: false,
+      geolocationStatus: 'pending',
+      userLat: null,
+      userLon: null,
     });
   });
 
-  it('should render the Header', () => {
-    render(<Dashboard />);
-    expect(screen.getByText('WORLD PULSE')).toBeInTheDocument();
-  });
-
-  it('should render the Globe section', () => {
+  it('renders the globe canvas', () => {
     render(<Dashboard />);
     expect(screen.getByTestId('globe-mock')).toBeInTheDocument();
   });
 
-  it('should render the EventPanel', () => {
+  it('renders HudStatusPanel with WORLD PULSE heading', () => {
     render(<Dashboard />);
-    // New format: "EVENTS" and "[0]" are separate elements
-    // Use getAllBy since EVENTS appears in both EventPanel and Ticker
-    const eventsLabels = screen.getAllByText('EVENTS');
-    expect(eventsLabels.length).toBeGreaterThanOrEqual(1);
-  });
-
-  it('should render the Ticker', () => {
-    render(<Dashboard />);
-    expect(screen.getByText('WORLD PULSE v0.2.0')).toBeInTheDocument();
-  });
-
-  it('should show all main layout sections together', () => {
-    render(<Dashboard />);
-    // Header
     expect(screen.getByText('WORLD PULSE')).toBeInTheDocument();
-    // Globe (mocked)
-    expect(screen.getByTestId('globe-mock')).toBeInTheDocument();
-    // Event panel - EVENTS appears multiple times, so use getAllBy
-    expect(screen.getAllByText('EVENTS').length).toBeGreaterThanOrEqual(1);
-    // Ticker status bar - "SOURCES" label is now separate from value
-    expect(screen.getByText('SOURCES')).toBeInTheDocument();
+  });
+
+  it('renders HudCollectorPanel with DATA SOURCES heading', () => {
+    render(<Dashboard />);
+    expect(screen.getByText('DATA SOURCES')).toBeInTheDocument();
+  });
+
+  it('renders the Ticker with empty state message when no events', () => {
+    render(<Dashboard />);
+    expect(screen.getByText('AWAITING EVENTS...')).toBeInTheDocument();
+  });
+
+  it('does not render SkyMapModal when skyMapOpen is false', () => {
+    render(<Dashboard />);
+    expect(screen.queryByTestId('skymap-mock')).not.toBeInTheDocument();
+  });
+
+  it('renders SkyMapModal when skyMapOpen is true', () => {
+    useAppStore.setState({ skyMapOpen: true });
+    render(<Dashboard />);
+    expect(screen.getByTestId('skymap-mock')).toBeInTheDocument();
+  });
+
+  it('HudEventPanel is not visible when selectedEvent is null', () => {
+    render(<Dashboard />);
+    // The panel exists but is translated off-screen (selectedEvent is null)
+    // Verify no event type label (e.g., "EARTHQUAKE EVENT") is shown
+    expect(screen.queryByText(/EVENT$/)).not.toBeInTheDocument();
   });
 });

@@ -598,6 +598,59 @@ body {
   transition: all var(--ob-timing-snap) var(--ob-easing-snap);
 }
 
+/* ============================================
+   HUD OVERLAY PANEL
+   Translucent glass-effect panel for fixed overlays
+   ============================================ */
+.ob-hud-panel {
+  background: rgba(10, 10, 15, 0.82);
+  border: 1px solid var(--ob-border-subtle);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  padding: 16px;
+  position: relative;
+}
+
+/* Cyan corner tick marks on HUD panels */
+.ob-hud-panel::before,
+.ob-hud-panel::after {
+  content: '';
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  border-color: var(--ob-accent-cyan);
+  border-style: solid;
+  pointer-events: none;
+  opacity: 0.6;
+}
+.ob-hud-panel::before {
+  top: -1px;
+  left: -1px;
+  border-width: 1px 0 0 1px;
+}
+.ob-hud-panel::after {
+  bottom: -1px;
+  right: -1px;
+  border-width: 0 1px 1px 0;
+}
+
+/* Token aliases for HUD components */
+.border-ob-border-active {
+  border-color: var(--ob-border-active);
+}
+.ob-warning {
+  color: var(--ob-warning);
+}
+.text-ob-warning {
+  color: var(--ob-warning);
+}
+.ob-text-glow {
+  text-shadow: 0 0 8px currentColor;
+}
+.ob-glow {
+  box-shadow: 0 0 6px currentColor;
+}
+
 .ob-transition-fade {
   transition: all var(--ob-timing-fade) var(--ob-easing-mechanical);
 }

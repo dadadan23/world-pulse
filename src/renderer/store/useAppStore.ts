@@ -2,6 +2,8 @@ import { create } from 'zustand';
 import type { Event, ConnectionStatus, CollectorHealth } from '@shared/types';
 import { selectFeaturedEvent } from './eventPrioritizer';
 
+export type GeolocationStatus = 'pending' | 'granted' | 'denied';
+
 interface AppState {
   // Connection state
   connectionStatus: ConnectionStatus;
@@ -18,6 +20,12 @@ interface AppState {
   // UI state
   isInitialized: boolean;
   hasEverConnected: boolean;
+  skyMapOpen: boolean;
+
+  // Geolocation
+  userLat: number | null;
+  userLon: number | null;
+  geolocationStatus: GeolocationStatus;
 
   // Actions
   setConnectionStatus: (status: ConnectionStatus) => void;
@@ -27,6 +35,9 @@ interface AppState {
   setFeaturedEvent: (event: Event | null) => void;
   setSelectedEvent: (event: Event | null) => void;
   setInitialized: (initialized: boolean) => void;
+  setSkyMapOpen: (open: boolean) => void;
+  setGeolocation: (lat: number, lon: number) => void;
+  setGeolocationDenied: () => void;
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
@@ -38,6 +49,10 @@ export const useAppStore = create<AppState>((set, get) => ({
   selectedEvent: null,
   isInitialized: false,
   hasEverConnected: false,
+  skyMapOpen: false,
+  userLat: null,
+  userLon: null,
+  geolocationStatus: 'pending',
 
   // Actions
   setConnectionStatus: (status) =>
@@ -80,4 +95,10 @@ export const useAppStore = create<AppState>((set, get) => ({
   setSelectedEvent: (event) => set({ selectedEvent: event }),
 
   setInitialized: (initialized) => set({ isInitialized: initialized }),
+
+  setSkyMapOpen: (open) => set({ skyMapOpen: open }),
+
+  setGeolocation: (lat, lon) => set({ userLat: lat, userLon: lon, geolocationStatus: 'granted' }),
+
+  setGeolocationDenied: () => set({ userLat: 30, userLon: -40, geolocationStatus: 'denied' }),
 }));

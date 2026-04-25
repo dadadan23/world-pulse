@@ -27,7 +27,7 @@ function Atmosphere() {
       <meshBasicMaterial
         color={OB_COLORS.atmosphere}
         transparent
-        opacity={0.03}
+        opacity={0.15}
         side={THREE.BackSide}
       />
     </mesh>
@@ -38,11 +38,11 @@ function Atmosphere() {
 function AtmosphereRing() {
   return (
     <mesh rotation={[Math.PI / 2, 0, 0]}>
-      <ringGeometry args={[GLOBE_RADIUS * 1.02, GLOBE_RADIUS * 1.08, 64]} />
+      <ringGeometry args={[GLOBE_RADIUS * 1.02, GLOBE_RADIUS * 1.12, 64]} />
       <meshBasicMaterial
         color={OB_COLORS.cyan}
         transparent
-        opacity={0.08}
+        opacity={0.12}
         side={THREE.DoubleSide}
       />
     </mesh>
@@ -72,7 +72,7 @@ function EarthSphere() {
       {/* Thin rim wireframe overlay for technical aesthetic */}
       <mesh>
         <sphereGeometry args={[GLOBE_RADIUS * 1.002, 48, 24]} />
-        <meshBasicMaterial color={OB_COLORS.cyan} wireframe transparent opacity={0.04} />
+        <meshBasicMaterial color={OB_COLORS.cyan} wireframe transparent opacity={0.06} />
       </mesh>
     </>
   );
@@ -222,6 +222,39 @@ function EventPulseRing({ event, isFeatured }: { event: Event; isFeatured: boole
   );
 }
 
+/** Pulsing home beacon at user's geolocation */
+function HomeBeacon() {
+  const { userLat, userLon, geolocationStatus } = useAppStore();
+  const ringRef = useRef<THREE.Mesh>(null);
+
+  useFrame(({ clock }) => {
+    if (!ringRef.current) return;
+    const t = (clock.elapsedTime % 1.8) / 1.8;
+    const scale = 1 + t * 3;
+    ringRef.current.scale.setScalar(scale);
+    (ringRef.current.material as THREE.MeshBasicMaterial).opacity = 0.6 * (1 - t);
+  });
+
+  if (geolocationStatus === 'pending' || userLat === null || userLon === null) return null;
+
+  const position = latLonToVector3(userLat, userLon, GLOBE_RADIUS + 0.005);
+
+  return (
+    <group position={position}>
+      {/* Static dot */}
+      <mesh>
+        <sphereGeometry args={[0.012, 8, 8]} />
+        <meshBasicMaterial color="#00ff88" />
+      </mesh>
+      {/* Expanding pulse ring */}
+      <mesh ref={ringRef}>
+        <ringGeometry args={[0.02, 0.024, 24]} />
+        <meshBasicMaterial color="#00ff88" transparent opacity={0.6} side={THREE.DoubleSide} />
+      </mesh>
+    </group>
+  );
+}
+
 /** Container that auto-rotates and holds the globe + markers */
 function RotatingGlobe({ children, isPaused }: { children: React.ReactNode; isPaused: boolean }) {
   const ref = useRef<THREE.Group>(null);
@@ -237,7 +270,7 @@ function RotatingGlobe({ children, isPaused }: { children: React.ReactNode; isPa
 
 /** All event markers as a group */
 function EventMarkers() {
-  const { events, featuredEvent, setFeaturedEvent } = useAppStore();
+  const { events, featuredEvent, setFeaturedEvent, setSelectedEvent } = useAppStore();
 
   const eventsWithLocations = useMemo(
     () => events.filter((e) => e.location).slice(0, 30),
@@ -253,7 +286,10 @@ function EventMarkers() {
             <EventMarker
               event={event}
               isFeatured={isFeatured}
-              onClick={() => setFeaturedEvent(event)}
+              onClick={() => {
+                setFeaturedEvent(event);
+                setSelectedEvent(event);
+              }}
             />
             <EventRing event={event} isFeatured={isFeatured} />
             <EventPulseRing event={event} isFeatured={isFeatured} />
@@ -306,86 +342,48 @@ function CityLabelsWithTracking() {
   );
 }
 
-/** Main Globe component */
+/** Main Globe component - fills its container (100vw x 100vh from Dashboard) */
 export function Globe() {
   const [isInteracting, setIsInteracting] = useState(false);
-  const { events } = useAppStore();
-  const eventsWithLocations = events.filter((e) => e.location).length;
 
   const handlePointerDown = useCallback(() => setIsInteracting(true), []);
   const handlePointerUp = useCallback(() => {
-    // Resume rotation after a brief delay
     setTimeout(() => setIsInteracting(false), 2000);
   }, []);
 
   return (
-    <div className="ob-panel p-4 flex flex-col h-full">
-      <div className="ob-panel-inner flex flex-col h-full">
-        {/* Header */}
-        <div className="flex items-center justify-between border-b border-ob-border pb-3 mb-3">
-          <div className="flex items-center gap-2">
-            <span className="ob-heading text-sm text-ob-text tracking-wide">GLOBE</span>
-            <span className="ob-label text-ob-cyan">[GEOGRAPHIC]</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <div className="w-1 h-1 rounded-full bg-ob-cyan animate-pulse" />
-            <span className="ob-label text-[9px] text-ob-text-dim">3D VIEW</span>
-          </div>
-        </div>
+    <div
+      className="w-full h-full cursor-grab active:cursor-grabbing"
+      onPointerDown={handlePointerDown}
+      onPointerUp={handlePointerUp}
+    >
+      <Canvas
+        camera={{ position: [0, 0.4, 2.6], fov: 45 }}
+        style={{ background: 'transparent', width: '100%', height: '100%' }}
+        gl={{ antialias: true, alpha: true }}
+      >
+        {/* Lighting */}
+        <ambientLight intensity={0.5} />
+        <directionalLight position={[5, 5, 5]} intensity={0.8} color={OB_COLORS.cyan} />
+        <hemisphereLight args={['#102030', '#000000', 0.3]} />
 
-        {/* 3D Globe Canvas */}
-        <div
-          className="flex-1 min-h-0 relative cursor-grab active:cursor-grabbing"
-          onPointerDown={handlePointerDown}
-          onPointerUp={handlePointerUp}
-        >
-          <Canvas
-            camera={{ position: [0, 0.6, 2.8], fov: 40 }}
-            style={{ background: 'transparent' }}
-            gl={{ antialias: true, alpha: true }}
-          >
-            {/* Lighting for better landmass definition */}
-            <ambientLight intensity={0.6} />
-            <directionalLight position={[5, 5, 5]} intensity={0.6} color={OB_COLORS.cyan} />
-            <hemisphereLight args={['#10202A', '#000000', 0.2]} />
-
-            <Stars />
-            <RotatingGlobe isPaused={isInteracting}>
-              <EarthSphere />
-              <Atmosphere />
-              <AtmosphereRing />
-              <EventMarkers />
-              <CityLabelsWithTracking />
-            </RotatingGlobe>
-            <OrbitControls
-              enableZoom={true}
-              enablePan={false}
-              minDistance={1.3}
-              maxDistance={8}
-              zoomSpeed={0.6}
-            />
-          </Canvas>
-        </div>
-
-        {/* Legend */}
-        <div className="mt-3 pt-3 border-t border-ob-border flex items-center gap-4 text-[10px]">
-          <div className="flex items-center gap-1.5">
-            <div className="w-2 h-2 rounded-full bg-ob-amber" />
-            <span className="ob-label text-ob-text-dim">FEATURED</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <div className="w-2 h-2 rounded-full bg-ob-danger" />
-            <span className="ob-label text-ob-text-dim">HIGH SEV</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <div className="w-2 h-2 rounded-full bg-ob-cyan" />
-            <span className="ob-label text-ob-text-dim">EVENT</span>
-          </div>
-          <span className="ml-auto ob-label text-ob-text-dim tabular-nums">
-            {eventsWithLocations} PLOTTED
-          </span>
-        </div>
-      </div>
+        <Stars />
+        <RotatingGlobe isPaused={isInteracting}>
+          <EarthSphere />
+          <Atmosphere />
+          <AtmosphereRing />
+          <HomeBeacon />
+          <EventMarkers />
+          <CityLabelsWithTracking />
+        </RotatingGlobe>
+        <OrbitControls
+          enableZoom={true}
+          enablePan={false}
+          minDistance={1.3}
+          maxDistance={8}
+          zoomSpeed={0.6}
+        />
+      </Canvas>
     </div>
   );
 }
