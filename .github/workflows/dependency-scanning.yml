@@ -19,7 +19,7 @@ jobs:
     name: Scan .NET Dependencies
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Check for .NET projects
         id: detect
@@ -68,7 +68,7 @@ jobs:
     name: Scan Python Dependencies
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Check for Python projects
         id: detect
@@ -121,7 +121,7 @@ jobs:
     name: Scan Node.js Dependencies
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Check for Node.js projects
         id: detect
