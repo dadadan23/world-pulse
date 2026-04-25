@@ -1,8 +1,6 @@
 {
-  "version": "8.4.36",
-  "provider": "local",
-  "mode": "local",
-  "integration": "local",
+  "version": "5.3.1",
+  "mode": "github",
   "installedAt": "2026-02-22T16:57:52.221Z",
-  "updatedAt": "2026-04-25T20:11:59.547Z"
+  "updatedAt": "2026-02-22T16:57:52.221Z"
 }

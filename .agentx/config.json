@@ -1,17 +1,6 @@
 {
-  "provider": "github",
-  "integration": "github",
   "mode": "github",
-  "enforceIssues": false,
-  "nextIssueNumber": 26,
-  "created": "2026-02-22T16:57:52.221Z",
-  "updatedAt": "2026-04-25T22:04:12.002Z",
-  "repo": "dadadan23/world-pulse",
+  "repo": "goldsphere-design/world-pulse",
   "project": null,
-  "adapters": {
-    "github": {
-      "repo": "dadadan23/world-pulse",
-      "project": null
-    }
-  }
+  "created": "2026-02-22T16:57:52.221Z"
 }
