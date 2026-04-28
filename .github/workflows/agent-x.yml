@@ -28,7 +28,7 @@ jobs:
     steps:
       - name: Determine Agent
         id: route
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: |
             // Get issue number
