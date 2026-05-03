@@ -175,8 +175,9 @@ export function drawInteriorBorders(
   ctx.setLineDash([6, 4]);
   for (const coastline of coastlines) {
     if (coastline.length < 4) continue;
-    const cx = coastline.reduce((s, p) => s + p[0], 0) / coastline.length;
-    const cy = coastline.reduce((s, p) => s + p[1], 0) / coastline.length;
+    const sum = coastline.reduce((acc, p) => [acc[0] + p[0], acc[1] + p[1]], [0, 0]);
+    const cx = sum[0] / coastline.length;
+    const cy = sum[1] / coastline.length;
     ctx.beginPath();
     const startX = cx + (coastline[0][0] - cx) * 0.98;
     const startY = cy + (coastline[0][1] - cy) * 0.98;
