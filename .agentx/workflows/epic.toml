@@ -1,9 +1,14 @@
 # Epic Workflow — Large initiatives broken into features/stories
-# PM creates PRD and child issues, then each follows its own workflow
+# PM creates PRD and child issues; engineer tracks execute in parallel tracks when defined;
+# architect reviews before merge gate.
+#
+# Parallel track execution compresses calendar time by ~30–40% vs. sequential.
+# Define [parallel_tracks] when an epic's stories split into independent data and render layers
+# (e.g., Globe GeoJSON epic #40: Track A = data pipeline, Track B = render layer).
 
 [workflow]
 name = "epic"
-description = "Large initiative — PM breaks into features and stories"
+description = "Large initiative — PM breaks into features and stories, parallel tracks when possible"
 type = "epic"
 
 [[steps]]
@@ -15,5 +20,62 @@ status_on_complete = "Ready"
 output = "docs/prd/PRD-{{issue_number}}.md"
 template = ".github/templates/PRD-TEMPLATE.md"
 
-# After PRD, PM creates child feature/story issues.
-# Each child follows its own workflow (feature.toml, story.toml, etc.)
+# --- Parallel track execution (optional) ---
+# When an epic has two independent workstreams, define them here.
+# Both tracks start simultaneously after PRD is ready.
+# Track B steps that need Track A output declare it via `needs_track`.
+# A merge gate (architect review) runs after both tracks complete.
+
+[parallel_tracks]
+enabled = true
+description = "Run Track A and Track B concurrently; merge gate before reviewer"
+
+[parallel_tracks.track_a]
+label = "globe-data"
+description = "Data pipeline — GeoJSON sourcing, normalization, texture abstraction"
+stories = ["#56", "#57", "#41", "#42"]
+# Sequential within track: #56 → #57 → #41 → #42
+
+[parallel_tracks.track_b]
+label = "globe-render"
+description = "Render layer — shaders, Three.js geometry, visual effects"
+stories = ["#44", "#45", "#43"]
+needs_track_a_story = "#41"
+# #43 needs Track A #41 output; #44 and #45 need only #56 (can start earlier)
+
+[[steps]]
+id = "track-a"
+title = "Track A: {{track_a.description}}"
+agent = "engineer"
+parallel_group = "main-tracks"
+labels = ["globe-data"]
+status_on_start = "In Progress"
+status_on_complete = "In Review"
+
+[[steps]]
+id = "track-b"
+title = "Track B: {{track_b.description}}"
+agent = "engineer"
+parallel_group = "main-tracks"
+labels = ["globe-render"]
+status_on_start = "In Progress"
+status_on_complete = "In Review"
+# Note: Track B stories that depend on Track A output are gated within the track
+
+[[steps]]
+id = "merge-gate"
+title = "Architect merge gate — validate both tracks before review"
+agent = "architect"
+needs = ["track-a", "track-b"]
+status_on_start = "In Review"
+status_on_complete = "In Review"
+
+[[steps]]
+id = "review"
+title = "Code review — full epic"
+agent = "reviewer"
+needs = ["merge-gate"]
+status_on_start = "In Review"
+status_on_complete = "Done"
+output = "docs/reviews/REVIEW-{{issue_number}}.md"
+template = ".github/templates/REVIEW-TEMPLATE.md"

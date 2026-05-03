@@ -485,13 +485,25 @@ cmd_hook() {
  local phase="${1:-}"
  local agent="${2:-}"
  local issue="${3:-}"
+ local extra="${4:-}"  # artifacts (complete) or error message (failed)
 
  if [[ -z "$phase" || -z "$agent" ]]; then
- echo -e "${RED}Usage: agentx hook start|finish <agent> [issue]${NC}"
+ echo -e "${RED}Usage: agentx hook start|complete|failed <agent> [issue] [artifacts|error]${NC}"
  return 1
  fi
 
  ensure_dir "$(dirname "$STATE_FILE")"
+
+ if [[ ! -f "$STATE_FILE" ]]; then
+ echo '{}' > "$STATE_FILE"
+ fi
+
+ local ts
+ ts=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+ local issue_val="null"
+ [[ -n "$issue" ]] && issue_val="\"$issue\""
+ local branch
+ branch=$(git branch --show-current 2>/dev/null || echo "unknown")
 
  case "$phase" in
  start)
@@ -540,47 +552,60 @@ cmd_hook() {
  echo -e " ${GREEN}[PASS] No blockers${NC}"
  fi
 
- # 2. Update agent state
- local status="working"
- [[ "$agent" == "reviewer" ]] && status="reviewing"
- local ts
- ts=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
- local issue_val="null"
- [[ -n "$issue" ]] && issue_val="$issue"
-
- if [[ ! -f "$STATE_FILE" ]]; then
- echo '{}' > "$STATE_FILE"
- fi
-
- jq --arg a "$agent" --arg s "$status" --arg t "$ts" --argjson i "$issue_val" \
- '.[$a] = { status: $s, issue: $i, lastActivity: $t }' \
+ # 2. Write structured start state: { role, status, issue, branch, startedAt }
+ jq --arg role "$agent" --arg branch "$branch" --arg t "$ts" --argjson i "$issue_val" \
+ '.[$role] = { role: $role, status: "active", issue: $i, branch: $branch, startedAt: $t }' \
  "$STATE_FILE" > "$STATE_FILE.tmp" && mv "$STATE_FILE.tmp" "$STATE_FILE"
 
- echo -e " ${GREEN}[PASS] $agent -> $status (issue #$issue)${NC}"
+ echo -e " ${GREEN}[PASS] $agent -> active (issue #$issue, branch: $branch)${NC}"
  echo ""
  ;;
- finish)
- echo -e "\n ${CYAN}Agent Hook: FINISH${NC}"
+ complete|finish)
+ echo -e "\n ${CYAN}Agent Hook: COMPLETE${NC}"
  echo -e " ${GRAY}---------------------------------------------${NC}"
 
- local ts
- ts=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
- local issue_val="null"
- [[ -n "$issue" ]] && issue_val="$issue"
+ # Read startedAt from existing state (if present)
+ local started_at
+ started_at=$(jq -r --arg a "$agent" '.[$a].startedAt // "unknown"' "$STATE_FILE" 2>/dev/null || echo "unknown")
 
- if [[ ! -f "$STATE_FILE" ]]; then
- echo '{}' > "$STATE_FILE"
+ # Parse artifacts from extra arg (comma-separated list → JSON array)
+ local artifacts_json="[]"
+ if [[ -n "$extra" ]]; then
+ artifacts_json=$(echo "$extra" | jq -R 'split(",")')
  fi
 
- jq --arg a "$agent" --arg t "$ts" --argjson i "$issue_val" \
- '.[$a] = { status: "done", issue: $i, lastActivity: $t }' \
+ # Write structured complete state
+ jq --arg role "$agent" --arg branch "$branch" \
+ --arg started "$started_at" --arg completed "$ts" \
+ --argjson i "$issue_val" --argjson artifacts "$artifacts_json" \
+ '.[$role] = { role: $role, status: "complete", issue: $i, branch: $branch, startedAt: $started, completedAt: $completed, artifacts: $artifacts }' \
  "$STATE_FILE" > "$STATE_FILE.tmp" && mv "$STATE_FILE.tmp" "$STATE_FILE"
 
- echo -e " ${GREEN}[PASS] $agent -> done (issue #$issue)${NC}"
+ echo -e " ${GREEN}[PASS] $agent -> complete (issue #$issue)${NC}"
+ echo ""
+ ;;
+ failed)
+ echo -e "\n ${CYAN}Agent Hook: FAILED${NC}"
+ echo -e " ${GRAY}---------------------------------------------${NC}"
+
+ # Read startedAt from existing state
+ local started_at
+ started_at=$(jq -r --arg a "$agent" '.[$a].startedAt // "unknown"' "$STATE_FILE" 2>/dev/null || echo "unknown")
+
+ local error_msg="${extra:-unspecified error}"
+
+ # Write structured failed state
+ jq --arg role "$agent" --arg branch "$branch" \
+ --arg started "$started_at" --arg failed "$ts" \
+ --arg error "$error_msg" --argjson i "$issue_val" \
+ '.[$role] = { role: $role, status: "failed", issue: $i, branch: $branch, startedAt: $started, failedAt: $failed, error: $error }' \
+ "$STATE_FILE" > "$STATE_FILE.tmp" && mv "$STATE_FILE.tmp" "$STATE_FILE"
+
+ echo -e " ${RED}[FAIL] $agent -> failed (issue #$issue): $error_msg${NC}"
  echo ""
  ;;
  *)
- echo -e "${RED}Unknown phase: $phase (use start|finish)${NC}"
+ echo -e "${RED}Unknown phase: $phase (use start|complete|failed)${NC}"
  return 1
  ;;
  esac

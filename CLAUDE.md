@@ -4,7 +4,93 @@
 
 World Pulse is a real-time information radiator that visualizes global events on an interactive 3D globe. It is designed to run 24/7 as an ambient dashboard on dedicated hardware (TV, iPad, monitor). The app streams live data from multiple sources (earthquakes, ISS tracking, aurora, volcanoes, asteroids, planet visibility) and renders them on a Three.js globe with a dark "Oblivion" aesthetic.
 
-**Current status:** v0.1.0 — Phase 0 (foundation) is complete; Phase 1 (backend + MVP globe) is in progress.
+**Current status:** v0.1.0 — Phase 0 (foundation) is complete; Phase 1 (backend + MVP globe) is substantially in progress.
+
+---
+
+## Project Status (as of 2026-05-03)
+
+| Area | Status | Notes |
+|---|---|---|
+| CI/CD | Fixing | Actions upgraded to Node.js 24-compatible versions (branch `claude/plan-world-pulse-mission-qoZIF`). Green CI is a prerequisite for all other merges. |
+| Globe fidelity | 0% (blocked) | Requires GeoJSON pipeline (#41, #42) then render layer (#43–#45). See epic #40. |
+| Oblivion design system | ~25% | HUD layout done; LoadingScreen, StatusBadge, EventPanel, Typography stories remain (#48–#53, #59). |
+| Degraded UX | ~25% | Disconnect overlay (#63) and reconnection recovery (#58) in progress. |
+| Reliability | In progress | Collector health (#64), Electron crash recovery (#67), Event TTL (#60) open. |
+| Release readiness | ~50% | `release.yml` Electron packaging (#66) open; smoke tests not yet written. |
+| AgentX knowledge layer | New | `.agentx/knowledge/` now exists with 9 skills, 3 instructions, 4 templates. |
+| Agent coordination | Active | Lifecycle tracking wired in `agentx.sh`/`agentx.ps1`. Risk-surface gates active in `story.toml`, `bug.toml`, `docs.toml`. |
+
+## Active Branches
+
+| Branch | Purpose | Status |
+|---|---|---|
+| `claude/plan-world-pulse-mission-qoZIF` | Mission execution (CI fix, AgentX, knowledge layer, CLAUDE.md) | Active — this branch |
+| `copilot/fix-ci-failure-and-merge-conflicts` | Copilot's earlier CI fix attempt | Superseded by our branch |
+| `copilot/upgrade-github-actions-to-v6` | PR #86 — Copilot CI upgrade | Open, superseded |
+| `feature/sprint2-batch3` | Sprint 2 batch 3 features | In progress |
+| `fix/pr78-ci-retrigger` | CI retrigger for PR #78 | In progress |
+
+**Before starting work:** run `git fetch --all` and check `.agentx/state/agent-status.json` for active branches on the same issue.
+
+## AgentX Knowledge Layer
+
+`.agentx/knowledge/` now exists. **Load the relevant skill(s) before beginning any issue.**
+
+| Directory | Contents |
+|---|---|
+| `.agentx/knowledge/skills/` | 9 skills: `oblivion-component` (P0), `react-component`, `three-js-scene`, `socket-io-event`, `electron-ipc`, `vitest-unit`, `playwright-e2e`, `github-actions-workflow`, `typescript-type` |
+| `.agentx/knowledge/instructions/` | `security.md`, `commit-standards.md`, `performance.md` |
+| `.agentx/knowledge/templates/` | `pr-description.md`, `execution-plan.md`, `adr.md`, `changelog-entry.md` |
+
+**Always load `oblivion-component.md` for any UI change.** It is the visual identity of the project.
+
+## Severity Gate Rules
+
+Any change touching the following paths is **high risk surface** and requires architect review, regardless of file count:
+
+| Pattern | Reason |
+|---|---|
+| `src/shared/**` | Cross-boundary TypeScript contracts — breaks frontend and backend simultaneously |
+| `src/server/**` | Backend protocol — affects all connected clients |
+| `*Contract*`, `*Schema*`, `*Types*` | Shared type contract filenames |
+| `.github/workflows/**` | CI pipeline — breaks all PR gates |
+
+This is enforced in `.agentx/workflows/story.toml`, `bug.toml`, and `docs.toml` via the `[routing]` section. The `agentx.sh hook start` command checks this before routing.
+
+## Critical Path
+
+```
+1. CI green (branch claude/plan-world-pulse-mission-qoZIF merged)
+   ↓
+2. Knowledge Layer loaded (done — .agentx/knowledge/)
+   ↓
+3. Globe GeoJSON epic (#40): Track A (data pipeline) → Track B (render)
+   ↓
+4. Oblivion design system completion (#46, #48–#53, #59)
+   ↓
+5. Degraded UX stories (#58, #63)
+   ↓
+6. Release readiness (#66, smoke tests)
+```
+
+Do not start Globe Track B before Track A GeoJSON output is available.
+
+## Agent Coordination
+
+Two agents are active: **Claude Code** and **GitHub Copilot SWE**. Collisions are a real risk.
+
+**Before starting any issue:**
+
+1. Check `.agentx/state/agent-status.json` for agents with `"status": "active"` on the same issue or branch.
+2. If Copilot is active on the same issue, wait or post a coordination comment on the GitHub issue.
+3. When starting: `./agentx/agentx.sh hook start <role> <issue-number>`
+4. When done: `./.agentx/agentx.sh hook complete <role> <issue-number>`
+5. On error: `./.agentx/agentx.sh hook failed <role> <issue-number> "<error message>"`
+
+The state file is at `.agentx/state/agent-status.json`. It records `{ role, status, issue, branch, startedAt }`.
+
+---
 
 ## Operating Principles
 

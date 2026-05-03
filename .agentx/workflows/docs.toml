@@ -1,10 +1,37 @@
 # Documentation Workflow — Docs-only changes
-# Engineer writes, no formal review needed for pure docs
+# Engineer writes; escalates to architect when docs touch shared contracts or CI pipelines.
 
 [workflow]
 name = "docs"
-description = "Documentation-only changes — direct to engineer"
+description = "Documentation-only changes — direct to engineer; architect review required for high-risk surface files"
 type = "docs"
+
+# Risk surface: docs changes that touch these paths require architect review.
+[routing]
+risk_surface_patterns = [
+  "src/shared/**",
+  "src/server/**",
+  "*Contract*",
+  "*Schema*",
+  "*Types*",
+  ".github/workflows/**"
+]
+
+[routing.routes.standard]
+condition = "file_count <= 3 AND risk_surface == 'low'"
+route = ["engineer"]
+
+[routing.routes.elevated]
+condition = "file_count > 3 OR risk_surface == 'high'"
+route = ["architect", "engineer", "reviewer"]
+
+[[steps]]
+id = "architect-review"
+title = "Architect review: {{doc_title}}"
+agent = "architect"
+condition = "risk_surface == 'high'"
+status_on_start = "In Progress"
+status_on_complete = "In Progress"
 
 [[steps]]
 id = "write"

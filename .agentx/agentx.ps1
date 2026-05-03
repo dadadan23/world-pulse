@@ -28,8 +28,11 @@ param(
  [string]$Type,
 
  # hook subcommand params
- [ValidateSet('start', 'finish', '')]
+ [ValidateSet('start', 'complete', 'failed', 'finish', '')]
  [string]$Phase,
+
+ # artifacts (complete) or error message (failed)
+ [string]$Extra,
 
  # output format
  [switch]$Json
@@ -480,9 +483,17 @@ function Show-Workflow {
 
 function Run-Hook {
  if (-not $Phase -or -not $Agent) {
- Write-Host "Usage: agentx hook -Phase start|finish -Agent <name> -Issue <n>" -ForegroundColor Red
+ Write-Host "Usage: agentx hook -Phase start|complete|failed -Agent <name> -Issue <n> [-Extra <artifacts|error>]" -ForegroundColor Red
  return
  }
+
+ Ensure-Dir (Split-Path $StateFile -Parent)
+ if (-not (Test-Path $StateFile)) { '{}' | Set-Content $StateFile -Encoding UTF8 }
+
+ $now = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
+ $issueVal = if ($Issue -gt 0) { $Issue } else { $null }
+ $branch = (git branch --show-current 2>$null) -replace "`n",""
+ if (-not $branch) { $branch = "unknown" }
 
  switch ($Phase) {
  'start' {
@@ -491,24 +502,17 @@ function Run-Hook {
 
  # 1. Check dependencies (if issue provided)
  if ($Issue -gt 0) {
- $IssueNumber = $Issue
  Write-Host " Checking dependencies for #$Issue..." -ForegroundColor DarkGray
 
  $issueData = $null
  if ($script:Mode -eq "github") {
- # Fetch from GitHub
  try {
  $ghJson = gh issue view $Issue --json body,title,state 2>&1
- if ($LASTEXITCODE -eq 0) {
- $issueData = $ghJson | ConvertFrom-Json
- }
+ if ($LASTEXITCODE -eq 0) { $issueData = $ghJson | ConvertFrom-Json }
  } catch { }
  } else {
- # Fetch from local
  $issueFile = Join-Path $IssuesDir "$Issue.json"
- if (Test-Path $issueFile) {
- $issueData = Get-Content $issueFile -Raw | ConvertFrom-Json
- }
+ if (Test-Path $issueFile) { $issueData = Get-Content $issueFile -Raw | ConvertFrom-Json }
  }
 
  if ($issueData) {
@@ -524,16 +528,14 @@ function Run-Hook {
  $bJson = gh issue view $bid --json state,title 2>&1
  if ($LASTEXITCODE -eq 0) {
  $blocker = $bJson | ConvertFrom-Json
- $blockerState = $blocker.state
- $blockerTitle = $blocker.title
+ $blockerState = $blocker.state; $blockerTitle = $blocker.title
  }
  } catch { }
  } else {
  $blockerFile = Join-Path $IssuesDir "$bid.json"
  if (Test-Path $blockerFile) {
  $blocker = Get-Content $blockerFile -Raw | ConvertFrom-Json
- $blockerState = $blocker.state
- $blockerTitle = $blocker.title
+ $blockerState = $blocker.state; $blockerTitle = $blocker.title
  }
  }
  if ($blockerState -and $blockerState -ne "closed") {
@@ -547,19 +549,52 @@ function Run-Hook {
  }
  }
 
- # 2. Update agent state
- $status = if ($Agent -eq 'reviewer') { 'reviewing' } else { 'working' }
- Update-AgentState $Agent $status $Issue
- Write-Host " [PASS] $Agent -> $status (issue #$Issue)" -ForegroundColor Green
+ # 2. Write structured start state: { role, status, issue, branch, startedAt }
+ $state = Get-Content $StateFile -Raw | ConvertFrom-Json
+ $state | Add-Member -NotePropertyName $Agent -NotePropertyValue ([ordered]@{
+ role = $Agent; status = "active"; issue = $issueVal
+ branch = $branch; startedAt = $now
+ }) -Force
+ $state | ConvertTo-Json -Depth 5 | Set-Content $StateFile -Encoding UTF8
+
+ Write-Host " [PASS] $Agent -> active (issue #$Issue, branch: $branch)" -ForegroundColor Green
  Write-Host ""
  }
- 'finish' {
- Write-Host "`n Agent Hook: FINISH" -ForegroundColor Cyan
+ { $_ -in 'complete','finish' } {
+ Write-Host "`n Agent Hook: COMPLETE" -ForegroundColor Cyan
  Write-Host " ---------------------------------------------" -ForegroundColor DarkGray
 
- # 1. Mark agent as done
- Update-AgentState $Agent 'done' $Issue
- Write-Host " [PASS] $Agent -> done (issue #$Issue)" -ForegroundColor Green
+ $state = Get-Content $StateFile -Raw | ConvertFrom-Json
+ $startedAt = if ($state.$Agent.startedAt) { $state.$Agent.startedAt } else { "unknown" }
+
+ # Parse artifacts from Extra (comma-separated)
+ $artifacts = @()
+ if ($Extra) { $artifacts = $Extra -split "," | ForEach-Object { $_.Trim() } }
+
+ $state | Add-Member -NotePropertyName $Agent -NotePropertyValue ([ordered]@{
+ role = $Agent; status = "complete"; issue = $issueVal
+ branch = $branch; startedAt = $startedAt; completedAt = $now; artifacts = $artifacts
+ }) -Force
+ $state | ConvertTo-Json -Depth 5 | Set-Content $StateFile -Encoding UTF8
+
+ Write-Host " [PASS] $Agent -> complete (issue #$Issue)" -ForegroundColor Green
+ Write-Host ""
+ }
+ 'failed' {
+ Write-Host "`n Agent Hook: FAILED" -ForegroundColor Cyan
+ Write-Host " ---------------------------------------------" -ForegroundColor DarkGray
+
+ $state = Get-Content $StateFile -Raw | ConvertFrom-Json
+ $startedAt = if ($state.$Agent.startedAt) { $state.$Agent.startedAt } else { "unknown" }
+ $errorMsg = if ($Extra) { $Extra } else { "unspecified error" }
+
+ $state | Add-Member -NotePropertyName $Agent -NotePropertyValue ([ordered]@{
+ role = $Agent; status = "failed"; issue = $issueVal
+ branch = $branch; startedAt = $startedAt; failedAt = $now; error = $errorMsg
+ }) -Force
+ $state | ConvertTo-Json -Depth 5 | Set-Content $StateFile -Encoding UTF8
+
+ Write-Host " [FAIL] $Agent -> failed (issue #$Issue): $errorMsg" -ForegroundColor Red
  Write-Host ""
  }
  }
