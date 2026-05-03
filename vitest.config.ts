@@ -1,9 +1,10 @@
 import { defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
 import path from 'path';
+import { geojsonPlugin } from './scripts/vite-plugins/geojson';
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), geojsonPlugin()],
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),

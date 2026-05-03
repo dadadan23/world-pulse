@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import { useAppStore } from '../../store/useAppStore';
 import { createEarthTextures } from './textureRenderer';
 import { latLonToVector3 } from './projection';
+import { ne110mCoastlineSource } from './geoJsonCoastlineSource';
 import { CityLabels } from './CityLabels';
 import type { Event } from '@shared/types';
 
@@ -52,7 +53,7 @@ function AtmosphereRing() {
 
 /** The main earth sphere with canvas texture */
 function EarthSphere() {
-  const textures = useMemo(() => createEarthTextures(), []);
+  const textures = useMemo(() => createEarthTextures(ne110mCoastlineSource), []);
 
   return (
     <>
