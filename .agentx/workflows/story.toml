@@ -1,10 +1,38 @@
 # Story Workflow — Small, well-defined work items
-# Skips PM/Architect if scope is clear (<=3 files)
 
 [workflow]
 name = "story"
-description = "Small well-defined work — direct to engineer"
+description = "Small well-defined work — direct to engineer, escalates to architect on high-risk surface"
 type = "story"
+
+# Risk surface: files matching these patterns require architect review regardless of file count.
+# Patterns: src/shared/** (cross-boundary contracts), src/server/** (backend protocol),
+# *Contract*/*Schema*/*Types* (type contract filenames), .github/workflows/** (CI pipeline).
+[routing]
+risk_surface_patterns = [
+  "src/shared/**",
+  "src/server/**",
+  "*Contract*",
+  "*Schema*",
+  "*Types*",
+  ".github/workflows/**"
+]
+
+[routing.routes.standard]
+condition = "file_count <= 3 AND risk_surface == 'low'"
+route = ["engineer", "reviewer"]
+
+[routing.routes.elevated]
+condition = "file_count > 3 OR risk_surface == 'high'"
+route = ["architect", "engineer", "reviewer"]
+
+[[steps]]
+id = "architect-review"
+title = "Architect review: {{story_title}}"
+agent = "architect"
+condition = "risk_surface == 'high'"
+status_on_start = "In Progress"
+status_on_complete = "In Progress"
 
 [[steps]]
 id = "implement"
