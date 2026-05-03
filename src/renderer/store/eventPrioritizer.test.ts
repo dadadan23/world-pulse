@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { selectFeaturedEvent, prioritizeTickerEvents } from './eventPrioritizer';
+import {
+  selectFeaturedEvent,
+  prioritizeTickerEvents,
+  rotateFeaturedEvent,
+} from './eventPrioritizer';
 import type { Event } from '@shared/types';
 
 function makeEvent(overrides: Partial<Event> & { id: string }): Event {
@@ -103,5 +107,65 @@ describe('prioritizeTickerEvents', () => {
     expect(result[0].id).toBe('eq1');
     expect(result[1].id).toBe('wx1');
     expect(result[2].id).toBe('eq2');
+  });
+});
+
+describe('rotateFeaturedEvent', () => {
+  it('returns null for empty array', () => {
+    expect(rotateFeaturedEvent([], null)).toBeNull();
+  });
+
+  it('returns null for empty array even with a current event', () => {
+    expect(rotateFeaturedEvent([], makeEvent({ id: 'x' }))).toBeNull();
+  });
+
+  it('returns unchanged event when it is the only one', () => {
+    const event = makeEvent({ id: 'sole', severity: 5 });
+    expect(rotateFeaturedEvent([event], event)?.id).toBe('sole');
+  });
+
+  it('rotates to next highest-severity event', () => {
+    const current = makeEvent({ id: 'current', severity: 8 });
+    const next = makeEvent({ id: 'next', severity: 6 });
+    const low = makeEvent({ id: 'low', severity: 2 });
+    expect(rotateFeaturedEvent([current, next, low], current)?.id).toBe('next');
+  });
+
+  it('uses timestamp tiebreaker when rotating', () => {
+    const now = Date.now();
+    const current = makeEvent({ id: 'current', severity: 8, timestamp: now });
+    const a = makeEvent({ id: 'a', severity: 5, timestamp: now - 2000, type: 'weather' });
+    const b = makeEvent({ id: 'b', severity: 5, timestamp: now - 1000, type: 'volcano' });
+    expect(rotateFeaturedEvent([current, a, b], current)?.id).toBe('b');
+  });
+
+  it('selects best from all events when current is null', () => {
+    const events = [makeEvent({ id: 'low', severity: 2 }), makeEvent({ id: 'high', severity: 9 })];
+    expect(rotateFeaturedEvent(events, null)?.id).toBe('high');
+  });
+
+  it('wraps around: after last candidate returns most recent fallback', () => {
+    // All events outside the 30-min window -> fallback path kicks in
+    const staleTs = Date.now() - 2 * 60 * 60 * 1000;
+    const current = makeEvent({ id: 'current', severity: 9, timestamp: staleTs });
+    const other = makeEvent({ id: 'other', severity: 3, timestamp: staleTs + 1000 });
+    // current excluded -> only 'other' remains -> returned
+    expect(rotateFeaturedEvent([current, other], current)?.id).toBe('other');
+  });
+
+  it('prefers fresh events over stale when rotating', () => {
+    const now = Date.now();
+    const staleTs = now - 2 * 60 * 60 * 1000;
+    const current = makeEvent({ id: 'current', severity: 9, timestamp: now });
+    // 'stale-high' has higher numeric severity but is outside the 30-min window
+    const staleHigh = makeEvent({ id: 'stale-high', severity: 8, timestamp: staleTs });
+    // 'fresh-mid' is inside the 30-min window
+    const freshMid = makeEvent({
+      id: 'fresh-mid',
+      severity: 6,
+      timestamp: now - 1000,
+      type: 'weather',
+    });
+    expect(rotateFeaturedEvent([current, staleHigh, freshMid], current)?.id).toBe('fresh-mid');
   });
 });

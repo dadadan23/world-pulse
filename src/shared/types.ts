@@ -38,6 +38,28 @@ export type ConnectionStatus =
   | 'error'
   | 'dormant-reconnecting';
 
+/**
+ * Named severity levels for events, ordered from highest to lowest.
+ * Maps to the numeric 0-10 severity scale used on the Event interface.
+ */
+export type SeverityLevel = 'critical' | 'high' | 'medium' | 'low' | 'info';
+
+/**
+ * Canonical numeric value for each named severity level (0-10 scale).
+ * Use these constants when creating events or comparing against Event.severity
+ * rather than using raw numbers, so that prioritization thresholds stay
+ * consistent across the codebase.
+ *
+ * Example: `{ severity: SEVERITY_LEVELS.critical }` produces severity 9.
+ */
+export const SEVERITY_LEVELS: Record<SeverityLevel, number> = {
+  critical: 9,
+  high: 7,
+  medium: 5,
+  low: 3,
+  info: 1,
+};
+
 export type EventType =
   | 'earthquake'
   | 'weather'

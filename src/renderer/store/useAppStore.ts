@@ -1,6 +1,9 @@
 import { create } from 'zustand';
 import type { Event, ConnectionStatus, CollectorHealth } from '@shared/types';
-import { selectFeaturedEvent } from './eventPrioritizer';
+import {
+  selectFeaturedEvent,
+  rotateFeaturedEvent as rotateFeaturedEventFn,
+} from './eventPrioritizer';
 
 export type GeolocationStatus = 'pending' | 'granted' | 'denied';
 
@@ -33,6 +36,7 @@ interface AppState {
   setEvents: (events: Event[]) => void;
   addEvents: (events: Event[]) => void;
   setFeaturedEvent: (event: Event | null) => void;
+  rotateFeaturedEvent: () => void;
   setSelectedEvent: (event: Event | null) => void;
   setInitialized: (initialized: boolean) => void;
   setSkyMapOpen: (open: boolean) => void;
@@ -91,6 +95,11 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   setFeaturedEvent: (event) => set({ featuredEvent: event }),
+
+  rotateFeaturedEvent: () => {
+    const { events, featuredEvent } = get();
+    set({ featuredEvent: rotateFeaturedEventFn(events, featuredEvent) });
+  },
 
   setSelectedEvent: (event) => set({ selectedEvent: event }),
 
