@@ -1,6 +1,6 @@
 import type { CoastlineSource } from './textureRenderer';
 import { parseGeoJsonCoastlines } from './geoJsonParser';
-import coastlineGeoJson from '../../data/ne_110m_coastline.geojson';
+import coastlineGeoJson from './ne_110m_coastline.geojson';
 
 /**
  * Pre-parsed Natural Earth 110m coastline data.
