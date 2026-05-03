@@ -145,6 +145,7 @@ export function createEarthTextures(source: CoastlineSource = () => COASTLINES):
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
   for (const coastline of coastlines) {
+    if (coastline.length === 0) continue;
     ctx.beginPath();
     ctx.moveTo(toX(coastline[0][0]), toY(coastline[0][1]));
     for (let i = 1; i < coastline.length; i++) {
@@ -163,6 +164,7 @@ export function createEarthTextures(source: CoastlineSource = () => COASTLINES):
   ctx.strokeStyle = OBLIVION_COLORS.coastline;
   ctx.lineWidth = 1.5;
   for (const coastline of coastlines) {
+    if (coastline.length === 0) continue;
     ctx.beginPath();
     ctx.moveTo(toX(coastline[0][0]), toY(coastline[0][1]));
     for (let i = 1; i < coastline.length; i++) {

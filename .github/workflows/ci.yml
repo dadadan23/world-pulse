@@ -12,19 +12,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-      
+
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
           node-version: '20'
           cache: 'npm'
-      
+
       - name: Install dependencies
         run: npm ci
-      
+
       - name: Run ESLint
         run: npx eslint src --ext .ts,.tsx --max-warnings=-1
-      
+
       - name: Check formatting
         run: npx prettier --check "src/**/*.{ts,tsx,json,css,md}"
 
@@ -33,16 +33,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-      
+
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
           node-version: '20'
           cache: 'npm'
-      
+
       - name: Install dependencies
         run: npm ci
-      
+
       - name: Type check
         run: npm run typecheck
 
@@ -51,19 +51,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-      
+
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
           node-version: '20'
           cache: 'npm'
-      
+
       - name: Install dependencies
         run: npm ci
-      
+
       - name: Run unit tests
         run: npm run test:coverage
-      
+
       - name: Upload coverage
         uses: codecov/codecov-action@v5
         with:
@@ -77,21 +77,22 @@ jobs:
     needs: [lint, typecheck, test]
     steps:
       - uses: actions/checkout@v6
-      
+
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
           node-version: '20'
           cache: 'npm'
-      
+
       - name: Install dependencies
         run: npm ci
-      
+
       - name: Build project
         run: npm run build
-      
+
       - name: Upload build artifacts
         uses: actions/upload-artifact@v7
+        continue-on-error: true
         with:
           name: dist
           path: dist/
@@ -128,6 +129,7 @@ jobs:
 
       - name: Upload Electron artifacts
         uses: actions/upload-artifact@v7
+        continue-on-error: true
         with:
           name: electron-${{ matrix.os }}
           path: release/

@@ -44,6 +44,7 @@ export function generateHeightCanvas(
   }
 
   // Fill height canvas with octave noise, masked to land
+  const maskData = mctx.getImageData(0, 0, width, height).data;
   const hImage = hctx.createImageData(width, height);
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
@@ -59,7 +60,7 @@ export function generateHeightCanvas(
       }
       v = Math.pow(v / (1 - Math.pow(0.5, 5)), 1.3);
 
-      const maskVal = mctx.getImageData(x, y, 1, 1).data[0];
+      const maskVal = maskData[(y * width + x) * 4];
       const heightValue = maskVal > 128 ? Math.floor(v * 255) : 0;
       const idx = (y * width + x) * 4;
       hImage.data[idx] = heightValue;
