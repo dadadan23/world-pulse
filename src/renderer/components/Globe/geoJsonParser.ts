@@ -1,33 +1,39 @@
 import type { CoastlineData, CoastlinePolyline } from './coastlineData';
 
-/** Minimal GeoJSON types needed for coastline parsing. */
-interface GeoJsonLineString {
-  type: 'LineString';
-  coordinates: [number, number][];
-}
-
-interface GeoJsonMultiLineString {
-  type: 'MultiLineString';
-  coordinates: [number, number][][];
-}
-
-interface GeoJsonFeature {
-  type: 'Feature';
-  geometry: GeoJsonLineString | GeoJsonMultiLineString | { type: string };
-}
-
+/**
+ * Minimal exported type for callers that need to type-annotate GeoJSON input.
+ * The parser validates the full structure at runtime, so this is intentionally
+ * loose -- only the top-level shape is described here.
+ */
 export interface GeoJsonFeatureCollection {
   type: 'FeatureCollection';
-  features: GeoJsonFeature[];
+  features: unknown[];
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
 }
 
 function isFeatureCollection(value: unknown): value is GeoJsonFeatureCollection {
   return (
-    typeof value === 'object' &&
-    value !== null &&
-    (value as Record<string, unknown>)['type'] === 'FeatureCollection' &&
-    Array.isArray((value as Record<string, unknown>)['features'])
+    isRecord(value) && value['type'] === 'FeatureCollection' && Array.isArray(value['features'])
   );
+}
+
+/** Return true when v is a finite number (not NaN, not Infinity). */
+function isFiniteNumber(v: unknown): v is number {
+  return typeof v === 'number' && isFinite(v);
+}
+
+/** Validate that a value is a [lon, lat] coordinate pair with finite numbers. */
+function isCoordPair(v: unknown): v is [number, number] {
+  return Array.isArray(v) && v.length >= 2 && isFiniteNumber(v[0]) && isFiniteNumber(v[1]);
+}
+
+/** Extract valid coordinate pairs from a raw coordinates array, silently dropping bad entries. */
+function safeCoords(raw: unknown): [number, number][] {
+  if (!Array.isArray(raw)) return [];
+  return raw.filter(isCoordPair);
 }
 
 /**
@@ -37,6 +43,7 @@ function isFeatureCollection(value: unknown): value is GeoJsonFeatureCollection 
  * Each LineString becomes one CoastlinePolyline.
  * Each MultiLineString ring becomes a separate CoastlinePolyline.
  * Features with other geometry types are silently ignored.
+ * Malformed features (missing geometry, missing/invalid coordinates) are skipped.
  *
  * Coordinates are expected as [longitude, latitude] pairs (standard GeoJSON).
  *
@@ -51,18 +58,26 @@ export function parseGeoJsonCoastlines(geojson: unknown): CoastlineData {
   const result: CoastlineData = [];
 
   for (const feature of geojson.features) {
-    const { geometry } = feature;
+    // Skip any non-object entries in the features array.
+    if (!isRecord(feature)) continue;
 
-    if (geometry.type === 'LineString') {
-      const line = geometry as GeoJsonLineString;
-      if (line.coordinates.length >= 2) {
-        result.push(line.coordinates as CoastlinePolyline);
+    const geometry = feature['geometry'];
+    if (!isRecord(geometry)) continue;
+
+    const geoType = geometry['type'];
+
+    if (geoType === 'LineString') {
+      const coords = safeCoords(geometry['coordinates']);
+      if (coords.length >= 2) {
+        result.push(coords as CoastlinePolyline);
       }
-    } else if (geometry.type === 'MultiLineString') {
-      const multi = geometry as GeoJsonMultiLineString;
-      for (const ring of multi.coordinates) {
-        if (ring.length >= 2) {
-          result.push(ring as CoastlinePolyline);
+    } else if (geoType === 'MultiLineString') {
+      const rings = geometry['coordinates'];
+      if (!Array.isArray(rings)) continue;
+      for (const ring of rings) {
+        const coords = safeCoords(ring);
+        if (coords.length >= 2) {
+          result.push(coords as CoastlinePolyline);
         }
       }
     }

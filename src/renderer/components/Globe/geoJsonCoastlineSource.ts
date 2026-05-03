@@ -9,6 +9,15 @@ import coastlineGeoJson from './ne_110m_coastline.geojson';
  */
 const NE_110M_COASTLINES = parseGeoJsonCoastlines(coastlineGeoJson);
 
+if (NE_110M_COASTLINES.length === 0) {
+  console.warn(
+    '[world-pulse] ne110mCoastlineSource: coastline dataset parsed to 0 polylines. ' +
+      'The globe will render with no coastlines. ' +
+      'Ensure the geojsonPlugin() is registered in your Vite/Vitest config and that ' +
+      'ne_110m_coastline.geojson is a valid GeoJSON FeatureCollection.'
+  );
+}
+
 /**
  * CoastlineSource backed by Natural Earth 110m real-world coastline data.
  *

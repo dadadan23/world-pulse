@@ -2,6 +2,7 @@ import { defineConfig, externalizeDepsPlugin } from 'electron-vite';
 import react from '@vitejs/plugin-react';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import { geojsonPlugin } from './scripts/vite-plugins/geojson';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -37,7 +38,7 @@ export default defineConfig({
   },
   renderer: {
     root: '.',
-    plugins: [react()],
+    plugins: [react(), geojsonPlugin()],
     build: {
       outDir: 'dist/renderer',
       emptyOutDir: true,

@@ -10,6 +10,113 @@ describe('parseGeoJsonCoastlines', () => {
     expect(parseGeoJsonCoastlines('not an object')).toHaveLength(0);
   });
 
+  it('should silently skip features with missing or null geometry', () => {
+    const input = {
+      type: 'FeatureCollection',
+      features: [
+        { type: 'Feature', geometry: null },
+        { type: 'Feature' }, // no geometry key at all
+        {
+          type: 'Feature',
+          geometry: {
+            type: 'LineString',
+            coordinates: [
+              [0, 0],
+              [1, 1],
+            ],
+          },
+        },
+      ],
+    };
+
+    const result = parseGeoJsonCoastlines(input);
+    expect(result).toHaveLength(1);
+  });
+
+  it('should silently skip coordinate pairs with non-finite numbers', () => {
+    const input = {
+      type: 'FeatureCollection',
+      features: [
+        {
+          type: 'Feature',
+          geometry: {
+            type: 'LineString',
+            // mix of valid, NaN, Infinity, wrong types
+            coordinates: [
+              [0, 0],
+              [NaN, 1],
+              [Infinity, 1],
+              ['x', 1],
+              [1, 2],
+            ],
+          },
+        },
+      ],
+    };
+
+    const result = parseGeoJsonCoastlines(input);
+    // Only the 2 fully-finite pairs [0,0] and [1,2] survive
+    expect(result).toHaveLength(1);
+    expect(result[0]).toEqual([
+      [0, 0],
+      [1, 2],
+    ]);
+  });
+
+  it('should silently skip a LineString whose coordinates field is not an array', () => {
+    const input = {
+      type: 'FeatureCollection',
+      features: [
+        {
+          type: 'Feature',
+          geometry: { type: 'LineString', coordinates: 'bad' },
+        },
+      ],
+    };
+
+    const result = parseGeoJsonCoastlines(input);
+    expect(result).toHaveLength(0);
+  });
+
+  it('should silently skip a MultiLineString whose coordinates field is not an array', () => {
+    const input = {
+      type: 'FeatureCollection',
+      features: [
+        {
+          type: 'Feature',
+          geometry: { type: 'MultiLineString', coordinates: null },
+        },
+      ],
+    };
+
+    const result = parseGeoJsonCoastlines(input);
+    expect(result).toHaveLength(0);
+  });
+
+  it('should silently skip non-object entries in the features array', () => {
+    const input = {
+      type: 'FeatureCollection',
+      features: [
+        null,
+        42,
+        'string',
+        {
+          type: 'Feature',
+          geometry: {
+            type: 'LineString',
+            coordinates: [
+              [5, 10],
+              [6, 11],
+            ],
+          },
+        },
+      ],
+    };
+
+    const result = parseGeoJsonCoastlines(input);
+    expect(result).toHaveLength(1);
+  });
+
   it('should parse a single LineString feature', () => {
     const input: GeoJsonFeatureCollection = {
       type: 'FeatureCollection',
