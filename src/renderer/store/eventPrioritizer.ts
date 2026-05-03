@@ -1,7 +1,10 @@
 import type { Event } from '@shared/types';
 
 /** Window (ms) for featured-event candidacy (default: 30 minutes) */
-const FEATURED_WINDOW_MS = 30 * 60 * 1000;
+export const FEATURED_WINDOW_MS = 30 * 60 * 1000;
+
+/** How long (ms) a featured event is displayed before auto-rotation fires (default: 60 seconds) */
+export const FEATURED_ROTATION_MS = 60 * 1000;
 
 /**
  * Select the best featured event from a list.
@@ -57,4 +60,26 @@ export function prioritizeTickerEvents(events: Event[]): Event[] {
   }
 
   return result;
+}
+
+/**
+ * Rotate to the next highest-priority event, skipping the current featured event.
+ * Intended for use by the auto-rotation timer (see FEATURED_ROTATION_MS).
+ *
+ * Selection follows the same rules as selectFeaturedEvent: highest severity in
+ * the last 30 minutes wins, with a timestamp tiebreaker. When all remaining
+ * events are outside the featured window (stale scenario), the function falls
+ * back to the highest-severity event from the full remaining list so the
+ * featured slot is never left empty.
+ *
+ * When the current event is the only one available it is returned unchanged.
+ */
+export function rotateFeaturedEvent(events: Event[], currentFeatured: Event | null): Event | null {
+  if (events.length === 0) return null;
+
+  const candidates = currentFeatured ? events.filter((e) => e.id !== currentFeatured.id) : events;
+
+  if (candidates.length === 0) return currentFeatured;
+
+  return selectFeaturedEvent(candidates);
 }
