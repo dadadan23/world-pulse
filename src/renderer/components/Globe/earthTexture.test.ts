@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { latLonToVector3 } from './earthTexture';
+import { latLonToVector3 } from './projection';
 
 describe('latLonToVector3', () => {
   it('should place north pole at top of sphere', () => {

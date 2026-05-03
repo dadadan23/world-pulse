@@ -3,7 +3,8 @@ import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
 import * as THREE from 'three';
 import { useAppStore } from '../../store/useAppStore';
-import { createEarthTextures, latLonToVector3 } from './earthTexture';
+import { createEarthTextures } from './textureRenderer';
+import { latLonToVector3 } from './projection';
 import { CityLabels } from './CityLabels';
 import type { Event } from '@shared/types';
 

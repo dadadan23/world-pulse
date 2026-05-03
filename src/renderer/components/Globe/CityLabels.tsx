@@ -7,7 +7,7 @@
 
 import { useMemo } from 'react';
 import { CITIES, type CityData } from './cityData';
-import { latLonToVector3 } from './earthTexture';
+import { latLonToVector3 } from './projection';
 import { createTextTexture } from './textTexture';
 
 const GLOBE_RADIUS = 1;
