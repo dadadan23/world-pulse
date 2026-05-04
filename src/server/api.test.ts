@@ -90,6 +90,14 @@ describe('Server API', () => {
       expect(res.body.timestamp).toBeDefined();
     });
 
+    it('should return ISO timestamp string', async () => {
+      const { app: expressApp } = setup();
+      const res = await request(expressApp).get('/api/events');
+
+      expect(typeof res.body.timestamp).toBe('string');
+      expect(Date.parse(res.body.timestamp)).toBeGreaterThan(0);
+    });
+
     it('should return added events', async () => {
       const { app: expressApp, addEvents } = setup();
       const event = {
@@ -108,6 +116,64 @@ describe('Server API', () => {
       expect(res.body.events).toHaveLength(1);
       expect(res.body.events[0].id).toBe('test-1');
       expect(res.body.events[0].location.name).toBe('Tokyo');
+    });
+
+    it('should return events matching the Event[] schema', async () => {
+      const { app: expressApp, addEvents } = setup();
+      const event: Event = {
+        id: 'schema-test-1',
+        timestamp: Date.now(),
+        type: 'earthquake',
+        source: 'USGS Earthquake Hazards Program',
+        location: { lat: -33.9, lon: 151.2, name: 'Sydney' },
+        severity: 3,
+        title: 'M3.1 - Near Sydney',
+        description: 'Minor tremor near Sydney',
+        data: { magnitude: 3.1, depth: 10, region: 'New South Wales' },
+      };
+      addEvents([event]);
+
+      const res = await request(expressApp).get('/api/events');
+      expect(res.status).toBe(200);
+      const ev = res.body.events[0];
+
+      // Validate all required Event fields
+      expect(typeof ev.id).toBe('string');
+      expect(typeof ev.timestamp).toBe('number');
+      expect(typeof ev.type).toBe('string');
+      expect(typeof ev.source).toBe('string');
+      expect(typeof ev.title).toBe('string');
+      expect(ev.data).toBeDefined();
+      expect(typeof ev.data).toBe('object');
+
+      // Optional fields present in this event
+      expect(typeof ev.severity).toBe('number');
+      expect(typeof ev.description).toBe('string');
+
+      // GeoLocation fields
+      expect(typeof ev.location.lat).toBe('number');
+      expect(typeof ev.location.lon).toBe('number');
+      expect(typeof ev.location.name).toBe('string');
+    });
+
+    it('should return event with null location', async () => {
+      const { app: expressApp, addEvents } = setup();
+      addEvents([makeEvent({ id: 'null-loc-1' })]);
+
+      const res = await request(expressApp).get('/api/events');
+      expect(res.body.events[0].location).toBeNull();
+    });
+
+    it('should deduplicate events with the same id', async () => {
+      const { app: expressApp, addEvents } = setup();
+      const event = makeEvent({ id: 'dup-1', title: 'Original' });
+      addEvents([event]);
+      addEvents([{ ...event, title: 'Updated' }]);
+
+      const res = await request(expressApp).get('/api/events');
+      const matches = res.body.events.filter((e: Event) => e.id === 'dup-1');
+      expect(matches).toHaveLength(1);
+      expect(matches[0].title).toBe('Updated');
     });
 
     it('should cap events at 100', async () => {
@@ -133,6 +199,27 @@ describe('Server API', () => {
       const { app: expressApp } = setup();
       const res = await request(expressApp).get('/unknown');
       expect(res.status).toBe(404);
+    });
+
+    it('should return 404 for unknown API sub-paths', async () => {
+      const { app: expressApp } = setup();
+      const res = await request(expressApp).get('/api/not-a-route');
+      expect(res.status).toBe(404);
+    });
+  });
+
+  describe('addEvents error resilience', () => {
+    it('should keep events in cache even if io.emit throws', () => {
+      const { io, addEvents, getEventCache } = setup();
+      vi.spyOn(io, 'emit').mockImplementationOnce(() => {
+        throw new Error('socket error');
+      });
+
+      expect(() => addEvents([makeEvent({ id: 'resilient-1' })])).not.toThrow();
+      expect(getEventCache()).toHaveLength(1);
+      expect(getEventCache()[0].id).toBe('resilient-1');
+
+      vi.restoreAllMocks();
     });
   });
 
