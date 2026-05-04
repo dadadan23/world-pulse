@@ -11,15 +11,5 @@
       "project": null
     }
   },
-  "updatedAt": "2026-05-04T00:32:23.305Z",
-  "llmProvider": "claude-code",
-  "llmProviders": {
-    "claude-code": {
-      "enabled": true,
-      "defaultModel": "claude-sonnet-4.6",
-      "profile": "subscription",
-      "modelRouting": "mapped",
-      "disableExperimentalBetas": false
-    }
-  }
+  "updatedAt": "2026-05-04T00:32:23.305Z"
 }
