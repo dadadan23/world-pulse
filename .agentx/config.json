@@ -1,6 +1,25 @@
 {
   "mode": "github",
-  "repo": "goldsphere-design/world-pulse",
+  "repo": "dadadan23/world-pulse",
   "project": null,
-  "created": "2026-02-22T16:57:52.221Z"
+  "created": "2026-02-22T16:57:52.221Z",
+  "provider": "github",
+  "integration": "github",
+  "adapters": {
+    "github": {
+      "repo": "dadadan23/world-pulse",
+      "project": null
+    }
+  },
+  "updatedAt": "2026-05-04T00:32:23.305Z",
+  "llmProvider": "claude-code",
+  "llmProviders": {
+    "claude-code": {
+      "enabled": true,
+      "defaultModel": "claude-sonnet-4.6",
+      "profile": "subscription",
+      "modelRouting": "mapped",
+      "disableExperimentalBetas": false
+    }
+  }
 }
