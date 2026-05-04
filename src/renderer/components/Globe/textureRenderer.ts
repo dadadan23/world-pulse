@@ -22,20 +22,29 @@ export function createEarthTextures(source: CoastlineSource = () => COASTLINES):
   map: THREE.CanvasTexture;
   normalMap: THREE.CanvasTexture;
 } {
-  const width = 2048;
-  const height = 1024;
+  // Main texture at 4096×2048 for sufficient coastline detail at default zoom.
+  // Height/normal maps at half resolution — 2048×1024 reduces pixel loop cost
+  // by 4× while still providing adequate terrain shading.
+  const width = 4096;
+  const height = 2048;
+  const hmWidth = 2048;
+  const hmHeight = 1024;
 
   const canvas = document.createElement('canvas');
   canvas.width = width;
   canvas.height = height;
   const ctx = canvas.getContext('2d')!;
 
-  // Bind projection functions for this canvas size
+  // Projection functions bound to main canvas dimensions
   const toX = (lon: number) => projToX(lon, width);
   const toY = (lat: number) => projToY(lat, height);
 
+  // Separate projection for height map canvas (lower resolution)
+  const hmToX = (lon: number) => projToX(lon, hmWidth);
+  const hmToY = (lat: number) => projToY(lat, hmHeight);
+
   const coastlines = source();
-  const heightCanvas = generateHeightCanvas(width, height, coastlines, toX, toY);
+  const heightCanvas = generateHeightCanvas(hmWidth, hmHeight, coastlines, hmToX, hmToY);
 
   drawBaseLayer(ctx, width, height);
   drawGridLines(ctx, width, height, toX, toY);
@@ -51,7 +60,7 @@ export function createEarthTextures(source: CoastlineSource = () => COASTLINES):
   ctx.drawImage(heightCanvas, 0, 0, width, height);
   ctx.restore();
 
-  const normalCanvas = generateNormalMap(heightCanvas, width, height);
+  const normalCanvas = generateNormalMap(heightCanvas, hmWidth, hmHeight);
 
   const mapTexture = new THREE.CanvasTexture(canvas);
   mapTexture.wrapS = THREE.RepeatWrapping;
