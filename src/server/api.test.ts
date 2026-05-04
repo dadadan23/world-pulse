@@ -95,7 +95,7 @@ describe('Server API', () => {
       const res = await request(expressApp).get('/api/events');
 
       expect(typeof res.body.timestamp).toBe('string');
-      expect(new Date(res.body.timestamp).getTime()).not.toBeNaN();
+      expect(Date.parse(res.body.timestamp)).toBeGreaterThan(0);
     });
 
     it('should return added events', async () => {

@@ -16,11 +16,18 @@ interface EventPayload {
   timestamp: number;
 }
 
+/** Milliseconds to wait after emitting before asserting emit count (no duplicate should arrive). */
+const EMIT_SETTLE_TIME_MS = 200;
+/** Milliseconds to wait for three sequential addEvents calls to be received by a client. */
+const MULTI_EMIT_SETTLE_TIME_MS = 300;
+/** Fixed timestamp used in test fixtures to keep tests deterministic. */
+const FIXED_TIMESTAMP = 1_700_000_000_000;
+
 /** Helper: create a minimal valid Event */
 function makeSocketEvent(id: string, overrides: Partial<Event> = {}): Event {
   return {
     id,
-    timestamp: Date.now(),
+    timestamp: FIXED_TIMESTAMP,
     type: 'earthquake',
     source: 'USGS Earthquake Hazards Program',
     location: null,
@@ -206,7 +213,7 @@ describe('Socket.io integration', () => {
     app.addEvents([makeSocketEvent('double-emit-test')]);
 
     // Wait enough time for any duplicate emit to arrive
-    await new Promise((resolve) => setTimeout(resolve, 200));
+    await new Promise((resolve) => setTimeout(resolve, EMIT_SETTLE_TIME_MS));
 
     expect(emitCount).toBe(1);
   });
@@ -228,7 +235,7 @@ describe('Socket.io integration', () => {
     app.addEvents([makeSocketEvent('incr-3')]);
 
     // Wait for all three emissions
-    await new Promise((resolve) => setTimeout(resolve, 300));
+    await new Promise((resolve) => setTimeout(resolve, MULTI_EMIT_SETTLE_TIME_MS));
 
     expect(received).toHaveLength(3);
     expect(received[0].events[0].id).toBe('incr-1');
