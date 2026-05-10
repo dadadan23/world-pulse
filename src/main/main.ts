@@ -20,6 +20,8 @@ const RESTART_WINDOW_MS = 60_000;
 const RESTART_DELAY_MS = 3_000;
 /** How long to poll /health before giving up at startup. */
 const SERVER_START_TIMEOUT_MS = 10_000;
+/** Interval (ms) between /health poll attempts during startup. */
+const HEALTH_CHECK_POLL_INTERVAL_MS = 250;
 
 const restartController = createRestartController({
   maxRestarts: RESTART_MAX,
@@ -73,7 +75,7 @@ async function waitForServer(maxMs: number): Promise<boolean> {
     } catch {
       // Server not ready yet; keep polling.
     }
-    await new Promise<void>((resolve) => setTimeout(resolve, 250));
+    await new Promise<void>((resolve) => setTimeout(resolve, HEALTH_CHECK_POLL_INTERVAL_MS));
   }
   return false;
 }
@@ -162,8 +164,9 @@ function startBackendServer(): void {
       );
       setTimeout(startBackendServer, RESTART_DELAY_MS);
     } else {
+      const crashCount = restartController.getRecentRestartCount();
       const errMsg =
-        `The backend server crashed ${RESTART_MAX} times within ` +
+        `The backend server crashed ${crashCount} times within ` +
         `${RESTART_WINDOW_MS / 1000} seconds and will not restart automatically. ` +
         `Please restart the application.`;
       writeCrashLog(`Circuit breaker opened: ${errMsg}`);
