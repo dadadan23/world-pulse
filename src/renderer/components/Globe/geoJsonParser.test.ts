@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { parseGeoJsonCoastlines } from './geoJsonParser';
 import type { GeoJsonFeatureCollection } from './geoJsonParser';
+import ne110mRaw from './ne_110m_coastline.geojson';
 
 describe('parseGeoJsonCoastlines', () => {
   it('should return empty array for non-FeatureCollection input', () => {
@@ -304,5 +305,57 @@ describe('parseGeoJsonCoastlines', () => {
     const result = parseGeoJsonCoastlines(input);
     expect(result[0][0][0]).toBe(139.7); // longitude
     expect(result[0][0][1]).toBe(35.7); // latitude
+  });
+});
+
+// Integration test: exercise the real Natural Earth 110m dataset through the full pipeline.
+describe('ne_110m_coastline.geojson integration', () => {
+  it('parses to a non-empty CoastlineData array', () => {
+    const result = parseGeoJsonCoastlines(ne110mRaw);
+    // Natural Earth 110m coastline has ~4 000+ line features
+    expect(result.length).toBeGreaterThan(100);
+  });
+
+  it('every polyline has at least 2 coordinate pairs', () => {
+    const result = parseGeoJsonCoastlines(ne110mRaw);
+    for (const polyline of result) {
+      expect(polyline.length).toBeGreaterThanOrEqual(2);
+    }
+  });
+
+  it('all coordinates are valid [lon, lat] pairs within bounds', () => {
+    const result = parseGeoJsonCoastlines(ne110mRaw);
+    for (const polyline of result) {
+      for (const [lon, lat] of polyline) {
+        expect(lon).toBeGreaterThanOrEqual(-180);
+        expect(lon).toBeLessThanOrEqual(180);
+        expect(lat).toBeGreaterThanOrEqual(-90);
+        expect(lat).toBeLessThanOrEqual(90);
+      }
+    }
+  });
+
+  it('includes coastlines near Europe (lon 0..30, lat 35..70)', () => {
+    const result = parseGeoJsonCoastlines(ne110mRaw);
+    const europeFeature = result.find((polyline) =>
+      polyline.some(([lon, lat]) => lon >= 0 && lon <= 30 && lat >= 35 && lat <= 70)
+    );
+    expect(europeFeature).toBeDefined();
+  });
+
+  it('includes coastlines near North America (lon -130..-60, lat 25..70)', () => {
+    const result = parseGeoJsonCoastlines(ne110mRaw);
+    const naFeature = result.find((polyline) =>
+      polyline.some(([lon, lat]) => lon >= -130 && lon <= -60 && lat >= 25 && lat <= 70)
+    );
+    expect(naFeature).toBeDefined();
+  });
+
+  it('includes coastlines near East Asia (lon 100..150, lat 0..50)', () => {
+    const result = parseGeoJsonCoastlines(ne110mRaw);
+    const asiaFeature = result.find((polyline) =>
+      polyline.some(([lon, lat]) => lon >= 100 && lon <= 150 && lat >= 0 && lat <= 50)
+    );
+    expect(asiaFeature).toBeDefined();
   });
 });
