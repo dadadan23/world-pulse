@@ -13,12 +13,17 @@ import {
 
 /** Inject an alternative coastline source to swap built-in data for GeoJSON without touching render logic. */
 export type CoastlineSource = () => [number, number][][];
+/** Inject an alternative country-boundary source for interior border rendering. */
+export type CountryBoundarySource = () => [number, number][][];
 
 /**
  * Generate canvas-based earth textures with the Oblivion UI aesthetic.
  * Pass a custom `source` to swap the underlying coastline data (e.g. GeoJSON pipeline).
  */
-export function createEarthTextures(source: CoastlineSource = () => COASTLINES): {
+export function createEarthTextures(
+  source: CoastlineSource = () => COASTLINES,
+  boundarySource: CountryBoundarySource = source
+): {
   map: THREE.CanvasTexture;
   normalMap: THREE.CanvasTexture;
 } {
@@ -44,6 +49,7 @@ export function createEarthTextures(source: CoastlineSource = () => COASTLINES):
   const hmToY = (lat: number) => projToY(lat, hmHeight);
 
   const coastlines = source();
+  const countryBoundaries = boundarySource();
   const heightCanvas = generateHeightCanvas(hmWidth, hmHeight, coastlines, hmToX, hmToY);
 
   drawBaseLayer(ctx, width, height);
@@ -51,7 +57,7 @@ export function createEarthTextures(source: CoastlineSource = () => COASTLINES):
   drawContinentFills(ctx, coastlines, toX, toY);
   drawContourLines(ctx, coastlines, toX, toY);
   drawCoastlines(ctx, coastlines, toX, toY);
-  drawInteriorBorders(ctx, coastlines, toX, toY);
+  drawInteriorBorders(ctx, countryBoundaries, toX, toY);
 
   // Composite height shading (multiply blend)
   ctx.save();

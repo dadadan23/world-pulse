@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { parseGeoJsonCoastlines } from './geoJsonParser';
 import type { GeoJsonFeatureCollection } from './geoJsonParser';
 import ne110mRaw from './ne_110m_coastline.geojson';
+import ne110mAdminBoundaryRaw from './ne_110m_admin_0_boundary_lines_land.geojson';
 
 describe('parseGeoJsonCoastlines', () => {
   it('should return empty array for non-FeatureCollection input', () => {
@@ -357,5 +358,20 @@ describe('ne_110m_coastline.geojson integration', () => {
       polyline.some(([lon, lat]) => lon >= 100 && lon <= 150 && lat >= 0 && lat <= 50)
     );
     expect(asiaFeature).toBeDefined();
+  });
+});
+
+describe('ne_110m_admin_0_boundary_lines_land.geojson integration', () => {
+  it('parses to a non-empty CoastlineData array', () => {
+    const result = parseGeoJsonCoastlines(ne110mAdminBoundaryRaw);
+    expect(result.length).toBeGreaterThan(100);
+  });
+
+  it('includes boundary segments in central Europe', () => {
+    const result = parseGeoJsonCoastlines(ne110mAdminBoundaryRaw);
+    const europeBoundary = result.find((polyline) =>
+      polyline.some(([lon, lat]) => lon >= 5 && lon <= 25 && lat >= 45 && lat <= 55)
+    );
+    expect(europeBoundary).toBeDefined();
   });
 });
