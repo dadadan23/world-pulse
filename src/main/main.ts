@@ -1,12 +1,88 @@
-import { app, BrowserWindow, shell } from 'electron';
+import { app, BrowserWindow, shell, dialog } from 'electron';
 import path from 'path';
+import fs from 'fs';
+import os from 'os';
 import { fork, type ChildProcess } from 'child_process';
 import { is } from '@electron-toolkit/utils';
+import { createRestartController } from './restartController';
 
 let mainWindow: BrowserWindow | null = null;
 let serverProcess: ChildProcess | null = null;
+let isAppQuitting = false;
 
 const SERVER_PORT = process.env.PORT || 3000;
+
+/** Maximum restart attempts before the circuit opens. */
+const RESTART_MAX = 3;
+/** Sliding window (ms) for counting restarts. */
+const RESTART_WINDOW_MS = 60_000;
+/** Delay (ms) before each restart attempt. */
+const RESTART_DELAY_MS = 3_000;
+/** How long to poll /health before giving up at startup. */
+const SERVER_START_TIMEOUT_MS = 10_000;
+/** Interval (ms) between /health poll attempts during startup. */
+const HEALTH_CHECK_POLL_INTERVAL_MS = 250;
+
+const restartController = createRestartController({
+  maxRestarts: RESTART_MAX,
+  windowMs: RESTART_WINDOW_MS,
+});
+
+// ---------------------------------------------------------------------------
+// Crash logging
+// ---------------------------------------------------------------------------
+
+function writeCrashLog(message: string): void {
+  try {
+    const logDir = app.isReady() ? app.getPath('logs') : os.tmpdir();
+    fs.mkdirSync(logDir, { recursive: true });
+    const logPath = path.join(logDir, 'world-pulse-crash.log');
+    const timestamp = new Date().toISOString();
+    fs.appendFileSync(logPath, `[${timestamp}] ${message}\n`);
+  } catch {
+    // Silently ignore log-write failures so they do not cause a second crash.
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Global error handlers
+// ---------------------------------------------------------------------------
+
+process.on('uncaughtException', (err: Error) => {
+  const msg = `Uncaught exception: ${err.message}\n${err.stack ?? ''}`;
+  process.stderr.write(`[Electron] ${msg}\n`);
+  writeCrashLog(msg);
+});
+
+process.on('unhandledRejection', (reason: unknown) => {
+  const msg = `Unhandled rejection: ${String(reason)}`;
+  process.stderr.write(`[Electron] ${msg}\n`);
+  writeCrashLog(msg);
+});
+
+// ---------------------------------------------------------------------------
+// Health check polling
+// ---------------------------------------------------------------------------
+
+/** Poll /health until the server responds OK or the timeout expires. */
+async function waitForServer(maxMs: number): Promise<boolean> {
+  const url = `http://localhost:${SERVER_PORT}/health`;
+  const deadline = Date.now() + maxMs;
+  while (Date.now() < deadline) {
+    try {
+      const res = await fetch(url);
+      if (res.ok) return true;
+    } catch {
+      // Server not ready yet; keep polling.
+    }
+    await new Promise<void>((resolve) => setTimeout(resolve, HEALTH_CHECK_POLL_INTERVAL_MS));
+  }
+  return false;
+}
+
+// ---------------------------------------------------------------------------
+// Window management
+// ---------------------------------------------------------------------------
 
 function createWindow(): void {
   mainWindow = new BrowserWindow({
@@ -39,6 +115,10 @@ function createWindow(): void {
   });
 }
 
+// ---------------------------------------------------------------------------
+// Backend server lifecycle
+// ---------------------------------------------------------------------------
+
 function startBackendServer(): void {
   const serverEntry = is.dev
     ? path.join(__dirname, '../../src/server/index.ts')
@@ -60,30 +140,65 @@ function startBackendServer(): void {
     process.stderr.write(`[Server:err] ${data.toString()}`);
   });
 
-  serverProcess.on('error', (err) => {
-    console.error('[Electron] Failed to start backend server:', err);
+  serverProcess.on('error', (err: Error) => {
+    const msg = `Backend server process error: ${err.message}`;
+    process.stderr.write(`[Electron] ${msg}\n`);
+    writeCrashLog(msg);
   });
 
-  serverProcess.on('exit', (code) => {
-    console.error(`[Electron] Backend server exited with code ${code}`);
+  serverProcess.on('exit', (code: number | null, signal: NodeJS.Signals | null) => {
+    const msg = `Backend server exited (code=${code ?? 'null'} signal=${signal ?? 'null'})`;
+    process.stderr.write(`[Electron] ${msg}\n`);
     serverProcess = null;
+
+    // Do not restart during an intentional shutdown.
+    if (isAppQuitting) return;
+
+    writeCrashLog(msg);
+
+    if (restartController.shouldRestart()) {
+      restartController.recordRestart();
+      const attempt = restartController.getRecentRestartCount();
+      process.stderr.write(
+        `[Electron] Restarting backend server in ${RESTART_DELAY_MS}ms (attempt ${attempt}/${RESTART_MAX})...\n`
+      );
+      setTimeout(startBackendServer, RESTART_DELAY_MS);
+    } else {
+      const crashCount = restartController.getRecentRestartCount();
+      const errMsg =
+        `The backend server crashed ${crashCount} times within ` +
+        `${RESTART_WINDOW_MS / 1000} seconds and will not restart automatically. ` +
+        `Please restart the application.`;
+      writeCrashLog(`Circuit breaker opened: ${errMsg}`);
+      process.stderr.write(`[Electron] ${errMsg}\n`);
+      dialog.showErrorBox('Backend Server Failed', errMsg);
+    }
   });
 }
 
 function stopBackendServer(): void {
+  isAppQuitting = true;
   if (serverProcess) {
     serverProcess.kill('SIGTERM');
     serverProcess = null;
   }
 }
 
-app.whenReady().then(() => {
+// ---------------------------------------------------------------------------
+// App lifecycle
+// ---------------------------------------------------------------------------
+
+app.whenReady().then(async () => {
   startBackendServer();
 
-  // Give the server a moment to start before loading the window
-  setTimeout(() => {
-    createWindow();
-  }, 1500);
+  const ready = await waitForServer(SERVER_START_TIMEOUT_MS);
+  if (!ready) {
+    process.stderr.write(
+      `[Electron] Backend server did not respond within ${SERVER_START_TIMEOUT_MS}ms; loading UI anyway.\n`
+    );
+  }
+
+  createWindow();
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
