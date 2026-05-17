@@ -4,7 +4,7 @@ import type { GeoJsonFeatureCollection } from './geoJsonParser';
 import ne110mRaw from './ne_110m_coastline.geojson';
 import ne110mAdminBoundaryRaw from './ne_110m_admin_0_boundary_lines_land.geojson';
 
-const MIN_EXPECTED_BOUNDARY_SEGMENTS = 100;
+const MIN_BOUNDARY_SEGMENTS = 100;
 
 describe('parseGeoJsonCoastlines', () => {
   it('should return empty array for non-FeatureCollection input', () => {
@@ -366,7 +366,7 @@ describe('ne_110m_coastline.geojson integration', () => {
 describe('ne_110m_admin_0_boundary_lines_land.geojson integration', () => {
   it('parses to a non-empty CoastlineData array', () => {
     const result = parseGeoJsonCoastlines(ne110mAdminBoundaryRaw);
-    expect(result.length).toBeGreaterThan(MIN_EXPECTED_BOUNDARY_SEGMENTS);
+    expect(result.length).toBeGreaterThan(MIN_BOUNDARY_SEGMENTS);
   });
 
   it('includes boundary segments in central Europe', () => {
