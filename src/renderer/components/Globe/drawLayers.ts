@@ -163,30 +163,21 @@ export function drawCoastlines(
   }
 }
 
-/** Draw faint dashed interior offset suggesting country boundaries. */
+/** Draw faint dashed country boundary lines. */
 export function drawInteriorBorders(
   ctx: CanvasRenderingContext2D,
-  coastlines: CoastlinePolyline[],
+  borders: CoastlinePolyline[],
   toX: ProjectionFn,
   toY: ProjectionFn
 ): void {
+  // Country boundary features are line segments, not closed polygons.
+  const shouldClosePath = false;
   ctx.strokeStyle = 'rgba(200,230,240,0.14)';
   ctx.lineWidth = 0.8;
   ctx.setLineDash([6, 4]);
-  for (const coastline of coastlines) {
-    if (coastline.length < 4) continue;
-    const sum = coastline.reduce((acc, p) => [acc[0] + p[0], acc[1] + p[1]], [0, 0]);
-    const cx = sum[0] / coastline.length;
-    const cy = sum[1] / coastline.length;
-    ctx.beginPath();
-    const startX = cx + (coastline[0][0] - cx) * 0.98;
-    const startY = cy + (coastline[0][1] - cy) * 0.98;
-    ctx.moveTo(toX(startX), toY(startY));
-    for (let i = 1; i < coastline.length; i++) {
-      ctx.lineTo(toX(cx + (coastline[i][0] - cx) * 0.98), toY(cy + (coastline[i][1] - cy) * 0.98));
-    }
-    ctx.closePath();
-    ctx.stroke();
+  for (const border of borders) {
+    if (border.length < 2) continue;
+    strokeWrappedPath(ctx, border, toX, toY, shouldClosePath);
   }
   ctx.setLineDash([]);
 }
