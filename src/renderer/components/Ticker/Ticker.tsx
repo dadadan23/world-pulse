@@ -62,7 +62,7 @@ export function Ticker() {
             })}
           </>
         ) : (
-          <span className="ob-label text-ob-text-dim">AWAITING EVENTS...</span>
+          <span className="ob-label text-ob-cyan">NO ACTIVE EVENTS</span>
         )}
       </div>
     </div>

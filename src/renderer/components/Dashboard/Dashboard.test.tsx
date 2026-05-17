@@ -51,7 +51,7 @@ describe('Dashboard', () => {
 
   it('renders the Ticker with empty state message when no events', () => {
     render(<Dashboard />);
-    expect(screen.getByText('AWAITING EVENTS...')).toBeInTheDocument();
+    expect(screen.getByText('NO ACTIVE EVENTS')).toBeInTheDocument();
   });
 
   it('does not render SkyMapModal when skyMapOpen is false', () => {

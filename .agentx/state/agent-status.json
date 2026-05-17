@@ -15,9 +15,13 @@
     "lastActivity": null
   },
   "engineer": {
-    "status": "idle",
-    "issue": null,
-    "lastActivity": null
+    "role": "engineer",
+    "status": "complete",
+    "issue": "131",
+    "branch": "claude/dadadan23-deliver-empty-state-experience",
+    "startedAt": "unknown",
+    "completedAt": "2026-05-17T22:29:14Z",
+    "artifacts": []
   },
   "reviewer": {
     "status": "idle",

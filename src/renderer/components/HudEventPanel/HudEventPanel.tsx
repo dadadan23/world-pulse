@@ -1,6 +1,7 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { useAppStore } from '../../store/useAppStore';
 import type { Event } from '@shared/types';
+import EmptyState from '../EmptyState/EmptyState';
 
 const AUTO_CLOSE_MS = 8_000;
 
@@ -129,26 +130,35 @@ function HudEventDetail({ event, onClose }: HudEventDetailProps) {
 
 /**
  * Slide-in event detail panel, anchored right.
- * Renders when selectedEvent is set; auto-closes after 8 seconds.
+ * Shows EmptyState when no events available; otherwise renders selected event detail.
+ * Auto-closes after 8 seconds when showing event details.
  */
 export function HudEventPanel() {
   const selectedEvent = useAppStore((state) => state.selectedEvent);
+  const events = useAppStore((state) => state.events);
+  const connectionStatus = useAppStore((state) => state.connectionStatus);
   const setSelectedEvent = useAppStore((state) => state.setSelectedEvent);
-  const visible = selectedEvent !== null;
+
+  const showEmptyState = events.length === 0 && connectionStatus === 'connected';
+  const visible = selectedEvent !== null || showEmptyState;
 
   const handleClose = useCallback(() => setSelectedEvent(null), [setSelectedEvent]);
 
   return (
     <div
-      className="fixed top-1/2 right-5 z-20 w-[310px] ob-hud-panel"
+      className="fixed top-1/2 right-5 z-20 w-[310px] ob-hud-panel ob-transition-fade"
       style={{
         transform: visible
           ? 'translateY(-50%) translateX(0)'
           : 'translateY(-50%) translateX(340px)',
-        transition: 'transform 400ms cubic-bezier(0.4, 0, 0.2, 1)',
+        opacity: visible ? 1 : 0,
       }}
     >
-      {selectedEvent && <HudEventDetail event={selectedEvent} onClose={handleClose} />}
+      {showEmptyState ? (
+        <EmptyState />
+      ) : (
+        selectedEvent && <HudEventDetail event={selectedEvent} onClose={handleClose} />
+      )}
     </div>
   );
 }

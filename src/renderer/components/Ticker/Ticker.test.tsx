@@ -26,9 +26,9 @@ describe('Ticker', () => {
     });
   });
 
-  it('should show waiting message when no events', () => {
+  it('should show no active events message when no events', () => {
     render(<Ticker />);
-    expect(screen.getByText('AWAITING EVENTS...')).toBeInTheDocument();
+    expect(screen.getByText('NO ACTIVE EVENTS')).toBeInTheDocument();
   });
 
   it('should render event titles in ticker', () => {
