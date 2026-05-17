@@ -170,12 +170,13 @@ export function drawInteriorBorders(
   toX: ProjectionFn,
   toY: ProjectionFn
 ): void {
+  const closePath = false;
   ctx.strokeStyle = 'rgba(200,230,240,0.14)';
   ctx.lineWidth = 0.8;
   ctx.setLineDash([6, 4]);
   for (const border of borders) {
     if (border.length < 2) continue;
-    strokeWrappedPath(ctx, border, toX, toY, false);
+    strokeWrappedPath(ctx, border, toX, toY, closePath);
   }
   ctx.setLineDash([]);
 }

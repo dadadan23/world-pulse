@@ -22,7 +22,7 @@ export type CountryBoundarySource = () => [number, number][][];
  */
 export function createEarthTextures(
   source: CoastlineSource = () => COASTLINES,
-  boundarySource: CountryBoundarySource = source
+  boundarySource: CountryBoundarySource = () => []
 ): {
   map: THREE.CanvasTexture;
   normalMap: THREE.CanvasTexture;
