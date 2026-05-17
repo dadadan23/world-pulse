@@ -656,6 +656,50 @@ body {
 }
 
 /* ============================================
+   CONNECTION BANNER
+   Non-destructive overlay banner for connection state
+   ============================================ */
+.ob-banner {
+  margin-top: 1rem;
+  padding: 0.75rem 1.5rem;
+  background: var(--ob-bg-panel);
+  border: 1px solid var(--ob-border-subtle);
+  opacity: 1;
+  transition:
+    opacity var(--ob-timing-fade) var(--ob-easing-snap),
+    transform var(--ob-timing-snap) var(--ob-easing-snap);
+}
+
+/* Warning banner (amber) for disconnect/error states */
+.ob-banner-warning {
+  border-color: var(--ob-accent-amber-dim);
+  box-shadow: 0 0 16px var(--ob-glow-amber);
+}
+
+/* Success banner (cyan) for reconnect success */
+.ob-banner-success {
+  border-color: var(--ob-accent-cyan-dim);
+  box-shadow: 0 0 16px var(--ob-glow-cyan);
+}
+
+/* Fade-out animation for success banner */
+.ob-banner-fade-out {
+  animation: bannerFadeOut 2s var(--ob-easing-snap) forwards;
+}
+
+@keyframes bannerFadeOut {
+  0% {
+    opacity: 1;
+  }
+  70% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+/* ============================================
    ACCESSIBILITY: REDUCED MOTION
    ============================================ */
 @media (prefers-reduced-motion: reduce) {
@@ -674,5 +718,26 @@ body {
   .ob-panel::before,
   .ob-panel::after {
     transition: none;
+  }
+
+  /* Banner uses only opacity transitions for reduced motion */
+  .ob-banner {
+    transition: opacity var(--ob-timing-fade) ease-out;
+  }
+
+  .ob-banner-fade-out {
+    animation: bannerFadeOutReduced 2s ease-out forwards;
+  }
+
+  @keyframes bannerFadeOutReduced {
+    0% {
+      opacity: 1;
+    }
+    70% {
+      opacity: 1;
+    }
+    100% {
+      opacity: 0;
+    }
   }
 }
