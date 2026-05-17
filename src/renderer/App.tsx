@@ -1,4 +1,5 @@
 import { useSocket } from './hooks/useSocket';
+import { useCollectorHealthPolling } from './hooks/useCollectorHealthPolling';
 import { useAppStore } from './store/useAppStore';
 import { Dashboard } from './components/Dashboard/Dashboard';
 import { LoadingScreen } from './components/LoadingScreen/LoadingScreen';
@@ -6,8 +7,9 @@ import { DisconnectOverlay } from './components/DisconnectOverlay/DisconnectOver
 import { ErrorBoundary } from './components/ErrorBoundary/ErrorBoundary';
 
 function App() {
-  // Initialize socket connection
+  // Initialize socket connection and periodic health polling
   useSocket();
+  useCollectorHealthPolling();
 
   const { isInitialized, connectionStatus, hasEverConnected } = useAppStore();
 

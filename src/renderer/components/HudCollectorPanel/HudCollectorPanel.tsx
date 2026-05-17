@@ -1,14 +1,39 @@
 import { useAppStore } from '../../store/useAppStore';
+import CollectorHealthBadge from '../CollectorHealthBadge/CollectorHealthBadge';
+import StatusBadge from '../StatusBadge/StatusBadge';
+
+function CollectorSummary({ total, healthy }: { total: number; healthy: number }) {
+  if (healthy === total) {
+    return (
+      <div className="flex items-center gap-1.5">
+        <div className="w-1.5 h-1.5 rounded-full bg-ob-success animate-pulse" />
+        <span className="ob-label text-ob-success">ALL SOURCES ACTIVE</span>
+      </div>
+    );
+  }
+
+  const badgeState = healthy === 0 ? 'critical' : 'warning';
+  return (
+    <div className="flex items-center justify-between">
+      <span className="ob-label text-ob-text-dim">SOURCES ACTIVE</span>
+      <StatusBadge state={badgeState}>
+        {healthy}/{total}
+      </StatusBadge>
+    </div>
+  );
+}
 
 /** Top-right HUD: data source / collector health badges + sky map toggle */
 export function HudCollectorPanel() {
   const { serverStatus, skyMapOpen, setSkyMapOpen } = useAppStore();
 
   const collectors = serverStatus?.collectors ?? [];
+  const healthyCount = collectors.filter((c) => c.status === 'healthy').length;
+  const allHealthy = collectors.length > 0 && healthyCount === collectors.length;
 
   return (
     <div className="fixed top-5 right-5 z-20 w-[220px] flex flex-col gap-2">
-      {/* Collector badges panel */}
+      {/* Collector health panel */}
       <div className="ob-hud-panel">
         <div className="ob-label text-ob-text-dim tracking-ultrawide mb-3 pb-2 border-b border-ob-border">
           DATA SOURCES
@@ -16,38 +41,20 @@ export function HudCollectorPanel() {
         {collectors.length === 0 ? (
           <div className="ob-label text-ob-text-dim">AWAITING...</div>
         ) : (
-          <div className="flex flex-col gap-1.5">
-            {collectors.map((c) => (
-              <div key={c.name} className="flex items-center justify-between">
-                <span className="ob-label text-ob-text">{c.name.toUpperCase()}</span>
-                <div className="flex items-center gap-1.5">
-                  <div
-                    className={`w-1.5 h-1.5 rounded-full ${
-                      !c.isEnabled || c.status === 'disabled'
-                        ? 'bg-ob-text-dim'
-                        : c.status === 'healthy'
-                          ? 'bg-ob-success animate-pulse'
-                          : 'bg-ob-danger'
-                    }`}
+          <div className="flex flex-col gap-2">
+            <CollectorSummary total={collectors.length} healthy={healthyCount} />
+            {!allHealthy && (
+              <div className="flex flex-col gap-1.5 pt-1.5 border-t border-ob-border">
+                {collectors.map((c) => (
+                  <CollectorHealthBadge
+                    key={c.name}
+                    name={c.name}
+                    status={c.status}
+                    errorCount={c.errorCount}
                   />
-                  <span
-                    className={`ob-label text-[9px] ${
-                      !c.isEnabled || c.status === 'disabled'
-                        ? 'text-ob-text-dim'
-                        : c.status === 'healthy'
-                          ? 'text-ob-success'
-                          : 'text-ob-danger'
-                    }`}
-                  >
-                    {!c.isEnabled || c.status === 'disabled'
-                      ? 'OFF'
-                      : c.status === 'healthy'
-                        ? 'LIVE'
-                        : 'ERR'}
-                  </span>
-                </div>
+                ))}
               </div>
-            ))}
+            )}
           </div>
         )}
       </div>
