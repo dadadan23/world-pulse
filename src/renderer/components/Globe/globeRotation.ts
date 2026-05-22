@@ -13,6 +13,8 @@
  *   ry = atan2(cos(theta), sin(theta)) = PI/2 - theta = -(90 + lon) * PI/180
  */
 
+const TWO_PI = 2 * Math.PI;
+
 /**
  * Compute the target Y rotation (radians) for the globe group to bring the
  * given longitude to face the camera at +Z.
@@ -26,7 +28,6 @@ export function lonToGlobeRotationY(lon: number): number {
  * Accounts for wrap-around so the globe always takes the short way around.
  */
 export function shortestAngleDiff(from: number, to: number): number {
-  const TWO_PI = 2 * Math.PI;
   const fromN = ((from % TWO_PI) + TWO_PI) % TWO_PI;
   const toN = ((to % TWO_PI) + TWO_PI) % TWO_PI;
   let diff = toN - fromN;

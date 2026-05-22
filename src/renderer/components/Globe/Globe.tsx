@@ -290,11 +290,12 @@ function RotatingGlobe({ children, isPaused }: { children: React.ReactNode; isPa
     if (targetYRef.current !== null) {
       // Smoothly interpolate towards the target rotation, taking the shortest path
       const diff = shortestAngleDiff(ref.current.rotation.y, targetYRef.current);
-      if (Math.abs(diff) < 0.005) {
+      if (Math.abs(diff) < ROTATION_CONVERGENCE_THRESHOLD) {
         ref.current.rotation.y += diff;
         targetYRef.current = null;
       } else {
-        ref.current.rotation.y += diff * Math.min(2.5 * delta, 0.25);
+        ref.current.rotation.y +=
+          diff * Math.min(ROTATION_INTERPOLATION_SPEED * delta, MAX_ROTATION_STEP);
       }
     } else if (!isPaused) {
       ref.current.rotation.y += delta * 0.06;
@@ -304,6 +305,15 @@ function RotatingGlobe({ children, isPaused }: { children: React.ReactNode; isPa
   return <group ref={ref}>{children}</group>;
 }
 
+/** Speed multiplier for globe rotation animation (radians/second scale factor). */
+const ROTATION_INTERPOLATION_SPEED = 2.5;
+
+/** Maximum per-frame rotation step to prevent sudden jumps on low frame rates. */
+const MAX_ROTATION_STEP = 0.25;
+
+/** Convergence threshold (~0.3 degrees) below which rotation animation is considered complete. */
+const ROTATION_CONVERGENCE_THRESHOLD = 0.005;
+
 /**
  * Maximum number of markers to display simultaneously.
  * Events are deduplicated by proximity before this cap is applied.
@@ -311,10 +321,10 @@ function RotatingGlobe({ children, isPaused }: { children: React.ReactNode; isPa
 const MAX_MARKERS = 50;
 
 /**
- * Minimum angular separation (radians) between two markers.
- * ~5 degrees keeps markers readable without clustering them excessively.
+ * Minimum angular separation (radians) between two markers (~5 degrees).
+ * Keeps markers readable without clustering them excessively.
  */
-const MIN_MARKER_SEPARATION = 0.087;
+const MIN_MARKER_SEPARATION = (5 * Math.PI) / 180;
 
 /**
  * Deduplicate events that are too close together on the globe surface.
