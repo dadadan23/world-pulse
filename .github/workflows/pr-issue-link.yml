@@ -1,0 +1,101 @@
+name: PR–Issue Link
+
+on:
+  pull_request:
+    types: [opened, edited, reopened]
+    branches: [main, develop]
+
+permissions:
+  pull-requests: write
+  issues: write
+
+jobs:
+  enforce-issue-link:
+    name: Require linked issue
+    runs-on: ubuntu-latest
+    outputs:
+      issue_number: ${{ steps.check.outputs.issue_number }}
+    steps:
+      - name: Check PR body for closing keyword
+        id: check
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const body = context.payload.pull_request.body || '';
+
+            // Match GitHub closing keywords followed by an issue number
+            const closingRe = /\b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)\s+#(\d+)/gi;
+            const bodyMatches = [...body.matchAll(closingRe)];
+
+            if (bodyMatches.length === 0) {
+              if (context.payload.action === 'opened') {
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: context.payload.pull_request.number,
+                  body: [
+                    '## ⚠️ Missing Issue Link',
+                    '',
+                    'This PR must reference the issue it addresses using a [closing keyword](https://docs.github.com/en/issues/tracking-your-work-with-issues/linking-a-pull-request-to-an-issue).',
+                    '',
+                    'Add one of the following to the PR body:',
+                    '',
+                    '```',
+                    'Closes #123',
+                    'Fixes #123',
+                    'Resolves #123',
+                    '```',
+                    '',
+                    '_The linked issue will be automatically closed when this PR is merged._',
+                  ].join('\n'),
+                });
+              }
+              core.setFailed(
+                'PR body must contain a closing keyword referencing an issue (e.g. "Closes #123"). ' +
+                'See https://docs.github.com/en/issues/tracking-your-work-with-issues/linking-a-pull-request-to-an-issue'
+              );
+              return;
+            }
+
+            const issueNumber = bodyMatches[0][1];
+            core.setOutput('issue_number', issueNumber);
+            core.info(`PR closes issue #${issueNumber}`);
+
+  track-in-progress:
+    name: Label issue as in-progress
+    needs: enforce-issue-link
+    if: needs.enforce-issue-link.outputs.issue_number != '' && github.event.action == 'opened'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ensure status:in-progress label exists
+        uses: actions/github-script@v8
+        with:
+          script: |
+            try {
+              await github.rest.issues.getLabel({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                name: 'status:in-progress',
+              });
+            } catch {
+              await github.rest.issues.createLabel({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                name: 'status:in-progress',
+                color: '0075ca',
+                description: 'Work is actively in progress on this issue',
+              });
+            }
+
+      - name: Apply label to linked issue
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const issueNumber = parseInt('${{ needs.enforce-issue-link.outputs.issue_number }}');
+            await github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issueNumber,
+              labels: ['status:in-progress'],
+            });
+            core.info(`Labeled issue #${issueNumber} as status:in-progress`);
