@@ -1,6 +1,7 @@
 /**
  * Globe rotation utilities: compute target Y-axis rotation for the globe group
  * so a given longitude faces the camera (which looks from +Z towards the origin).
+ * Implements globe-centering behavior for issue #62 (event location markers).
  *
  * The globe group uses Three.js Y-axis rotation. A point in globe-local space at
  * longitude `lon` has local-space coordinates:
