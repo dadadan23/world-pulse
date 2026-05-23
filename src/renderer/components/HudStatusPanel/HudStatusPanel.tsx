@@ -33,7 +33,7 @@ export function HudStatusPanel() {
   }, []);
 
   const statusConfig = {
-    connected: { label: 'LIVE', cls: 'text-ob-success ob-text-glow animate-pulse' },
+    connected: { label: 'LIVE', cls: 'ob-status-nominal ob-text-glow' },
     connecting: { label: 'CONNECTING', cls: 'text-ob-warning' },
     disconnected: { label: 'OFFLINE', cls: 'text-ob-danger' },
     error: { label: 'ERROR', cls: 'text-ob-danger' },
@@ -46,7 +46,7 @@ export function HudStatusPanel() {
     <div className="fixed top-5 left-5 z-20 w-[270px] ob-hud-panel">
       {/* Logo row */}
       <div className="flex items-center gap-3 mb-3 pb-3 border-b border-ob-border">
-        <div className="w-2 h-2 rounded-full bg-ob-cyan ob-glow animate-pulse" />
+        <div className="w-2 h-2 bg-ob-cyan ob-glow" />
         <span className="ob-heading text-ob-cyan tracking-ultrawide text-[13px]">WORLD PULSE</span>
       </div>
 

@@ -110,7 +110,7 @@ function HudEventDetail({ event, onClose }: HudEventDetailProps) {
               {event.severity.toFixed(1)} / 10
             </span>
           </div>
-          <div className="h-px bg-ob-border rounded-full overflow-hidden">
+          <div className="h-[1px] bg-ob-border overflow-hidden">
             <div
               className={`h-full transition-all duration-700 ${
                 event.severity >= 7

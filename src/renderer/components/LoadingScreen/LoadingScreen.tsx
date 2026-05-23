@@ -54,7 +54,7 @@ export function LoadingScreen() {
             {[0, 1, 2].map((i) => (
               <div
                 key={i}
-                className="w-2 h-2 bg-ob-cyan rounded-full animate-pulse-slow motion-reduce:animate-none"
+                className="w-2 h-2 bg-ob-cyan ob-glow motion-reduce:[animation:none]"
                 style={{ animationDelay: `${i * 0.4}s` }}
               />
             ))}
