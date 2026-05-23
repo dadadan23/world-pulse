@@ -22,6 +22,12 @@ export function Dashboard() {
         <Globe />
       </div>
 
+      {/* Ambient effects -- above globe, below HUD panels */}
+
+      {/* Ambient overlays: dot grid (z-1) and scanline sweep (z-2) sit above globe (z-0) */}
+      <div className="fixed inset-0 z-[1] pointer-events-none ob-dot-grid ob-dot-grid-animated" />
+      <div className="fixed inset-0 z-[2] pointer-events-none ob-scanline" />
+
       {/* HUD overlays -- z-20 and above */}
 
       {/* Top-left: status + clock + location */}

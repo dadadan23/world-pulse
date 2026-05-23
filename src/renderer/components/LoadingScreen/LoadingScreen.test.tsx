@@ -126,7 +126,7 @@ describe('LoadingScreen', () => {
   it('renders three pulse indicator dots', () => {
     const { container } = render(<LoadingScreen />);
     // Dots are aria-hidden so not accessible by role; find by class
-    const dots = container.querySelectorAll('.animate-pulse-slow');
+    const dots = container.querySelectorAll('.ob-glow');
     expect(dots).toHaveLength(3);
   });
 });

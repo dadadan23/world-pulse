@@ -8,7 +8,7 @@ type Props = {
 };
 
 const DOT_CLASSES: Record<CollectorHealthStatus, string> = {
-  healthy: 'bg-ob-success animate-pulse',
+  healthy: 'bg-ob-success ob-glow',
   degraded: 'bg-ob-amber',
   disabled: 'bg-ob-danger',
 };
