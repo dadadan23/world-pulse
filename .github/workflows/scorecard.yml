@@ -23,6 +23,7 @@ jobs:
         with:
           results_file: results.sarif
           results_format: sarif
+          # Disable publishing while Actions/code scanning storage is constrained.
           publish_results: false
 
   frontmatter-validation:
