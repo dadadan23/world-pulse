@@ -1,4 +1,4 @@
-import { useRef, useMemo, useState, useCallback } from 'react';
+import { useRef, useMemo, useState, useCallback, useEffect } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
 import * as THREE from 'three';
@@ -8,6 +8,7 @@ import { latLonToVector3 } from './projection';
 import { ne110mCoastlineSource } from './geoJsonCoastlineSource';
 import { ne110mBoundarySource } from './geoJsonBoundarySource';
 import { CityLabels } from './CityLabels';
+import { lonToGlobeRotationY, shortestAngleDiff } from './globeRotation';
 import type { Event } from '@shared/types';
 
 const GLOBE_RADIUS = 1;
@@ -271,14 +272,90 @@ function HomeBeacon() {
 /** Container that auto-rotates and holds the globe + markers */
 function RotatingGlobe({ children, isPaused }: { children: React.ReactNode; isPaused: boolean }) {
   const ref = useRef<THREE.Group>(null);
+  const featuredEvent = useAppStore((state) => state.featuredEvent);
+  const targetYRef = useRef<number | null>(null);
+
+  // Read lon as a scalar so the effect dependency is a primitive (stable)
+  const featuredLon = featuredEvent?.location?.lon;
+
+  // When the featured event changes to one with a location, animate globe to center it
+  useEffect(() => {
+    if (featuredLon === undefined) return;
+    targetYRef.current = lonToGlobeRotationY(featuredLon);
+  }, [featuredLon]);
 
   useFrame((_, delta) => {
-    if (ref.current && !isPaused) {
+    if (!ref.current) return;
+
+    if (targetYRef.current !== null) {
+      // Smoothly interpolate towards the target rotation, taking the shortest path
+      const diff = shortestAngleDiff(ref.current.rotation.y, targetYRef.current);
+      if (Math.abs(diff) < ROTATION_CONVERGENCE_THRESHOLD) {
+        ref.current.rotation.y += diff;
+        targetYRef.current = null;
+      } else {
+        ref.current.rotation.y +=
+          diff * Math.min(ROTATION_INTERPOLATION_SPEED * delta, MAX_ROTATION_STEP);
+      }
+    } else if (!isPaused) {
       ref.current.rotation.y += delta * 0.06;
     }
   });
 
   return <group ref={ref}>{children}</group>;
+}
+
+/** Speed multiplier for globe rotation animation (radians/second scale factor). */
+const ROTATION_INTERPOLATION_SPEED = 2.5;
+
+/** Maximum per-frame rotation step to prevent sudden jumps on low frame rates. */
+const MAX_ROTATION_STEP = 0.25;
+
+/** Convergence threshold (~0.3 degrees) below which rotation animation is considered complete. */
+const ROTATION_CONVERGENCE_THRESHOLD = 0.005;
+
+/**
+ * Maximum number of markers to display simultaneously.
+ * Events are deduplicated by proximity before this cap is applied.
+ */
+const MAX_MARKERS = 50;
+
+/**
+ * Minimum angular separation (radians) between two markers (~5 degrees).
+ * Keeps markers readable without clustering them excessively.
+ */
+const MIN_MARKER_SEPARATION = (5 * Math.PI) / 180;
+
+/**
+ * Deduplicate events that are too close together on the globe surface.
+ * Events are processed in priority order (caller responsibility). The first
+ * event in each proximity cluster is kept; subsequent events within
+ * MIN_MARKER_SEPARATION are suppressed.
+ *
+ * The featured event (if any) is always retained regardless of proximity.
+ */
+function deduplicateNearbyEvents(events: Event[], featuredId: string | undefined): Event[] {
+  const positions: THREE.Vector3[] = [];
+  const result: Event[] = [];
+
+  for (const event of events) {
+    if (!event.location) continue;
+
+    const pos = latLonToVector3(event.location.lat, event.location.lon, 1);
+    const isFeatured = event.id === featuredId;
+
+    // Always include the featured event even if it would be suppressed
+    const tooClose = !isFeatured && positions.some((p) => p.angleTo(pos) < MIN_MARKER_SEPARATION);
+
+    if (!tooClose) {
+      result.push(event);
+      positions.push(pos);
+    }
+
+    if (result.length >= MAX_MARKERS) break;
+  }
+
+  return result;
 }
 
 /** All event markers as a group */
@@ -288,10 +365,15 @@ function EventMarkers() {
   const setFeaturedEvent = useAppStore((state) => state.setFeaturedEvent);
   const setSelectedEvent = useAppStore((state) => state.setSelectedEvent);
 
-  const eventsWithLocations = useMemo(
-    () => events.filter((e) => e.location).slice(0, 30),
-    [events]
-  );
+  const eventsWithLocations = useMemo(() => {
+    // Sort: featured first, then by descending severity, then recency
+    const withLoc = events.filter((e) => e.location);
+    const featured = withLoc.filter((e) => e.id === featuredEvent?.id);
+    const rest = withLoc
+      .filter((e) => e.id !== featuredEvent?.id)
+      .sort((a, b) => (b.severity ?? 0) - (a.severity ?? 0) || b.timestamp - a.timestamp);
+    return deduplicateNearbyEvents([...featured, ...rest], featuredEvent?.id);
+  }, [events, featuredEvent?.id]);
 
   return (
     <group>
