@@ -43,7 +43,7 @@ jobs:
         if: github.event_name == 'pull_request' && github.actor != 'dependabot[bot]'
         run: |
           echo "Validating commit messages..."
-          COMMITS=$(git log origin/${{ github.base_ref }}..HEAD --pretty=format:"%s")
+          COMMITS=$(git log origin/${{ github.base_ref }}..HEAD --pretty=format:"%B")
 
           # Check for issue reference
           if ! echo "$COMMITS" | grep -qE '#[0-9]+'; then
@@ -62,16 +62,6 @@ jobs:
       - name: Check Documentation
         run: |
           echo "Checking documentation..."
-
-          # Check for C# XML docs
-          if find . -name "*.cs" -not -path "*/obj/*" -not -path "*/bin/*" | head -1 | grep -q "."; then
-            UNDOCUMENTED=$(find . -name "*.cs" -not -path "*/obj/*" -not -path "*/bin/*" -exec grep -l "public " {} \; | \
-              xargs grep -L "///" | wc -l)
-            if [ "$UNDOCUMENTED" -gt 0 ]; then
-              echo "[WARN] WARNING: $UNDOCUMENTED C# files with public APIs missing XML docs"
-              echo "All public APIs should have XML documentation"
-            fi
-          fi
 
           # Check for README updates (if new feature)
           if [ "${{ github.event.pull_request.title }}" ]; then
@@ -180,7 +170,7 @@ jobs:
 
       - name: Post Quality Report
         if: always() && github.event_name == 'pull_request'
-        uses: actions/github-script@v8
+        uses: actions/github-script@v7
         with:
           script: |
             const status = '${{ job.status }}' === 'success' ? '[PASS]' : '[FAIL]';

@@ -18,7 +18,7 @@ jobs:
     steps:
       - name: Check PR body for closing keyword
         id: check
-        uses: actions/github-script@v8
+        uses: actions/github-script@v7
         with:
           script: |
             const body = context.payload.pull_request.body || '';
@@ -68,7 +68,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Ensure status:in-progress label exists
-        uses: actions/github-script@v8
+        uses: actions/github-script@v7
         with:
           script: |
             try {
@@ -88,7 +88,7 @@ jobs:
             }
 
       - name: Apply label to linked issue
-        uses: actions/github-script@v8
+        uses: actions/github-script@v7
         with:
           script: |
             const issueNumber = parseInt('${{ needs.enforce-issue-link.outputs.issue_number }}');
