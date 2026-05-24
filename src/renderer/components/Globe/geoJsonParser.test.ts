@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseGeoJsonCoastlines } from './geoJsonParser';
-import { parseGeoJsonBoundaries } from './geoJsonParser';
+import { parseGeoJsonBoundaries, parseGeoJsonCoastlines } from './geoJsonParser';
 import type { GeoJsonFeatureCollection } from './geoJsonParser';
 import ne110mRaw from './ne_110m_coastline.geojson';
 import ne110mAdminBoundaryRaw from './ne_110m_admin_0_boundary_lines_land.geojson';

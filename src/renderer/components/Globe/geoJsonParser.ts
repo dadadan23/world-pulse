@@ -17,6 +17,14 @@ export interface ParsedBoundaryPolyline {
   style: ParsedBoundaryStyle;
 }
 
+const DISPUTED_TOKENS = [
+  'disputed',
+  'line of control',
+  'claim boundary',
+  'indefinite',
+  'indeterminant',
+];
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
@@ -52,15 +60,7 @@ function getFeatureClassification(feature: Record<string, unknown>): string {
 }
 
 function classifyBoundaryStyle(classification: string): ParsedBoundaryStyle {
-  const disputedTokens = [
-    'disputed',
-    'line of control',
-    'claim boundary',
-    'indefinite',
-    'indeterminant',
-  ];
-
-  return disputedTokens.some((token) => classification.includes(token)) ? 'disputed' : 'land';
+  return DISPUTED_TOKENS.some((token) => classification.includes(token)) ? 'disputed' : 'land';
 }
 
 /**
@@ -118,8 +118,8 @@ export function parseGeoJsonCoastlines(geojson: unknown): CoastlineData {
  * Parse boundary line GeoJSON and classify each segment for style rendering.
  *
  * Classification uses Natural Earth FEATURECLA metadata. Any segment marked as
- * disputed / line-of-control / claim / indefinite frontier is tagged as
- * `disputed`; all others default to `land`.
+ * disputed, line-of-control, claim, indefinite, or indeterminant frontier is
+ * tagged as `disputed`; all others default to `land`.
  */
 export function parseGeoJsonBoundaries(geojson: unknown): ParsedBoundaryPolyline[] {
   if (!isFeatureCollection(geojson)) {
@@ -145,7 +145,6 @@ export function parseGeoJsonBoundaries(geojson: unknown): ParsedBoundaryPolyline
     } else if (geoType === 'MultiLineString') {
       const rings = geometry['coordinates'];
       if (!Array.isArray(rings)) continue;
-
       for (const ring of rings) {
         const coords = safeCoords(ring);
         if (coords.length >= 2) {

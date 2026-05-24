@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { COASTLINES } from './coastlineData';
-import type { CoastlinePolyline } from './coastlineData';
+import type { ParsedBoundaryPolyline, ParsedBoundaryStyle } from './geoJsonParser';
 import { toX as projToX, toY as projToY } from './projection';
 import { generateHeightCanvas, generateNormalMap } from './normalMap';
 import {
@@ -15,12 +15,8 @@ import {
 /** Inject an alternative coastline source to swap built-in data for GeoJSON without touching render logic. */
 export type CoastlineSource = () => [number, number][][];
 
-export type BoundaryLineStyle = 'land' | 'disputed';
-
-export interface CountryBoundaryLine {
-  points: CoastlinePolyline;
-  style: BoundaryLineStyle;
-}
+export type BoundaryLineStyle = ParsedBoundaryStyle;
+export type CountryBoundaryLine = ParsedBoundaryPolyline;
 
 /** Inject an alternative country-boundary source for interior border rendering. */
 export type CountryBoundarySource = () => CountryBoundaryLine[];
