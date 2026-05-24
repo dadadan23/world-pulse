@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseGeoJsonCoastlines } from './geoJsonParser';
+import { parseGeoJsonBoundaries, parseGeoJsonCoastlines } from './geoJsonParser';
 import type { GeoJsonFeatureCollection } from './geoJsonParser';
 import ne110mRaw from './ne_110m_coastline.geojson';
 import ne110mAdminBoundaryRaw from './ne_110m_admin_0_boundary_lines_land.geojson';
@@ -375,5 +375,50 @@ describe('ne_110m_admin_0_boundary_lines_land.geojson integration', () => {
       polyline.some(([lon, lat]) => lon >= 5 && lon <= 25 && lat >= 45 && lat <= 55)
     );
     expect(europeBoundary).toBeDefined();
+  });
+});
+
+describe('parseGeoJsonBoundaries', () => {
+  it('classifies disputed and land boundaries from FEATURECLA', () => {
+    const input: GeoJsonFeatureCollection = {
+      type: 'FeatureCollection',
+      features: [
+        {
+          type: 'Feature',
+          properties: { FEATURECLA: 'International boundary (verify)' },
+          geometry: {
+            type: 'LineString',
+            coordinates: [
+              [0, 0],
+              [1, 1],
+            ],
+          },
+        },
+        {
+          type: 'Feature',
+          properties: { FEATURECLA: 'Disputed (please verify)' },
+          geometry: {
+            type: 'LineString',
+            coordinates: [
+              [10, 10],
+              [11, 11],
+            ],
+          },
+        },
+      ],
+    };
+
+    const result = parseGeoJsonBoundaries(input);
+    expect(result).toHaveLength(2);
+    expect(result[0].style).toBe('land');
+    expect(result[1].style).toBe('disputed');
+  });
+
+  it('parses Natural Earth boundaries and preserves both style classes', () => {
+    const result = parseGeoJsonBoundaries(ne110mAdminBoundaryRaw);
+
+    expect(result.length).toBeGreaterThan(MIN_BOUNDARY_SEGMENTS);
+    expect(result.some((segment) => segment.style === 'land')).toBe(true);
+    expect(result.some((segment) => segment.style === 'disputed')).toBe(true);
   });
 });

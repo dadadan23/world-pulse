@@ -1,5 +1,6 @@
 import type { ProjectionFn } from './projection';
 import type { CoastlinePolyline } from './coastlineData';
+import type { CountryBoundaryLine } from './textureRenderer';
 
 const OBLIVION_COLORS = {
   background: '#0A0A0F',
@@ -166,18 +167,31 @@ export function drawCoastlines(
 /** Draw faint dashed country boundary lines. */
 export function drawInteriorBorders(
   ctx: CanvasRenderingContext2D,
-  borders: CoastlinePolyline[],
+  borders: CountryBoundaryLine[],
   toX: ProjectionFn,
   toY: ProjectionFn
 ): void {
   // Country boundary features are line segments, not closed polygons.
   const shouldClosePath = false;
+
+  // Standard land borders: subtle dashed lines.
   ctx.strokeStyle = 'rgba(200,230,240,0.14)';
   ctx.lineWidth = 0.8;
+  ctx.lineCap = 'round';
   ctx.setLineDash([6, 4]);
   for (const border of borders) {
-    if (border.length < 2) continue;
-    strokeWrappedPath(ctx, border, toX, toY, shouldClosePath);
+    if (border.style !== 'land' || border.points.length < 2) continue;
+    strokeWrappedPath(ctx, border.points, toX, toY, shouldClosePath);
   }
+
+  // Disputed/indefinite borders: finer dotted pattern to distinguish clearly.
+  ctx.strokeStyle = 'rgba(200,230,240,0.2)';
+  ctx.lineWidth = 0.9;
+  ctx.setLineDash([2, 4]);
+  for (const border of borders) {
+    if (border.style !== 'disputed' || border.points.length < 2) continue;
+    strokeWrappedPath(ctx, border.points, toX, toY, shouldClosePath);
+  }
+
   ctx.setLineDash([]);
 }

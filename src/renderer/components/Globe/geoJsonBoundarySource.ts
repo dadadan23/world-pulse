@@ -1,12 +1,12 @@
 import type { CountryBoundarySource } from './textureRenderer';
-import { parseGeoJsonCoastlines } from './geoJsonParser';
+import { parseGeoJsonBoundaries } from './geoJsonParser';
 import boundaryGeoJson from './ne_110m_admin_0_boundary_lines_land.geojson';
 
 /**
  * Pre-parsed Natural Earth 110m admin-0 boundary lines.
  * Processed once at module load time so globe texture generation stays fast.
  */
-const NE_110M_BOUNDARIES = parseGeoJsonCoastlines(boundaryGeoJson);
+const NE_110M_BOUNDARIES = parseGeoJsonBoundaries(boundaryGeoJson);
 
 if (NE_110M_BOUNDARIES.length === 0) {
   console.warn(
