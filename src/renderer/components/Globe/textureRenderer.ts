@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { COASTLINES } from './coastlineData';
+import type { CoastlinePolyline } from './coastlineData';
 import { toX as projToX, toY as projToY } from './projection';
 import { generateHeightCanvas, generateNormalMap } from './normalMap';
 import {
@@ -13,8 +14,16 @@ import {
 
 /** Inject an alternative coastline source to swap built-in data for GeoJSON without touching render logic. */
 export type CoastlineSource = () => [number, number][][];
+
+export type BoundaryLineStyle = 'land' | 'disputed';
+
+export interface CountryBoundaryLine {
+  points: CoastlinePolyline;
+  style: BoundaryLineStyle;
+}
+
 /** Inject an alternative country-boundary source for interior border rendering. */
-export type CountryBoundarySource = () => [number, number][][];
+export type CountryBoundarySource = () => CountryBoundaryLine[];
 
 /**
  * Generate canvas-based earth textures with the Oblivion UI aesthetic.

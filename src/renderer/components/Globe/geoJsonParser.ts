@@ -10,6 +10,13 @@ export interface GeoJsonFeatureCollection {
   features: unknown[];
 }
 
+export type ParsedBoundaryStyle = 'land' | 'disputed';
+
+export interface ParsedBoundaryPolyline {
+  points: CoastlinePolyline;
+  style: ParsedBoundaryStyle;
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
@@ -34,6 +41,26 @@ function isCoordPair(v: unknown): v is [number, number] {
 function safeCoords(raw: unknown): [number, number][] {
   if (!Array.isArray(raw)) return [];
   return raw.filter(isCoordPair);
+}
+
+function getFeatureClassification(feature: Record<string, unknown>): string {
+  const props = feature['properties'];
+  if (!isRecord(props)) return '';
+
+  const raw = props['FEATURECLA'] ?? props['featurecla'];
+  return typeof raw === 'string' ? raw.toLowerCase() : '';
+}
+
+function classifyBoundaryStyle(classification: string): ParsedBoundaryStyle {
+  const disputedTokens = [
+    'disputed',
+    'line of control',
+    'claim boundary',
+    'indefinite',
+    'indeterminant',
+  ];
+
+  return disputedTokens.some((token) => classification.includes(token)) ? 'disputed' : 'land';
 }
 
 /**
@@ -82,6 +109,50 @@ export function parseGeoJsonCoastlines(geojson: unknown): CoastlineData {
       }
     }
     // Polygon / Point / other types are not coastline polylines; skip.
+  }
+
+  return result;
+}
+
+/**
+ * Parse boundary line GeoJSON and classify each segment for style rendering.
+ *
+ * Classification uses Natural Earth FEATURECLA metadata. Any segment marked as
+ * disputed / line-of-control / claim / indefinite frontier is tagged as
+ * `disputed`; all others default to `land`.
+ */
+export function parseGeoJsonBoundaries(geojson: unknown): ParsedBoundaryPolyline[] {
+  if (!isFeatureCollection(geojson)) {
+    return [];
+  }
+
+  const result: ParsedBoundaryPolyline[] = [];
+
+  for (const feature of geojson.features) {
+    if (!isRecord(feature)) continue;
+
+    const geometry = feature['geometry'];
+    if (!isRecord(geometry)) continue;
+
+    const style = classifyBoundaryStyle(getFeatureClassification(feature));
+    const geoType = geometry['type'];
+
+    if (geoType === 'LineString') {
+      const coords = safeCoords(geometry['coordinates']);
+      if (coords.length >= 2) {
+        result.push({ points: coords as CoastlinePolyline, style });
+      }
+    } else if (geoType === 'MultiLineString') {
+      const rings = geometry['coordinates'];
+      if (!Array.isArray(rings)) continue;
+
+      for (const ring of rings) {
+        const coords = safeCoords(ring);
+        if (coords.length >= 2) {
+          result.push({ points: coords as CoastlinePolyline, style });
+        }
+      }
+    }
   }
 
   return result;
