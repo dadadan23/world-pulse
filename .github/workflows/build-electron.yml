@@ -1,18 +1,18 @@
-name: Release
+name: Electron Build (main)
 
 on:
   push:
-    tags:
-      - 'v*'
+    branches: [main]
 
 jobs:
   build-electron:
-    name: Build Electron App (${{ matrix.os }})
+    name: Electron Build (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
         os: [macos-latest, ubuntu-latest, windows-latest]
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
 
@@ -25,20 +25,18 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build project
-        run: npm run build
+      - name: Build Electron app
+        run: npx electron-vite build
 
-      - name: Package Electron app
-        run: npm run build:electron
+      - name: Package Electron (directory only)
+        run: npx electron-builder --dir
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Upload release assets
-        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
+      - name: Upload Electron artifacts
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        continue-on-error: true
         with:
-          draft: true
-          prerelease: false
-          fail_on_unmatched_files: false
-          files: release/*
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          name: electron-${{ matrix.os }}
+          path: release/
+          retention-days: 7
