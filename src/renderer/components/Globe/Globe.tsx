@@ -23,33 +23,146 @@ const OB_COLORS = {
   stars: '#C8E6F0',
 };
 
-/** Atmosphere glow rendered on the backside of a slightly larger sphere */
-function Atmosphere() {
+const ATMOSPHERE_VERTEX_SHADER = `
+varying float vFresnel;
+varying float vSun;
+
+uniform float uPower;
+uniform vec3 uSunDirection;
+
+void main() {
+  vec3 worldNormal = normalize(mat3(modelMatrix) * normal);
+  vec3 worldPosition = (modelMatrix * vec4(position, 1.0)).xyz;
+  vec3 viewDirection = normalize(cameraPosition - worldPosition);
+
+  float fresnel = 1.0 - clamp(dot(worldNormal, viewDirection), 0.0, 1.0);
+  vFresnel = pow(fresnel, uPower);
+  vSun = clamp(dot(worldNormal, normalize(uSunDirection)) * 0.5 + 0.5, 0.0, 1.0);
+
+  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+}
+`;
+
+const ATMOSPHERE_FRAGMENT_SHADER = `
+varying float vFresnel;
+varying float vSun;
+
+uniform vec3 uColor;
+uniform float uOpacity;
+uniform float uIntensity;
+uniform float uPulseAmplitude;
+uniform float uTime;
+
+void main() {
+  float pulse = 1.0 + sin(uTime * 0.6) * uPulseAmplitude;
+  float sunBoost = mix(0.85, 1.15, vSun);
+  float alpha = vFresnel * uOpacity * uIntensity * pulse * sunBoost;
+
+  gl_FragColor = vec4(uColor, alpha);
+}
+`;
+
+const SUN_DIRECTION = new THREE.Vector3(0.6, 0.6, 0.5).normalize();
+
+function usePrefersReducedMotion(): boolean {
+  const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+      return;
+    }
+
+    const media = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const update = () => setPrefersReducedMotion(media.matches);
+
+    update();
+
+    if (typeof media.addEventListener === 'function') {
+      media.addEventListener('change', update);
+      return () => media.removeEventListener('change', update);
+    }
+
+    media.addListener(update);
+    return () => media.removeListener(update);
+  }, []);
+
+  return prefersReducedMotion;
+}
+
+function AtmosphereLayer({
+  scale,
+  opacity,
+  power,
+  intensity,
+  reducedMotion,
+}: {
+  scale: number;
+  opacity: number;
+  power: number;
+  intensity: number;
+  reducedMotion: boolean;
+}) {
+  const materialRef = useRef<THREE.ShaderMaterial | null>(null);
+
+  const material = useMemo(
+    () =>
+      new THREE.ShaderMaterial({
+        transparent: true,
+        depthWrite: false,
+        side: THREE.BackSide,
+        blending: THREE.AdditiveBlending,
+        vertexShader: ATMOSPHERE_VERTEX_SHADER,
+        fragmentShader: ATMOSPHERE_FRAGMENT_SHADER,
+        uniforms: {
+          uColor: { value: new THREE.Color(OB_COLORS.atmosphere) },
+          uOpacity: { value: opacity },
+          uPower: { value: power },
+          uIntensity: { value: intensity },
+          uPulseAmplitude: { value: reducedMotion ? 0 : 0.05 },
+          uSunDirection: { value: SUN_DIRECTION.clone() },
+          uTime: { value: 0 },
+        },
+      }),
+    [opacity, power, intensity, reducedMotion]
+  );
+
+  useEffect(() => {
+    materialRef.current = material;
+    return () => material.dispose();
+  }, [material]);
+
+  useFrame((state) => {
+    if (!materialRef.current) return;
+    materialRef.current.uniforms.uTime.value = reducedMotion ? 0 : state.clock.elapsedTime;
+  });
+
   return (
     <mesh>
-      <sphereGeometry args={[GLOBE_RADIUS * 1.06, 64, 32]} />
-      <meshBasicMaterial
-        color={OB_COLORS.atmosphere}
-        transparent
-        opacity={0.15}
-        side={THREE.BackSide}
-      />
+      <sphereGeometry args={[GLOBE_RADIUS * scale, 64, 32]} />
+      <primitive attach="material" object={material} />
     </mesh>
   );
 }
 
-/** Outer atmosphere ring for additional depth */
-function AtmosphereRing() {
+/** Multi-layer Fresnel atmosphere: inner soft glow + outer diffuse haze. */
+function Atmosphere({ reducedMotion }: { reducedMotion: boolean }) {
   return (
-    <mesh rotation={[Math.PI / 2, 0, 0]}>
-      <ringGeometry args={[GLOBE_RADIUS * 1.02, GLOBE_RADIUS * 1.12, 64]} />
-      <meshBasicMaterial
-        color={OB_COLORS.cyan}
-        transparent
-        opacity={0.12}
-        side={THREE.DoubleSide}
+    <group>
+      <AtmosphereLayer
+        scale={1.045}
+        opacity={0.24}
+        power={2.2}
+        intensity={0.95}
+        reducedMotion={reducedMotion}
       />
-    </mesh>
+      <AtmosphereLayer
+        scale={1.095}
+        opacity={0.16}
+        power={3.4}
+        intensity={0.8}
+        reducedMotion={reducedMotion}
+      />
+    </group>
   );
 }
 
@@ -443,6 +556,7 @@ function CityLabelsWithTracking() {
 /** Main Globe component - fills its container (100vw x 100vh from Dashboard) */
 export function Globe() {
   const [isInteracting, setIsInteracting] = useState(false);
+  const prefersReducedMotion = usePrefersReducedMotion();
 
   const handlePointerDown = useCallback(() => setIsInteracting(true), []);
   const handlePointerUp = useCallback(() => {
@@ -468,8 +582,7 @@ export function Globe() {
         <Stars />
         <RotatingGlobe isPaused={isInteracting}>
           <EarthSphere />
-          <Atmosphere />
-          <AtmosphereRing />
+          <Atmosphere reducedMotion={prefersReducedMotion} />
           <HomeBeacon />
           <EventMarkers />
           <CityLabelsWithTracking />
