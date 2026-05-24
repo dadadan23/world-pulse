@@ -6,12 +6,8 @@ on:
 
 jobs:
   build-electron:
-    name: Electron Build (${{ matrix.os }})
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [macos-latest, ubuntu-latest, windows-latest]
+    name: Electron Build
+    runs-on: self-hosted
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
@@ -37,6 +33,6 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         continue-on-error: true
         with:
-          name: electron-${{ matrix.os }}
+          name: electron-build
           path: release/
           retention-days: 7
