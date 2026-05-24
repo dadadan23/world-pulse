@@ -6,6 +6,7 @@ import { generateHeightCanvas, generateNormalMap } from './normalMap';
 import {
   drawBaseLayer,
   drawGridLines,
+  drawOceanDepthShading,
   drawContinentFills,
   drawContourLines,
   drawCoastlines,
@@ -58,6 +59,7 @@ export function createEarthTextures(
   const heightCanvas = generateHeightCanvas(hmWidth, hmHeight, coastlines, hmToX, hmToY);
 
   drawBaseLayer(ctx, width, height);
+  drawOceanDepthShading(ctx, coastlines, toX, toY);
   drawGridLines(ctx, width, height, toX, toY);
   drawContinentFills(ctx, coastlines, toX, toY);
   drawContourLines(ctx, coastlines, toX, toY);
@@ -67,7 +69,7 @@ export function createEarthTextures(
   // Composite height shading (multiply blend)
   ctx.save();
   ctx.globalCompositeOperation = 'multiply';
-  ctx.globalAlpha = 0.7;
+  ctx.globalAlpha = 0.58;
   ctx.drawImage(heightCanvas, 0, 0, width, height);
   ctx.restore();
 

@@ -4,12 +4,16 @@ import type { CountryBoundaryLine } from './textureRenderer';
 
 const OBLIVION_COLORS = {
   background: '#0A0A0F',
+  oceanDeep: '#071019',
+  oceanMid: '#0b1822',
+  oceanShelf: 'rgba(18, 72, 86, 0.24)',
   gridDot: 'rgba(200, 230, 240, 0.03)',
   gridLine: 'rgba(0, 212, 255, 0.06)',
   gridMajor: 'rgba(0, 212, 255, 0.12)',
   coastline: 'rgba(0, 212, 255, 0.85)',
   coastlineGlow: 'rgba(0, 212, 255, 0.45)',
-  landFill: 'rgba(0, 212, 255, 0.14)',
+  landFillLow: '#0d2430',
+  landFillHigh: '#173643',
   contourLine: 'rgba(0, 212, 255, 0.28)',
 };
 
@@ -40,7 +44,11 @@ function strokeWrappedPath(
 
 /** Draw background fill and Oblivion dot grid. */
 export function drawBaseLayer(ctx: CanvasRenderingContext2D, width: number, height: number): void {
-  ctx.fillStyle = OBLIVION_COLORS.background;
+  const gradient = ctx.createLinearGradient(0, 0, 0, height);
+  gradient.addColorStop(0, OBLIVION_COLORS.oceanDeep);
+  gradient.addColorStop(0.5, OBLIVION_COLORS.oceanMid);
+  gradient.addColorStop(1, OBLIVION_COLORS.background);
+  ctx.fillStyle = gradient;
   ctx.fillRect(0, 0, width, height);
   ctx.fillStyle = OBLIVION_COLORS.gridDot;
   const dotSpacing = 20;
@@ -50,6 +58,29 @@ export function drawBaseLayer(ctx: CanvasRenderingContext2D, width: number, heig
       ctx.arc(x, y, 1, 0, Math.PI * 2);
       ctx.fill();
     }
+  }
+}
+
+/** Draw ocean depth cues with broad shelf strokes around coastlines. */
+export function drawOceanDepthShading(
+  ctx: CanvasRenderingContext2D,
+  coastlines: CoastlinePolyline[],
+  toX: ProjectionFn,
+  toY: ProjectionFn
+): void {
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+
+  ctx.strokeStyle = 'rgba(11, 40, 52, 0.16)';
+  ctx.lineWidth = 34;
+  for (const coastline of coastlines) {
+    strokeWrappedPath(ctx, coastline, toX, toY, false);
+  }
+
+  ctx.strokeStyle = OBLIVION_COLORS.oceanShelf;
+  ctx.lineWidth = 18;
+  for (const coastline of coastlines) {
+    strokeWrappedPath(ctx, coastline, toX, toY, false);
   }
 }
 
@@ -110,12 +141,20 @@ export function drawContinentFills(
   toX: ProjectionFn,
   toY: ProjectionFn
 ): void {
-  ctx.fillStyle = OBLIVION_COLORS.landFill;
   for (const coastline of coastlines) {
     if (coastline.length < 4) continue;
     const first = coastline[0];
     const last = coastline[coastline.length - 1];
     if (Math.abs(first[0] - last[0]) >= 5 || Math.abs(first[1] - last[1]) >= 5) continue;
+
+    const latitudes = coastline.map(([, lat]) => lat);
+    const minLat = Math.min(...latitudes);
+    const maxLat = Math.max(...latitudes);
+    const fillGradient = ctx.createLinearGradient(0, toY(maxLat), 0, toY(minLat));
+    fillGradient.addColorStop(0, OBLIVION_COLORS.landFillHigh);
+    fillGradient.addColorStop(1, OBLIVION_COLORS.landFillLow);
+
+    ctx.fillStyle = fillGradient;
     ctx.beginPath();
     ctx.moveTo(toX(coastline[0][0]), toY(coastline[0][1]));
     for (let i = 1; i < coastline.length; i++)
