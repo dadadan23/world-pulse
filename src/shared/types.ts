@@ -225,12 +225,19 @@ export interface DataCollector {
  */
 export type CollectorHealthStatus = 'healthy' | 'degraded' | 'disabled';
 
+/**
+ * Quality tier for data collectors.
+ * Primary collectors provide core event data; supplementary collectors enrich the display.
+ */
+export type QualityTier = 'primary' | 'supplementary';
+
 export interface CollectorHealth {
   name: string;
   status: CollectorHealthStatus;
   lastFetchAt: number | null;
   errorCount: number;
   isEnabled: boolean;
+  qualityTier: QualityTier;
 }
 
 /**

@@ -233,6 +233,10 @@ describe('Server API', () => {
       }
     }
 
+    class FakePrimaryCollector extends FakeCollector {
+      public readonly qualityTier = 'primary' as const;
+    }
+
     it('should return CollectorHealth shape for each collector', async () => {
       const { app: expressApp, setCollectors } = setup();
       const collector = new FakeCollector('earthquakes', 'earthquake', 60000);
@@ -249,7 +253,26 @@ describe('Server API', () => {
         lastFetchAt: null,
         errorCount: 0,
         isEnabled: true,
+        qualityTier: 'supplementary',
       });
+    });
+
+    it('should report degraded overall status when a primary collector is disabled', async () => {
+      const { app: expressApp, setCollectors } = setup();
+      const collector = new FakePrimaryCollector('earthquakes', 'earthquake', 60000, 1);
+      collector.fetch = async () => {
+        throw new Error('primary source unavailable');
+      };
+
+      // One failure reaches maxErrors=1 and disables the collector.
+      await collector.pollNow(() => {});
+      setCollectors([collector]);
+
+      const res = await request(expressApp).get('/api/status');
+      expect(res.status).toBe(200);
+      expect(res.body.status).toBe('degraded');
+      expect(res.body.collectors[0].qualityTier).toBe('primary');
+      expect(res.body.collectors[0].status).toBe('disabled');
     });
 
     it('should report degraded when collector has errors', async () => {

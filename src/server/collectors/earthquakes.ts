@@ -4,7 +4,7 @@
  */
 
 import axios from 'axios';
-import type { Event, EarthquakeEvent } from '@shared/types';
+import type { Event, EarthquakeEvent, QualityTier } from '@shared/types';
 import { BaseCollector } from './base';
 
 interface USGSFeature {
@@ -30,6 +30,7 @@ interface USGSResponse {
 }
 
 export class EarthquakeCollector extends BaseCollector {
+  public readonly qualityTier: QualityTier = 'primary';
   private readonly apiUrl = 'https://earthquake.usgs.gov/fdsnws/event/1/query';
   private readonly minMagnitude = 2.5; // Only show significant quakes
   private readonly lookbackHours = 24;

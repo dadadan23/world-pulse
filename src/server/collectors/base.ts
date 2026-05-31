@@ -3,7 +3,7 @@
  * All data source plugins should extend this
  */
 
-import type { Event, DataCollector, EventType } from '@shared/types';
+import type { Event, DataCollector, EventType, QualityTier } from '@shared/types';
 
 /** Maximum backoff interval: 5 minutes */
 const MAX_BACKOFF_MS = 5 * 60 * 1000;
@@ -16,6 +16,7 @@ export abstract class BaseCollector implements DataCollector {
   public readonly type: EventType;
   public readonly interval: number;
   public enabled: boolean = true;
+  public readonly qualityTier: QualityTier = 'supplementary';
 
   private pollTimer: NodeJS.Timeout | null = null;
   private recoveryTimer: NodeJS.Timeout | null = null;
@@ -233,6 +234,7 @@ export abstract class BaseCollector implements DataCollector {
       disabledReason: this.disabledReason,
       recoveryPending: this.recoveryTimer !== null,
       healthy: this.enabled && this.pollTimer !== null && this.errorCount < this.maxErrors,
+      qualityTier: this.qualityTier,
     };
   }
 }
