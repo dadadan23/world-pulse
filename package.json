@@ -31,14 +31,14 @@
   "dependencies": {
     "@react-three/drei": "^9.96.0",
     "@react-three/fiber": "^8.15.0",
-    "axios": "^1.6.0",
+    "axios": "^1.16.1",
     "dotenv": "^16.3.1",
     "express": "^4.18.2",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "socket.io": "^4.6.1",
-    "socket.io-client": "^4.6.1",
-"three": "^0.160.0",
+    "socket.io": "^4.8.3",
+    "socket.io-client": "^4.8.3",
+    "three": "^0.160.0",
     "zustand": "^4.4.7"
   },
   "devDependencies": {
@@ -85,7 +85,9 @@
   "overrides": {
     "tar": "^7.5.7",
     "cacache": "^19.0.0",
-    "make-fetch-happen": "^15.0.3"
+    "make-fetch-happen": "^15.0.3",
+    "qs": "^6.14.0",
+    "ws": "^8.18.3"
   },
   "lint-staged": {
     "*.{ts,tsx}": [

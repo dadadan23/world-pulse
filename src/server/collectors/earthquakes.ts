@@ -25,8 +25,14 @@ interface USGSFeature {
 
 interface USGSResponse {
   type: string;
-  metadata: any;
+  metadata: Record<string, unknown>;
   features: USGSFeature[];
+}
+
+interface USGSFeatureLike {
+  properties?: {
+    mag?: unknown;
+  };
 }
 
 export class EarthquakeCollector extends BaseCollector {
@@ -61,11 +67,14 @@ export class EarthquakeCollector extends BaseCollector {
 
   validate(data: unknown): data is USGSResponse {
     if (typeof data !== 'object' || data === null) return false;
-    const obj = data as any;
+    const obj = data as Partial<USGSResponse>;
     return (
       obj.type === 'FeatureCollection' &&
       Array.isArray(obj.features) &&
-      obj.features.every((f: any) => f.properties?.mag !== undefined)
+      obj.features.every((feature) => {
+        const candidate = feature as USGSFeatureLike;
+        return candidate.properties?.mag !== undefined;
+      })
     );
   }
 
