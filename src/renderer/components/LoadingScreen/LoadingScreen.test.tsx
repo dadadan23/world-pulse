@@ -11,6 +11,7 @@ function makeCollector(overrides: Partial<CollectorHealth> = {}): CollectorHealt
     lastFetchAt: Date.now(),
     errorCount: 0,
     isEnabled: true,
+    qualityTier: 'supplementary',
     ...overrides,
   };
 }

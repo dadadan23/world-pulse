@@ -216,6 +216,7 @@ describe('useAppStore', () => {
             lastFetchAt: null,
             errorCount: 0,
             isEnabled: true,
+            qualityTier: 'supplementary' as const,
           },
         ],
       };

@@ -27,7 +27,7 @@ export function useSocket() {
         if (response.ok) {
           const status = await response.json();
           setServerStatus({
-            ready: status.status === 'ready',
+            ready: status.status === 'ready' || status.status === 'degraded',
             collectors: status.collectors || [],
           });
         }

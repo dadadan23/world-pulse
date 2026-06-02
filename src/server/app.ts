@@ -23,6 +23,7 @@ function toCollectorHealth(collector: BaseCollector): CollectorHealth {
     lastFetchAt: raw.lastFetch || null,
     errorCount: raw.errorCount,
     isEnabled: raw.enabled,
+    qualityTier: collector.qualityTier,
   };
 }
 
@@ -84,9 +85,13 @@ export function createApp(options?: { corsOrigin?: string }) {
   app.get('/api/status', (_req, res) => {
     const collectorHealth = collectors.map(toCollectorHealth);
     const healthyCount = collectorHealth.filter((c) => c.status === 'healthy').length;
+    const primaryCollectors = collectorHealth.filter((c) => c.qualityTier === 'primary');
+    const primaryAllHealthy =
+      primaryCollectors.length === 0 || primaryCollectors.every((c) => c.status === 'healthy');
+    const overallStatus = primaryAllHealthy ? 'ready' : 'degraded';
 
     res.json({
-      status: 'ready',
+      status: overallStatus,
       timestamp: new Date().toISOString(),
       collectors: collectorHealth,
       collectorsTotal: collectorHealth.length,

@@ -45,6 +45,11 @@ class SucceedingCollector extends BaseCollector {
   }
 }
 
+/** Collector that marks itself as primary quality tier */
+class PrimaryTierCollector extends SucceedingCollector {
+  public readonly qualityTier = 'primary' as const;
+}
+
 /** Collector that fails N times then succeeds */
 class RecoverableCollector extends BaseCollector {
   callCount = 0;
@@ -110,6 +115,18 @@ describe('BaseCollector', () => {
     await c.pollNow(noop).catch(() => {});
     expect(c.getStatus().errorCount).toBe(0);
     expect(c.getStatus().enabled).toBe(true);
+  });
+
+  describe('quality tier', () => {
+    it('defaults to supplementary quality tier', () => {
+      const c = new SucceedingCollector();
+      expect(c.getStatus().qualityTier).toBe('supplementary');
+    });
+
+    it('reports primary quality tier when overridden by subclass', () => {
+      const c = new PrimaryTierCollector();
+      expect(c.getStatus().qualityTier).toBe('primary');
+    });
   });
 
   describe('exponential backoff', () => {

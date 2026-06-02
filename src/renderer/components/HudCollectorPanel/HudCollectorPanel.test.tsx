@@ -13,7 +13,14 @@ function makeCollector(
   status: CollectorHealth['status'],
   errorCount = 0
 ): CollectorHealth {
-  return { name, status, errorCount, lastFetchAt: Date.now(), isEnabled: status !== 'disabled' };
+  return {
+    name,
+    status,
+    errorCount,
+    lastFetchAt: Date.now(),
+    isEnabled: status !== 'disabled',
+    qualityTier: 'supplementary',
+  };
 }
 
 const defaultStore = {

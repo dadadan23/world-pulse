@@ -4,7 +4,7 @@
  */
 
 import axios from 'axios';
-import type { Event, EarthquakeEvent } from '@shared/types';
+import type { Event, EarthquakeEvent, QualityTier } from '@shared/types';
 import { BaseCollector } from './base';
 
 interface USGSFeature {
@@ -25,11 +25,18 @@ interface USGSFeature {
 
 interface USGSResponse {
   type: string;
-  metadata: any;
+  metadata: Record<string, unknown>;
   features: USGSFeature[];
 }
 
+interface USGSFeatureLike {
+  properties?: {
+    mag?: unknown;
+  };
+}
+
 export class EarthquakeCollector extends BaseCollector {
+  public readonly qualityTier: QualityTier = 'primary';
   private readonly apiUrl = 'https://earthquake.usgs.gov/fdsnws/event/1/query';
   private readonly minMagnitude = 2.5; // Only show significant quakes
   private readonly lookbackHours = 24;
@@ -60,11 +67,14 @@ export class EarthquakeCollector extends BaseCollector {
 
   validate(data: unknown): data is USGSResponse {
     if (typeof data !== 'object' || data === null) return false;
-    const obj = data as any;
+    const obj = data as Partial<USGSResponse>;
     return (
       obj.type === 'FeatureCollection' &&
       Array.isArray(obj.features) &&
-      obj.features.every((f: any) => f.properties?.mag !== undefined)
+      obj.features.every((feature) => {
+        const candidate = feature as USGSFeatureLike;
+        return candidate.properties?.mag !== undefined;
+      })
     );
   }
 

@@ -5,7 +5,7 @@
  */
 
 import axios from 'axios';
-import type { Event, VolcanoEvent } from '@shared/types';
+import type { Event, VolcanoEvent, QualityTier } from '@shared/types';
 import { BaseCollector } from './base';
 
 interface USGSVolcano {
@@ -37,6 +37,7 @@ interface USGSElevatedResponse {
 }
 
 export class VolcanoCollector extends BaseCollector {
+  public readonly qualityTier: QualityTier = 'primary';
   // Get all elevated volcanoes (yellow, orange, red alert levels)
   private readonly elevatedUrl =
     'https://volcanoes.usgs.gov/hans-public/api/volcano/getElevatedVolcanoes';

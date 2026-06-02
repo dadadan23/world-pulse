@@ -20,7 +20,7 @@ export function useCollectorHealthPolling() {
         if (res.ok) {
           const data = (await res.json()) as StatusResponse;
           setServerStatus({
-            ready: data.status === 'ready',
+            ready: data.status === 'ready' || data.status === 'degraded',
             collectors: data.collectors ?? [],
           });
         }
