@@ -75,10 +75,12 @@ jobs:
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@75cd11691c0faa626561e295848008c8a7dddffe # v5
+        continue-on-error: true
         with:
           files: ./coverage/coverage-final.json
           flags: unittests
           fail_ci_if_error: false
+          skip_validation: true
 
   e2e:
     name: E2E Tests (Playwright)
