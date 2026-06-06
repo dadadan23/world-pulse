@@ -29,6 +29,8 @@
   --ob-border-active: rgba(0, 212, 255, 0.4);
   --ob-glow-cyan: rgba(0, 212, 255, 0.3);
   --ob-glow-amber: rgba(255, 140, 66, 0.3);
+  --ob-glow-success: rgba(74, 230, 138, 0.35);
+  --ob-glow-danger: rgba(255, 61, 61, 0.35);
 
   /* Typography */
   --ob-font-mono: 'JetBrains Mono', 'SF Mono', 'Fira Code', 'Consolas', monospace;
@@ -246,6 +248,22 @@ body {
   animation: breathingGlow var(--ob-timing-pulse) ease-in-out infinite;
 }
 
+.ob-glow-success {
+  animation: breathingGlowSuccess var(--ob-timing-pulse) ease-in-out infinite;
+}
+
+@keyframes breathingGlowSuccess {
+  0%,
+  100% {
+    box-shadow: 0 0 5px var(--ob-glow-success);
+  }
+  50% {
+    box-shadow:
+      0 0 20px var(--ob-glow-success),
+      0 0 40px rgba(74, 230, 138, 0.1);
+  }
+}
+
 @keyframes breathingGlow {
   0%,
   100% {
@@ -313,35 +331,40 @@ body {
    ============================================ */
 .ob-status-nominal {
   color: var(--ob-success);
+  box-shadow: 0 0 6px var(--ob-glow-success);
 }
 
 .ob-status-warning {
   color: var(--ob-accent-amber);
-  animation: warningPulse 1s ease-in-out infinite;
+  animation: warningPulse 3s ease-in-out infinite;
 }
 
 @keyframes warningPulse {
   0%,
   100% {
-    opacity: 1;
+    box-shadow: 0 0 4px var(--ob-glow-amber);
   }
   50% {
-    opacity: 0.6;
+    box-shadow:
+      0 0 12px var(--ob-glow-amber),
+      0 0 24px rgba(255, 140, 66, 0.15);
   }
 }
 
 .ob-status-critical {
   color: var(--ob-danger);
-  animation: criticalPulse 0.5s ease-in-out infinite;
+  animation: criticalPulse 1s ease-in-out infinite;
 }
 
 @keyframes criticalPulse {
   0%,
   100% {
-    opacity: 1;
+    box-shadow: 0 0 4px var(--ob-glow-danger);
   }
   50% {
-    opacity: 0.4;
+    box-shadow:
+      0 0 14px var(--ob-glow-danger),
+      0 0 28px rgba(255, 61, 61, 0.2);
   }
 }
 
@@ -706,6 +729,7 @@ body {
   .ob-scanline::after,
   .ob-dot-grid-animated,
   .ob-glow,
+  .ob-glow-success,
   .ob-text-glow,
   .ob-glitch,
   .ob-status-warning,

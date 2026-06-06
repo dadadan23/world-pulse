@@ -10,7 +10,7 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({ state, children }) => 
   switch (state) {
     case 'nominal':
       return (
-        <span className={`${base} text-ob-success bg-ob-success/8`}>{children || 'NOMINAL'}</span>
+        <span className={`${base} ob-status-nominal bg-ob-success/8`}>{children || 'NOMINAL'}</span>
       );
     case 'warning':
       return (
