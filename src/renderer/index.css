@@ -249,6 +249,7 @@ body {
 }
 
 .ob-glow-success {
+  box-shadow: 0 0 5px var(--ob-glow-success);
   animation: breathingGlowSuccess var(--ob-timing-pulse) ease-in-out infinite;
 }
 
@@ -336,6 +337,7 @@ body {
 
 .ob-status-warning {
   color: var(--ob-accent-amber);
+  box-shadow: 0 0 4px var(--ob-glow-amber);
   animation: warningPulse 3s ease-in-out infinite;
 }
 
@@ -353,6 +355,7 @@ body {
 
 .ob-status-critical {
   color: var(--ob-danger);
+  box-shadow: 0 0 4px var(--ob-glow-danger);
   animation: criticalPulse 1s ease-in-out infinite;
 }
 
