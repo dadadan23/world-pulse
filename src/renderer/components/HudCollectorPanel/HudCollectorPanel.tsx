@@ -51,6 +51,7 @@ export function HudCollectorPanel() {
                     name={c.name}
                     status={c.status}
                     errorCount={c.errorCount}
+                    isStale={c.isStale}
                   />
                 ))}
               </div>

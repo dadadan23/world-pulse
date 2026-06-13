@@ -55,4 +55,24 @@ describe('CollectorHealthBadge', () => {
     render(<CollectorHealthBadge name="aurora" status="healthy" />);
     expect(screen.getByText('AURORA')).toBeDefined();
   });
+
+  it('shows STALE label when healthy but stale', () => {
+    render(<CollectorHealthBadge name="Weather" status="healthy" isStale={true} />);
+    expect(screen.getByText('STALE')).toBeDefined();
+  });
+
+  it('shows LIVE label when healthy and not stale', () => {
+    render(<CollectorHealthBadge name="Weather" status="healthy" isStale={false} />);
+    expect(screen.getByText('LIVE')).toBeDefined();
+  });
+
+  it('shows LIVE label when healthy and isStale is not provided', () => {
+    render(<CollectorHealthBadge name="Weather" status="healthy" />);
+    expect(screen.getByText('LIVE')).toBeDefined();
+  });
+
+  it('shows DEGRADED label even when isStale is true (stale only overrides healthy)', () => {
+    render(<CollectorHealthBadge name="Weather" status="degraded" isStale={true} />);
+    expect(screen.getByText('DEGRADED')).toBeDefined();
+  });
 });

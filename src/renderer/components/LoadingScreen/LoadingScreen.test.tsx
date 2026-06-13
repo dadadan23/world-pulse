@@ -12,6 +12,8 @@ function makeCollector(overrides: Partial<CollectorHealth> = {}): CollectorHealt
     errorCount: 0,
     isEnabled: true,
     qualityTier: 'supplementary',
+    intervalMs: 60_000,
+    isStale: false,
     ...overrides,
   };
 }

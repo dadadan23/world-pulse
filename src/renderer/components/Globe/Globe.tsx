@@ -511,6 +511,56 @@ function EventMarkers() {
   );
 }
 
+const GRATICULE_RADIUS = GLOBE_RADIUS * 1.003;
+const GRATICULE_STEPS = 64;
+
+function buildGraticulePositions(): Float32Array {
+  const pts: number[] = [];
+
+  // Parallels at every 30° latitude (skip poles)
+  for (const lat of [-60, -30, 0, 30, 60]) {
+    for (let i = 0; i < GRATICULE_STEPS; i++) {
+      const lon1 = (i / GRATICULE_STEPS) * 360 - 180;
+      const lon2 = ((i + 1) / GRATICULE_STEPS) * 360 - 180;
+      const p1 = latLonToVector3(lat, lon1, GRATICULE_RADIUS);
+      const p2 = latLonToVector3(lat, lon2, GRATICULE_RADIUS);
+      pts.push(p1.x, p1.y, p1.z, p2.x, p2.y, p2.z);
+    }
+  }
+
+  // Meridians at every 30° longitude
+  for (let lon = -180; lon < 180; lon += 30) {
+    for (let i = 0; i < GRATICULE_STEPS; i++) {
+      const lat1 = (i / GRATICULE_STEPS) * 180 - 90;
+      const lat2 = ((i + 1) / GRATICULE_STEPS) * 180 - 90;
+      const p1 = latLonToVector3(lat1, lon, GRATICULE_RADIUS);
+      const p2 = latLonToVector3(lat2, lon, GRATICULE_RADIUS);
+      pts.push(p1.x, p1.y, p1.z, p2.x, p2.y, p2.z);
+    }
+  }
+
+  return new Float32Array(pts);
+}
+
+/** Latitude/longitude graticule grid — subtle geographic reference lines */
+function Graticule() {
+  const positions = useMemo(() => buildGraticulePositions(), []);
+
+  return (
+    <lineSegments>
+      <bufferGeometry>
+        <bufferAttribute
+          attach="attributes-position"
+          array={positions}
+          count={positions.length / 3}
+          itemSize={3}
+        />
+      </bufferGeometry>
+      <lineBasicMaterial color={OB_COLORS.cyan} transparent opacity={0.09} />
+    </lineSegments>
+  );
+}
+
 /** Small background stars for ambiance */
 function Stars() {
   const positions = useMemo(() => {
@@ -582,6 +632,7 @@ export function Globe() {
         <Stars />
         <RotatingGlobe isPaused={isInteracting}>
           <EarthSphere />
+          <Graticule />
           <Atmosphere reducedMotion={prefersReducedMotion} />
           <HomeBeacon />
           <EventMarkers />

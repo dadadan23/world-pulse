@@ -5,6 +5,7 @@ type Props = {
   name: string;
   status: CollectorHealthStatus;
   errorCount?: number;
+  isStale?: boolean;
 };
 
 const DOT_CLASSES: Record<CollectorHealthStatus, string> = {
@@ -25,18 +26,23 @@ const STATUS_LABELS: Record<CollectorHealthStatus, string> = {
   disabled: 'DISABLED',
 };
 
-export function CollectorHealthBadge({ name, status, errorCount }: Props) {
+export function CollectorHealthBadge({ name, status, errorCount, isStale }: Props) {
   const title =
     errorCount != null && errorCount > 0
       ? `${errorCount} error${errorCount !== 1 ? 's' : ''}`
       : undefined;
 
+  const showStale = isStale && status === 'healthy';
+  const dotClass = showStale ? 'bg-ob-amber' : DOT_CLASSES[status];
+  const badgeState = showStale ? 'warning' : BADGE_STATE[status];
+  const label = showStale ? 'STALE' : STATUS_LABELS[status];
+
   return (
     <div className="flex items-center justify-between w-full" title={title}>
       <span className="ob-label text-ob-text">{name.toUpperCase()}</span>
       <div className="flex items-center gap-1.5">
-        <div className={`w-1.5 h-1.5 rounded-full ${DOT_CLASSES[status]}`} />
-        <StatusBadge state={BADGE_STATE[status]}>{STATUS_LABELS[status]}</StatusBadge>
+        <div className={`w-1.5 h-1.5 rounded-full ${dotClass}`} />
+        <StatusBadge state={badgeState}>{label}</StatusBadge>
       </div>
     </div>
   );
