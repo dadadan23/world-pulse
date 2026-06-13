@@ -1,5 +1,6 @@
 import dotenv from 'dotenv';
 import { createApp } from './app';
+import { CollectorRegistry } from './collectors/registry';
 import { EarthquakeCollector } from './collectors/earthquakes';
 import { ISSCollector } from './collectors/iss';
 import { AuroraCollector } from './collectors/aurora';
@@ -7,6 +8,7 @@ import { AsteroidCollector } from './collectors/asteroids';
 import { VolcanoCollector } from './collectors/volcanoes';
 import { PlanetCollector } from './collectors/planets';
 import { WeatherCollector } from './collectors/weather';
+import type { CollectorManifest } from '@shared/types';
 
 // Load environment variables
 dotenv.config();
@@ -17,71 +19,161 @@ const { httpServer, io, addEvents, setCollectors } = createApp({
   corsOrigin: process.env.VITE_DEV_SERVER_URL || 'http://localhost:5173',
 });
 
-// Initialize all collectors
-const collectors = [
-  new EarthquakeCollector(),
-  new ISSCollector(),
-  new AuroraCollector(),
-  new AsteroidCollector(),
-  new VolcanoCollector(),
-  new PlanetCollector(),
-  new WeatherCollector(),
+// ---------------------------------------------------------------------------
+// Collector manifests — one per module, versioned and validated at startup.
+// ---------------------------------------------------------------------------
+
+const registry = new CollectorRegistry();
+
+const manifests: {
+  manifest: CollectorManifest;
+  factory: () => InstanceType<
+    | typeof EarthquakeCollector
+    | typeof ISSCollector
+    | typeof AuroraCollector
+    | typeof AsteroidCollector
+    | typeof VolcanoCollector
+    | typeof PlanetCollector
+    | typeof WeatherCollector
+  >;
+}[] = [
+  {
+    manifest: {
+      id: 'earthquakes',
+      version: '1.0.0',
+      displayName: 'USGS Earthquake Hazards',
+      capabilities: ['earthquake'],
+      qualityTier: 'primary',
+      enabledByDefault: true,
+      description: 'Real-time earthquake data from the USGS Earthquake Hazards Program.',
+      sourceUrl: 'https://earthquake.usgs.gov/earthquakes/feed/v1.0/geojson.php',
+    },
+    factory: () => new EarthquakeCollector(),
+  },
+  {
+    manifest: {
+      id: 'iss',
+      version: '1.0.0',
+      displayName: 'ISS Tracker',
+      capabilities: ['iss'],
+      qualityTier: 'supplementary',
+      enabledByDefault: true,
+      description: 'Real-time International Space Station position.',
+      sourceUrl: 'http://api.open-notify.org/iss-now.json',
+    },
+    factory: () => new ISSCollector(),
+  },
+  {
+    manifest: {
+      id: 'aurora',
+      version: '1.0.0',
+      displayName: 'NOAA Aurora Forecast',
+      capabilities: ['aurora'],
+      qualityTier: 'supplementary',
+      enabledByDefault: true,
+      description: 'Aurora borealis activity from NOAA Space Weather Prediction Center.',
+      sourceUrl: 'https://services.swpc.noaa.gov/',
+    },
+    factory: () => new AuroraCollector(),
+  },
+  {
+    manifest: {
+      id: 'asteroids',
+      version: '1.0.0',
+      displayName: 'NASA Near-Earth Objects',
+      capabilities: ['asteroid'],
+      qualityTier: 'supplementary',
+      enabledByDefault: true,
+      description: 'Near-Earth asteroid close-approach data from NASA JPL.',
+      sourceUrl: 'https://api.nasa.gov/neo/rest/v1/feed',
+    },
+    factory: () => new AsteroidCollector(),
+  },
+  {
+    manifest: {
+      id: 'volcanoes',
+      version: '1.0.0',
+      displayName: 'Volcano Discovery',
+      capabilities: ['volcano'],
+      qualityTier: 'primary',
+      enabledByDefault: true,
+      description: 'Active volcano eruption reports.',
+      sourceUrl: 'https://www.volcanodiscovery.com/',
+    },
+    factory: () => new VolcanoCollector(),
+  },
+  {
+    manifest: {
+      id: 'planets',
+      version: '1.0.0',
+      displayName: 'Planet Visibility',
+      capabilities: ['planet'],
+      qualityTier: 'supplementary',
+      enabledByDefault: true,
+      description: 'Nightly visibility data for planets observable from Earth.',
+    },
+    factory: () => new PlanetCollector(),
+  },
+  {
+    manifest: {
+      id: 'weather',
+      version: '1.0.0',
+      displayName: 'OpenWeatherMap',
+      capabilities: ['weather'],
+      qualityTier: 'primary',
+      enabledByDefault: true,
+      description: 'Current conditions and forecast from OpenWeatherMap.',
+      sourceUrl: 'https://openweathermap.org/',
+      requiredEnvVars: ['OPENWEATHER_API_KEY'],
+    },
+    factory: () => new WeatherCollector(),
+  },
 ];
 
-// Attach disable handlers so server can react and notify clients
-for (const c of collectors) {
-  c.onDisabled = (reason?: string) => {
-    console.warn(`[Server] Collector disabled: ${c.name} (${reason || 'unknown'})`);
-    try {
-      io.emit('collector:disabled', {
-        name: c.name,
-        reason: reason || null,
-        timestamp: Date.now(),
-      });
-    } catch (err) {
-      console.warn('[Server] Failed to emit collector:disabled', err);
-    }
-  };
-}
-
-setCollectors(collectors);
-
-// Start collectors and emit events via Socket.io
-function startCollectors() {
-  console.warn('[Server] Starting data collectors...');
-
-  for (const collector of collectors) {
-    collector.start((events) => {
-      addEvents(events);
-      console.warn(`[Server] Emitted ${events.length} ${collector.type} events to clients`);
-    });
-  }
+for (const { manifest, factory } of manifests) {
+  registry.register(manifest, factory);
 }
 
 // Start server
 httpServer.listen(PORT, () => {
   console.warn(`[Server] Running on http://localhost:${PORT}`);
   console.warn(`[Socket.io] WebSocket server ready`);
-  console.warn(`[Server] ${collectors.length} collectors configured`);
 
-  // Start collectors after server is running
-  startCollectors();
+  const collectors = registry.start((events) => {
+    addEvents(events);
+  });
+
+  setCollectors(collectors);
+
+  // Wire disable notifications
+  for (const c of collectors) {
+    c.onDisabled = (reason?: string) => {
+      console.warn(`[Server] Collector disabled: ${c.name} (${reason || 'unknown'})`);
+      try {
+        io.emit('collector:disabled', {
+          name: c.name,
+          reason: reason || null,
+          timestamp: Date.now(),
+        });
+      } catch (err) {
+        console.warn('[Server] Failed to emit collector:disabled', err);
+      }
+    };
+  }
+
+  console.warn(`[Server] ${collectors.length} collectors started`);
 });
 
 // Graceful shutdown
 process.on('SIGTERM', () => {
   console.warn('[Server] SIGTERM received, shutting down gracefully');
-
-  // Stop all collectors
-  collectors.forEach((c) => c.stop());
-
+  registry.stop();
   httpServer.close(() => {
     console.warn('[Server] HTTP server closed');
     process.exit(0);
   });
 });
 
-// Handle uncaught errors
 process.on('uncaughtException', (error) => {
   console.error('[Server] Uncaught exception:', error);
 });
