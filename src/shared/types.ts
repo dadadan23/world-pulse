@@ -238,6 +238,8 @@ export interface CollectorHealth {
   errorCount: number;
   isEnabled: boolean;
   qualityTier: QualityTier;
+  intervalMs: number;
+  isStale: boolean;
 }
 
 /**

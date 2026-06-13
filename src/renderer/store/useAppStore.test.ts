@@ -217,6 +217,8 @@ describe('useAppStore', () => {
             errorCount: 0,
             isEnabled: true,
             qualityTier: 'supplementary' as const,
+            intervalMs: 60_000,
+            isStale: false,
           },
         ],
       };

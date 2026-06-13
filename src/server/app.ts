@@ -17,6 +17,8 @@ function toCollectorHealth(collector: BaseCollector): CollectorHealth {
   } else {
     status = 'healthy';
   }
+  const intervalMs = collector.interval;
+  const isStale = raw.lastFetch > 0 && Date.now() - raw.lastFetch > intervalMs * 3;
   return {
     name: raw.name,
     status,
@@ -24,6 +26,8 @@ function toCollectorHealth(collector: BaseCollector): CollectorHealth {
     errorCount: raw.errorCount,
     isEnabled: raw.enabled,
     qualityTier: collector.qualityTier,
+    intervalMs,
+    isStale,
   };
 }
 

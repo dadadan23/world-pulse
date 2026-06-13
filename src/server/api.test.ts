@@ -254,6 +254,8 @@ describe('Server API', () => {
         errorCount: 0,
         isEnabled: true,
         qualityTier: 'supplementary',
+        intervalMs: 60000,
+        isStale: false,
       });
     });
 

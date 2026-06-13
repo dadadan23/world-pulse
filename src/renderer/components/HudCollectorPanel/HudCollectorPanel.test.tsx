@@ -20,6 +20,8 @@ function makeCollector(
     lastFetchAt: Date.now(),
     isEnabled: status !== 'disabled',
     qualityTier: 'supplementary',
+    intervalMs: 60_000,
+    isStale: false,
   };
 }
 
