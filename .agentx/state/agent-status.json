@@ -16,10 +16,12 @@
   },
   "engineer": {
     "role": "engineer",
-    "status": "active",
+    "status": "complete",
     "issue": "160",
     "branch": "claude/story-set-3-hist-pastechoes",
-    "startedAt": "2026-06-14T00:55:04Z"
+    "startedAt": "2026-06-14T00:55:04Z",
+    "completedAt": "2026-06-14T01:03:04Z",
+    "artifacts": []
   },
   "reviewer": {
     "status": "idle",
