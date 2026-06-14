@@ -272,3 +272,109 @@ export interface WSMessage {
   payload: Event | Event[] | string | null;
   timestamp: number;
 }
+
+// ---------------------------------------------------------------------------
+// #147 - Collector module manifest schema
+// ---------------------------------------------------------------------------
+
+/**
+ * Manifest for a collector module.
+ * Must be provided when registering a collector with CollectorRegistry.
+ */
+export interface CollectorManifest {
+  /** Unique stable identifier (snake_case, e.g. 'earthquakes'). */
+  id: string;
+  /** Semantic version string (e.g. '1.0.0'). */
+  version: string;
+  /** Human-readable display name used in logs and health UI. */
+  displayName: string;
+  /** Event types this collector can emit. */
+  capabilities: EventType[];
+  /** Quality tier - used for degraded-state prioritization. */
+  qualityTier: QualityTier;
+  /** Whether this collector should be started automatically. */
+  enabledByDefault: boolean;
+  /** Optional description of the upstream data source. */
+  description?: string;
+  /** Optional canonical URL for the upstream data source. */
+  sourceUrl?: string;
+  /** Names of environment variables that must be set for this collector to function. */
+  requiredEnvVars?: string[];
+}
+
+export type ManifestValidationResult = { valid: true } | { valid: false; errors: string[] };
+
+/**
+ * Validate a collector manifest object.
+ * Returns `{ valid: true }` or `{ valid: false, errors }`.
+ * An invalid manifest causes the registry to reject registration safely.
+ */
+export function validateManifest(manifest: unknown): ManifestValidationResult {
+  if (typeof manifest !== 'object' || manifest === null) {
+    return { valid: false, errors: ['manifest must be an object'] };
+  }
+  const m = manifest as Record<string, unknown>;
+  const errors: string[] = [];
+  if (typeof m.id !== 'string' || m.id.trim() === '') errors.push('id must be a non-empty string');
+  if (typeof m.version !== 'string' || m.version.trim() === '')
+    errors.push('version must be a non-empty string');
+  if (typeof m.displayName !== 'string' || m.displayName.trim() === '')
+    errors.push('displayName must be a non-empty string');
+  if (!Array.isArray(m.capabilities) || m.capabilities.length === 0)
+    errors.push('capabilities must be a non-empty array');
+  if (m.qualityTier !== 'primary' && m.qualityTier !== 'supplementary')
+    errors.push('qualityTier must be "primary" or "supplementary"');
+  if (typeof m.enabledByDefault !== 'boolean') errors.push('enabledByDefault must be a boolean');
+  return errors.length === 0 ? { valid: true } : { valid: false, errors };
+}
+
+// ---------------------------------------------------------------------------
+// #149 - Normalized event payload validation
+// ---------------------------------------------------------------------------
+
+export type EventValidationResult =
+  | { valid: true; event: Event }
+  | { valid: false; reason: string };
+
+/**
+ * Validate that an unknown value conforms to the Event contract.
+ * Invalid events are dropped at the registry boundary so downstream
+ * consumers always receive well-formed payloads.
+ */
+export function validateEventPayload(payload: unknown): EventValidationResult {
+  if (typeof payload !== 'object' || payload === null) {
+    return { valid: false, reason: 'payload must be an object' };
+  }
+  const e = payload as Record<string, unknown>;
+  if (typeof e.id !== 'string' || e.id.trim() === '')
+    return { valid: false, reason: 'id must be a non-empty string' };
+  if (typeof e.timestamp !== 'number' || !Number.isFinite(e.timestamp))
+    return { valid: false, reason: 'timestamp must be a finite number' };
+  if (typeof e.type !== 'string' || e.type.trim() === '')
+    return { valid: false, reason: 'type must be a non-empty string' };
+  if (typeof e.source !== 'string' || e.source.trim() === '')
+    return { valid: false, reason: 'source must be a non-empty string' };
+  if (typeof e.title !== 'string' || e.title.trim() === '')
+    return { valid: false, reason: 'title must be a non-empty string' };
+  if (e.location !== null && e.location !== undefined) {
+    if (typeof e.location !== 'object' || Array.isArray(e.location))
+      return { valid: false, reason: 'location must be an object or null' };
+    const loc = e.location as Record<string, unknown>;
+    if (typeof loc.lat !== 'number' || !Number.isFinite(loc.lat))
+      return { valid: false, reason: 'location.lat must be a finite number' };
+    if (typeof loc.lon !== 'number' || !Number.isFinite(loc.lon))
+      return { valid: false, reason: 'location.lon must be a finite number' };
+  }
+  if (e.severity !== undefined) {
+    if (
+      typeof e.severity !== 'number' ||
+      !Number.isFinite(e.severity) ||
+      e.severity < 0 ||
+      e.severity > 10
+    )
+      return { valid: false, reason: 'severity must be a number between 0 and 10' };
+  }
+  if (typeof e.data !== 'object' || e.data === null || Array.isArray(e.data))
+    return { valid: false, reason: 'data must be a plain object' };
+  return { valid: true, event: payload as Event };
+}
