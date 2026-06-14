@@ -1,7 +1,8 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { useAppStore } from '../../store/useAppStore';
-import type { Event } from '@shared/types';
+import type { Event, HistoricalContextRecord } from '@shared/types';
 import EmptyState from '../EmptyState/EmptyState';
+import { PastEchoesSection } from './PastEchoesSection';
 
 const AUTO_CLOSE_MS = 8_000;
 
@@ -47,9 +48,10 @@ function MetaRow({
 interface HudEventDetailProps {
   event: Event;
   onClose: () => void;
+  historicalContext?: HistoricalContextRecord[];
 }
 
-function HudEventDetail({ event, onClose }: HudEventDetailProps) {
+function HudEventDetail({ event, onClose, historicalContext = [] }: HudEventDetailProps) {
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -100,6 +102,9 @@ function HudEventDetail({ event, onClose }: HudEventDetailProps) {
           {event.description}
         </div>
       )}
+
+      {/* Past Echoes — historical context for this event location */}
+      <PastEchoesSection records={historicalContext} />
 
       {/* Severity bar */}
       {event.severity !== undefined && event.severity > 0 && (

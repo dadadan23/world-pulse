@@ -16,22 +16,10 @@
   },
   "engineer": {
     "role": "engineer",
-    "status": "complete",
-    "issue": "150,151,159,162,163",
-    "branch": "claude/story-set-2-viz-history-r7Xp2",
-    "startedAt": "2026-06-14T00:35:36Z",
-    "completedAt": "2026-06-14T00:42:00Z",
-    "artifacts": [
-      "src/shared/types.ts",
-      "src/shared/vizTypes.test.ts",
-      "src/renderer/components/Globe/vizRegistry.ts",
-      "src/renderer/components/Globe/vizRegistry.test.ts",
-      "src/renderer/components/Globe/useVizLayer.ts",
-      "src/server/historical/scorer.ts",
-      "src/server/historical/scorer.test.ts",
-      "src/server/historical/suppressionRules.ts",
-      "src/server/historical/suppressionRules.test.ts"
-    ]
+    "status": "active",
+    "issue": "160",
+    "branch": "claude/story-set-3-hist-pastechoes",
+    "startedAt": "2026-06-14T00:55:04Z"
   },
   "reviewer": {
     "status": "idle",
