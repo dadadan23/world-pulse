@@ -272,3 +272,159 @@ export interface WSMessage {
   payload: Event | Event[] | string | null;
   timestamp: number;
 }
+
+// ---------------------------------------------------------------------------
+// #150 — Visualization Layer Extension Contract
+// ---------------------------------------------------------------------------
+
+/**
+ * The render context provided to each visualization module's render function.
+ * Modules receive this object and must not mutate shared Three.js state outside
+ * their own scene objects.
+ */
+export interface VizRenderContext {
+  /** Globe radius in scene units (always 1). */
+  globeRadius: number;
+  /** Current elapsed time in seconds (for animations). */
+  elapsedTime: number;
+  /** Whether the viewer prefers reduced motion. */
+  prefersReducedMotion: boolean;
+}
+
+/**
+ * Manifest for a visualization layer module.
+ * Must be provided when registering with VizLayerRegistry.
+ */
+export interface VisualizationManifest {
+  /** Unique stable identifier (kebab-case, e.g. 'earthquake-marker'). */
+  id: string;
+  /** Semantic version string (e.g. '1.0.0'). */
+  version: string;
+  /** Human-readable display name. */
+  displayName: string;
+  /** Event types this module knows how to render. */
+  supportedEventTypes: EventType[];
+  /**
+   * Render order relative to other modules (lower renders first / further back).
+   * Globe texture = 0; markers default to 10; overlays default to 20.
+   */
+  renderOrder: number;
+  /** IDs of other visualization modules this module depends on being registered first. */
+  dependencies?: string[];
+  /** Whether this module is enabled by default. */
+  enabledByDefault: boolean;
+  /** Short description of what this module renders. */
+  description?: string;
+}
+
+export type VizManifestValidationResult = { valid: true } | { valid: false; errors: string[] };
+
+/**
+ * Validate a VisualizationManifest.
+ * Returns `{ valid: true }` or `{ valid: false, errors }`.
+ */
+export function validateVisualizationManifest(manifest: unknown): VizManifestValidationResult {
+  if (typeof manifest !== 'object' || manifest === null) {
+    return { valid: false, errors: ['manifest must be an object'] };
+  }
+  const m = manifest as Record<string, unknown>;
+  const errors: string[] = [];
+  if (typeof m.id !== 'string' || m.id.trim() === '') errors.push('id must be a non-empty string');
+  if (typeof m.version !== 'string' || m.version.trim() === '')
+    errors.push('version must be a non-empty string');
+  if (typeof m.displayName !== 'string' || m.displayName.trim() === '')
+    errors.push('displayName must be a non-empty string');
+  if (!Array.isArray(m.supportedEventTypes) || m.supportedEventTypes.length === 0)
+    errors.push('supportedEventTypes must be a non-empty array');
+  if (typeof m.renderOrder !== 'number' || !Number.isFinite(m.renderOrder))
+    errors.push('renderOrder must be a finite number');
+  if (typeof m.enabledByDefault !== 'boolean') errors.push('enabledByDefault must be a boolean');
+  if (m.dependencies !== undefined && !Array.isArray(m.dependencies))
+    errors.push('dependencies must be an array when provided');
+  return errors.length === 0 ? { valid: true } : { valid: false, errors };
+}
+
+// ---------------------------------------------------------------------------
+// #159 — Historical Context Schema and Taxonomy
+// ---------------------------------------------------------------------------
+
+/**
+ * Top-level taxonomy for historical context records.
+ * 'other' is the escape hatch for entries that don't fit a primary category.
+ */
+export type HistoricalContextCategory =
+  | 'disaster'
+  | 'conflict'
+  | 'transport'
+  | 'exploration'
+  | 'other';
+
+/**
+ * Sub-categories provide finer classification within a top-level category.
+ * These are informational and do not affect suppression logic.
+ */
+export type HistoricalContextSubCategory =
+  | 'shipwreck'
+  | 'plane-crash'
+  | 'earthquake'
+  | 'volcano'
+  | 'flood'
+  | 'battle'
+  | 'siege'
+  | 'expedition'
+  | 'discovery'
+  | 'other';
+
+/**
+ * Source attribution and licensing for a historical context record.
+ * Both fields are required — records without attribution must not be ingested.
+ */
+export interface HistoricalContextSource {
+  /** Name of the dataset or institution (e.g. 'Wreck Site Database'). */
+  name: string;
+  /** SPDX license identifier or 'proprietary' (e.g. 'CC-BY-4.0'). */
+  license: string;
+  /** Canonical URL for the original data entry. */
+  url?: string;
+}
+
+/**
+ * A single historical context record, as stored and retrieved for enrichment.
+ *
+ * Design constraints:
+ * - `confidence` 0–1: quality signal from the ingestion pipeline.
+ *   Below the suppression threshold the record is never shown.
+ * - `isSensitive` marks records requiring extra display care (e.g. recent conflicts,
+ *   mass-casualty events). Sensitive records use stricter confidence gates.
+ * - `era` is a human-readable period when a precise date is unavailable
+ *   (e.g. 'Late Bronze Age', '14th century').
+ */
+export interface HistoricalContextRecord {
+  /** Stable UUID for this record. */
+  id: string;
+  /** Short display title (max 120 chars). */
+  title: string;
+  /** Top-level category for matching and suppression logic. */
+  category: HistoricalContextCategory;
+  /** Optional sub-category for richer display and filtering. */
+  subCategory?: HistoricalContextSubCategory;
+  /** Geographic anchor for proximity matching. */
+  location: GeoLocation;
+  /** ISO 8601 date string when known (e.g. '1912-04-15'). */
+  date?: string;
+  /** Human-readable era/period when a precise date is unavailable. */
+  era?: string;
+  /** One-paragraph summary suitable for the Past Echoes panel (max 500 chars). */
+  summary: string;
+  /** Source attribution — required. */
+  source: HistoricalContextSource;
+  /** Ingestion confidence score (0–1). Records below threshold are suppressed. */
+  confidence: number;
+  /**
+   * Whether this record requires extra sensitivity in display.
+   * Sensitive records use stricter confidence thresholds and item caps.
+   */
+  isSensitive: boolean;
+  /** Unix timestamp (ms) when this record was ingested. */
+  ingestedAt: number;
+}
