@@ -32,7 +32,7 @@ export class VizLayerRegistry {
     const result: VizManifestValidationResult = validateVisualizationManifest(manifest);
     if (!result.valid) {
       throw new Error(
-        `Invalid visualization manifest for "${String((manifest as Record<string, unknown>).id ?? 'unknown')}": ${result.errors.join('; ')}`
+        `Invalid visualization manifest for "${manifest.id || 'unknown'}": ${result.errors.join('; ')}`
       );
     }
     if (this.registrations.has(manifest.id)) {
