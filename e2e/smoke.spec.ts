@@ -1,5 +1,5 @@
 /**
- * MVP Smoke Test Suite — Issue #37
+ * MVP Smoke Test Suite - Issue #37
  *
  * Validates the critical path for a running World Pulse instance:
  *   1. Health endpoint responds 200
@@ -37,7 +37,7 @@ test.describe('Health endpoint', () => {
   });
 });
 
-test.describe('Renderer — initial load', () => {
+test.describe('Renderer - initial load', () => {
   test('page loads without error-level console messages', async ({ page }) => {
     const consoleErrors: string[] = [];
     page.on('console', (msg) => {
@@ -63,7 +63,7 @@ test.describe('Renderer — initial load', () => {
   });
 });
 
-test.describe('Renderer — connected state', () => {
+test.describe('Renderer - connected state', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/');
   });

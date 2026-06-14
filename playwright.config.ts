@@ -30,10 +30,18 @@ export default defineConfig({
     },
   ],
 
-  webServer: {
-    command: 'npm run dev:renderer',
-    url: 'http://localhost:5173',
-    reuseExistingServer: !process.env.CI,
-    timeout: 30_000,
-  },
+  webServer: [
+    {
+      command: 'npm run dev:renderer',
+      url: 'http://localhost:5173',
+      reuseExistingServer: !process.env.CI,
+      timeout: 30_000,
+    },
+    {
+      command: 'npm run dev:server',
+      url: 'http://localhost:3000/health',
+      reuseExistingServer: !process.env.CI,
+      timeout: 30_000,
+    },
+  ],
 });

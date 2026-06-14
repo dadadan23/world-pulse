@@ -89,7 +89,7 @@ describe('CollectorRegistry', () => {
       expect(collectors).toHaveLength(0);
     });
 
-    it('isolates instantiation failures — other collectors still start', () => {
+    it('isolates instantiation failures - other collectors still start', () => {
       registry.register(validManifest, () => {
         throw new Error('boom');
       });

@@ -28,7 +28,7 @@ export class CollectorRegistry {
     const result = validateManifest(manifest);
     if (!result.valid) {
       throw new Error(
-        `Invalid manifest for "${String((manifest as Record<string, unknown>).id ?? 'unknown')}": ${result.errors.join('; ')}`
+        `Invalid manifest for "${manifest.id || 'unknown'}": ${result.errors.join('; ')}`
       );
     }
     if (this.registrations.some((r) => r.manifest.id === manifest.id)) {
@@ -40,7 +40,7 @@ export class CollectorRegistry {
   /**
    * Start all enabled collectors.
    * Collectors with `enabledByDefault: false` are skipped.
-   * Instantiation and start errors are logged and isolated — they do not
+   * Instantiation and start errors are logged and isolated - they do not
    * prevent other collectors from starting.
    */
   start(onEvents: (events: Event[]) => void): BaseCollector[] {
@@ -50,6 +50,16 @@ export class CollectorRegistry {
         continue;
       }
 
+      if (manifest.requiredEnvVars && manifest.requiredEnvVars.length > 0) {
+        const missing = manifest.requiredEnvVars.filter((v) => !process.env[v]);
+        if (missing.length > 0) {
+          console.warn(
+            `[Registry] Skipping "${manifest.id}": missing required env vars: ${missing.join(', ')}`
+          );
+          continue;
+        }
+      }
+
       let collector: BaseCollector;
       try {
         collector = factory();
@@ -57,8 +67,6 @@ export class CollectorRegistry {
         console.error(`[Registry] Failed to instantiate collector "${manifest.id}":`, err);
         continue;
       }
-
-      this.active.push(collector);
 
       try {
         collector.start((rawEvents) => {
@@ -74,6 +82,7 @@ export class CollectorRegistry {
           });
           if (valid.length > 0) onEvents(valid);
         });
+        this.active.push(collector);
       } catch (err) {
         console.error(`[Registry] Failed to start collector "${manifest.id}":`, err);
       }
@@ -91,7 +100,7 @@ export class CollectorRegistry {
       try {
         c.stop();
       } catch {
-        // Ignore stop errors — we're shutting down regardless.
+        // Ignore stop errors - we are shutting down regardless.
       }
     }
     this.active = [];

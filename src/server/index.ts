@@ -20,7 +20,7 @@ const { httpServer, io, addEvents, setCollectors } = createApp({
 });
 
 // ---------------------------------------------------------------------------
-// Collector manifests — one per module, versioned and validated at startup.
+// Collector manifests - one per module, versioned and validated at startup.
 // ---------------------------------------------------------------------------
 
 const registry = new CollectorRegistry();
@@ -131,7 +131,11 @@ const manifests: {
 ];
 
 for (const { manifest, factory } of manifests) {
-  registry.register(manifest, factory);
+  try {
+    registry.register(manifest, factory);
+  } catch (err) {
+    console.error(`[Server] Failed to register collector "${manifest.id}":`, err);
+  }
 }
 
 // Start server

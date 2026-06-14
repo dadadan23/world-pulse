@@ -274,7 +274,7 @@ export interface WSMessage {
 }
 
 // ---------------------------------------------------------------------------
-// #147 — Collector module manifest schema
+// #147 - Collector module manifest schema
 // ---------------------------------------------------------------------------
 
 /**
@@ -290,7 +290,7 @@ export interface CollectorManifest {
   displayName: string;
   /** Event types this collector can emit. */
   capabilities: EventType[];
-  /** Quality tier — used for degraded-state prioritization. */
+  /** Quality tier - used for degraded-state prioritization. */
   qualityTier: QualityTier;
   /** Whether this collector should be started automatically. */
   enabledByDefault: boolean;
@@ -329,7 +329,7 @@ export function validateManifest(manifest: unknown): ManifestValidationResult {
 }
 
 // ---------------------------------------------------------------------------
-// #149 — Normalized event payload validation
+// #149 - Normalized event payload validation
 // ---------------------------------------------------------------------------
 
 export type EventValidationResult =
@@ -356,6 +356,24 @@ export function validateEventPayload(payload: unknown): EventValidationResult {
     return { valid: false, reason: 'source must be a non-empty string' };
   if (typeof e.title !== 'string' || e.title.trim() === '')
     return { valid: false, reason: 'title must be a non-empty string' };
+  if (e.location !== null && e.location !== undefined) {
+    if (typeof e.location !== 'object' || Array.isArray(e.location))
+      return { valid: false, reason: 'location must be an object or null' };
+    const loc = e.location as Record<string, unknown>;
+    if (typeof loc.lat !== 'number' || !Number.isFinite(loc.lat))
+      return { valid: false, reason: 'location.lat must be a finite number' };
+    if (typeof loc.lon !== 'number' || !Number.isFinite(loc.lon))
+      return { valid: false, reason: 'location.lon must be a finite number' };
+  }
+  if (e.severity !== undefined) {
+    if (
+      typeof e.severity !== 'number' ||
+      !Number.isFinite(e.severity) ||
+      e.severity < 0 ||
+      e.severity > 10
+    )
+      return { valid: false, reason: 'severity must be a number between 0 and 10' };
+  }
   if (typeof e.data !== 'object' || e.data === null || Array.isArray(e.data))
     return { valid: false, reason: 'data must be a plain object' };
   return { valid: true, event: payload as Event };
