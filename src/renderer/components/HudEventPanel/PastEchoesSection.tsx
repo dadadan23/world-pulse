@@ -3,11 +3,11 @@ import type { HistoricalContextRecord } from '@shared/types';
 
 function extractYear(record: HistoricalContextRecord): string {
   if (record.date) {
-    // Negative ISO dates represent BC years (e.g. '-0480-08-09')
-    if (record.date.startsWith('-')) {
-      return `${record.date.substring(1, 5)} BC`;
-    }
-    return record.date.substring(0, 4);
+    // Negative ISO dates represent BC years (e.g. '-480-08-09')
+    const isBC = record.date.startsWith('-');
+    const cleanDate = isBC ? record.date.slice(1) : record.date;
+    const yearPart = cleanDate.split('-')[0];
+    return isBC ? `${yearPart} BC` : yearPart;
   }
   return record.era ?? '—';
 }

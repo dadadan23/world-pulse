@@ -87,7 +87,7 @@ export class VizBudgetTracker {
     const consecutive = (this.consecutiveViolations.get(moduleId) ?? 0) + 1;
     this.consecutiveViolations.set(moduleId, consecutive);
 
-    const averageMs = window.reduce((s, t) => s + t, 0) / window.length;
+    const averageMs = window.length > 0 ? window.reduce((s, t) => s + t, 0) / window.length : 0;
 
     const shouldDisable =
       this.config.autoDisableAfterFrames > 0 && consecutive >= this.config.autoDisableAfterFrames;

@@ -18,7 +18,7 @@ function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): nu
   const a =
     Math.sin(dLat / 2) ** 2 +
     Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
-  return EARTH_RADIUS_KM * 2 * Math.asin(Math.sqrt(a));
+  return EARTH_RADIUS_KM * 2 * Math.asin(Math.min(1, Math.sqrt(Math.max(0, a))));
 }
 
 /**
