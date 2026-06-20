@@ -125,7 +125,7 @@ export function createApp(options?: { corsOrigin?: string }) {
   if (process.env.NODE_ENV === 'production' && fs.existsSync(RENDERER_DIST)) {
     app.use(express.static(RENDERER_DIST));
     app.get('*', (req, res, next) => {
-      if (req.path.startsWith('/api/')) return next();
+      if (req.path === '/api' || req.path.startsWith('/api/')) return next();
       res.sendFile(path.join(RENDERER_DIST, 'index.html'));
     });
   }
