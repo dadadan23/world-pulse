@@ -38,6 +38,10 @@ export default defineConfig({
   },
   renderer: {
     root: '.',
+    // Packaged Electron loads index.html via the `file://` protocol (BrowserWindow.loadFile),
+    // where absolute asset paths (the Vite default `base: '/'`) resolve against the filesystem
+    // root instead of the app directory and 404. Relative paths fix asset loading in production.
+    base: './',
     plugins: [react(), geojsonPlugin()],
     build: {
       outDir: 'dist/renderer',

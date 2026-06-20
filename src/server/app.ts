@@ -1,8 +1,15 @@
 import express from 'express';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import fs from 'fs';
 import type { Event, CollectorHealth, CollectorHealthStatus } from '@shared/types';
 import type { BaseCollector } from './collectors/base';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+/** Built frontend assets, produced by `vite build` (see vite.config.ts outDir). */
+const RENDERER_DIST = path.resolve(__dirname, '../../dist/renderer');
 
 /**
  * Derive a CollectorHealth summary from the internal collector status.
@@ -111,6 +118,17 @@ export function createApp(options?: { corsOrigin?: string }) {
       timestamp: new Date().toISOString(),
     });
   });
+
+  // Serve the built frontend (single-container deployment). In dev/test the
+  // renderer is served by the Vite dev server instead, so this only activates
+  // in production, and only if dist/renderer was actually built.
+  if (process.env.NODE_ENV === 'production' && fs.existsSync(RENDERER_DIST)) {
+    app.use(express.static(RENDERER_DIST));
+    app.get('*', (req, res, next) => {
+      if (req.path.startsWith('/api/')) return next();
+      res.sendFile(path.join(RENDERER_DIST, 'index.html'));
+    });
+  }
 
   // Socket.io connection handling
   io.on('connection', (socket) => {
