@@ -8,6 +8,7 @@ import { AsteroidCollector } from './collectors/asteroids';
 import { VolcanoCollector } from './collectors/volcanoes';
 import { PlanetCollector } from './collectors/planets';
 import { WeatherCollector } from './collectors/weather';
+import { HistoricalCollector } from './collectors/historical';
 import type { CollectorManifest } from '@shared/types';
 
 // Load environment variables
@@ -35,6 +36,7 @@ const manifests: {
     | typeof VolcanoCollector
     | typeof PlanetCollector
     | typeof WeatherCollector
+    | typeof HistoricalCollector
   >;
 }[] = [
   {
@@ -127,6 +129,18 @@ const manifests: {
       requiredEnvVars: ['OPENWEATHER_API_KEY'],
     },
     factory: () => new WeatherCollector(),
+  },
+  {
+    manifest: {
+      id: 'historical',
+      version: '1.0.0',
+      displayName: 'Historical Geo-Context',
+      capabilities: ['historical'],
+      qualityTier: 'supplementary',
+      enabledByDefault: true,
+      description: 'Curated historical events (shipwrecks, battles) for globe enrichment.',
+    },
+    factory: () => new HistoricalCollector(),
   },
 ];
 
