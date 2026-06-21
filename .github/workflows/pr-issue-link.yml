@@ -40,7 +40,7 @@ jobs:
     steps:
       - name: Parse closing keywords
         id: extract
-        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
             const body = context.payload.pull_request.body || '';
@@ -101,7 +101,7 @@ jobs:
     runs-on: self-hosted
     steps:
       - name: Ensure status:in-progress label exists
-        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
             try {
@@ -121,7 +121,7 @@ jobs:
             }
 
       - name: Label issues as in-progress and update Projects v2
-        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           GH_PROJECT_TOKEN: ${{ secrets.GH_PROJECT_TOKEN }}
         with:
@@ -217,7 +217,7 @@ jobs:
     runs-on: self-hosted
     steps:
       - name: Update Projects v2 status to Done
-        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           GH_PROJECT_TOKEN: ${{ secrets.GH_PROJECT_TOKEN }}
         with:
@@ -297,7 +297,7 @@ jobs:
     runs-on: self-hosted
     steps:
       - name: Revert Projects v2 status to Ready
-        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           GH_PROJECT_TOKEN: ${{ secrets.GH_PROJECT_TOKEN }}
         with:
