@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef, useCallback, useMemo } from 'react';
 import { useAppStore } from '../../store/useAppStore';
 import type { Event, HistoricalEvent } from '@shared/types';
 import EmptyState from '../EmptyState/EmptyState';
@@ -144,8 +144,9 @@ export function HudEventPanel() {
   const connectionStatus = useAppStore((state) => state.connectionStatus);
   const setSelectedEvent = useAppStore((state) => state.setSelectedEvent);
 
-  const historicalEvents = useAppStore((state) =>
-    state.events.filter((e): e is HistoricalEvent => e.type === 'historical')
+  const historicalEvents = useMemo(
+    () => events.filter((e): e is HistoricalEvent => e.type === 'historical'),
+    [events]
   );
 
   const showEmptyState = events.length === 0 && connectionStatus === 'connected';
