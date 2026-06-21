@@ -90,6 +90,79 @@ describe('VisualizationRegistry', () => {
     });
   });
 
+  describe('fallback for unsupported modules (#151)', () => {
+    it('does not throw when a plugin factory throws; continues initializing others', () => {
+      const reg = new VisualizationRegistry<string>();
+      reg.register(baseManifest({ id: 'broken' }), () => {
+        throw new Error('boom');
+      });
+      reg.register(baseManifest({ id: 'fine' }), () => 'fine-instance');
+
+      let result: Map<string, string> | undefined;
+      expect(() => {
+        result = reg.initialize();
+      }).not.toThrow();
+
+      expect(result?.get('broken')).toBeUndefined();
+      expect(result?.get('fine')).toBe('fine-instance');
+    });
+
+    it('records a concise failure reason for a plugin whose factory throws', () => {
+      const reg = new VisualizationRegistry();
+      reg.register(baseManifest({ id: 'broken' }), () => {
+        throw new Error('boom');
+      });
+      reg.initialize();
+      expect(reg.getFailures()).toEqual([{ id: 'broken', reason: 'boom' }]);
+    });
+
+    it('excludes a failed plugin from getPlugins() so rendering falls back to defaults', () => {
+      const reg = new VisualizationRegistry<string>();
+      reg.register(baseManifest({ id: 'broken' }), () => {
+        throw new Error('boom');
+      });
+      reg.register(baseManifest({ id: 'fine' }), () => 'fine-instance');
+      reg.initialize();
+      expect(reg.getPlugins()).toEqual(['fine-instance']);
+    });
+
+    it('disable() prevents a plugin from being initialized', () => {
+      const reg = new VisualizationRegistry<string>();
+      reg.register(baseManifest(), () => 'instance-a');
+      reg.disable('test_plugin', 'flagged as problematic');
+      reg.initialize();
+      expect(reg.getPlugin('test_plugin')).toBeUndefined();
+      expect(reg.getFailures()).toEqual([{ id: 'test_plugin', reason: 'flagged as problematic' }]);
+    });
+
+    it('disable() removes an already-initialized instance immediately', () => {
+      const reg = new VisualizationRegistry<string>();
+      reg.register(baseManifest(), () => 'instance-a');
+      reg.initialize();
+      expect(reg.getPlugin('test_plugin')).toBe('instance-a');
+
+      reg.disable('test_plugin');
+      expect(reg.getPlugin('test_plugin')).toBeUndefined();
+    });
+
+    it('enable() clears the disabled flag and failure record', () => {
+      const reg = new VisualizationRegistry<string>();
+      reg.register(baseManifest(), () => 'instance-a');
+      reg.disable('test_plugin');
+      reg.enable('test_plugin');
+      expect(reg.isDisabled('test_plugin')).toBe(false);
+      reg.initialize();
+      expect(reg.getPlugin('test_plugin')).toBe('instance-a');
+      expect(reg.getFailures()).toEqual([]);
+    });
+
+    it('still throws for structural configuration errors (circular/missing dependency)', () => {
+      const reg = new VisualizationRegistry();
+      reg.register(baseManifest({ id: 'orphan', dependencies: ['missing_dep'] }), () => ({}));
+      expect(() => reg.initialize()).toThrow(/not registered/);
+    });
+  });
+
   describe('getManifests', () => {
     it('returns manifests sorted by render order tier', () => {
       const reg = new VisualizationRegistry();
