@@ -104,7 +104,7 @@ jobs:
     if: needs.route.outputs.agent == 'pm'
     runs-on: self-hosted
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Create PRD Scaffold
         run: |
@@ -145,7 +145,7 @@ jobs:
     if: needs.route.outputs.agent == 'ux'
     runs-on: self-hosted
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Create UX Scaffold
         run: |
@@ -177,7 +177,7 @@ jobs:
     if: needs.route.outputs.agent == 'architect'
     runs-on: self-hosted
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Create ADR + Spec Scaffold
         run: |
@@ -225,7 +225,7 @@ jobs:
     if: needs.route.outputs.agent == 'reviewer'
     runs-on: self-hosted
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Create Review Scaffold
         run: |
@@ -257,7 +257,7 @@ jobs:
     if: needs.route.outputs.agent == 'devops'
     runs-on: self-hosted
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Create Deployment Scaffold
         run: |
