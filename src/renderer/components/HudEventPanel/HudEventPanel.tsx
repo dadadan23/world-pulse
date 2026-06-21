@@ -1,7 +1,8 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { useAppStore } from '../../store/useAppStore';
-import type { Event } from '@shared/types';
+import type { Event, HistoricalEvent } from '@shared/types';
 import EmptyState from '../EmptyState/EmptyState';
+import { PastEchoes } from './PastEchoes';
 
 const AUTO_CLOSE_MS = 8_000;
 
@@ -46,10 +47,11 @@ function MetaRow({
 
 interface HudEventDetailProps {
   event: Event;
+  historicalEvents: HistoricalEvent[];
   onClose: () => void;
 }
 
-function HudEventDetail({ event, onClose }: HudEventDetailProps) {
+function HudEventDetail({ event, historicalEvents, onClose }: HudEventDetailProps) {
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -124,6 +126,9 @@ function HudEventDetail({ event, onClose }: HudEventDetailProps) {
           </div>
         </div>
       )}
+
+      {/* Past Echoes — historical context for live events */}
+      <PastEchoes event={event} historicalEvents={historicalEvents} />
     </div>
   );
 }
@@ -138,6 +143,10 @@ export function HudEventPanel() {
   const events = useAppStore((state) => state.events);
   const connectionStatus = useAppStore((state) => state.connectionStatus);
   const setSelectedEvent = useAppStore((state) => state.setSelectedEvent);
+
+  const historicalEvents = useAppStore((state) =>
+    state.events.filter((e): e is HistoricalEvent => e.type === 'historical')
+  );
 
   const showEmptyState = events.length === 0 && connectionStatus === 'connected';
   const visible = selectedEvent !== null || showEmptyState;
@@ -157,7 +166,13 @@ export function HudEventPanel() {
       {showEmptyState ? (
         <EmptyState />
       ) : (
-        selectedEvent && <HudEventDetail event={selectedEvent} onClose={handleClose} />
+        selectedEvent && (
+          <HudEventDetail
+            event={selectedEvent}
+            historicalEvents={historicalEvents}
+            onClose={handleClose}
+          />
+        )
       )}
     </div>
   );
