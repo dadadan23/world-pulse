@@ -378,3 +378,137 @@ export function validateEventPayload(payload: unknown): EventValidationResult {
     return { valid: false, reason: 'data must be a plain object' };
   return { valid: true, event: payload as Event };
 }
+
+// ---------------------------------------------------------------------------
+// #150 - Visualization plugin manifest and registration API
+// ---------------------------------------------------------------------------
+
+/**
+ * Render order tier for visualization layers.
+ * Layers render bottom-to-top: base → overlay → hud.
+ */
+export type VisualizationLayerOrder = 'base' | 'overlay' | 'hud';
+
+/**
+ * Manifest for a visualization plugin module.
+ * Must be provided when registering a plugin with VisualizationRegistry.
+ */
+export interface VisualizationManifest {
+  /** Unique stable identifier (snake_case, e.g. 'earthquake_markers'). */
+  id: string;
+  /** Semantic version string (e.g. '1.0.0'). */
+  version: string;
+  /** Human-readable display name used in UI. */
+  displayName: string;
+  /** Event types this plugin can render. */
+  supportedEventTypes: EventType[];
+  /** Render layer order: base (globe surface) → overlay (above globe) → hud (screen-space). */
+  renderOrder: VisualizationLayerOrder;
+  /** Other plugin ids that must be initialized before this one. */
+  dependencies?: string[];
+  /** Optional description of what this plugin renders. */
+  description?: string;
+}
+
+export type VisualizationManifestValidationResult =
+  | { valid: true }
+  | { valid: false; errors: string[] };
+
+/**
+ * Validate a visualization plugin manifest.
+ * Returns `{ valid: true }` or `{ valid: false, errors }`.
+ * An invalid manifest causes the registry to reject registration safely.
+ */
+export function validateVisualizationManifest(
+  manifest: unknown
+): VisualizationManifestValidationResult {
+  if (typeof manifest !== 'object' || manifest === null) {
+    return { valid: false, errors: ['manifest must be an object'] };
+  }
+  const m = manifest as Record<string, unknown>;
+  const errors: string[] = [];
+  if (typeof m.id !== 'string' || !/^[a-z][a-z0-9_]*$/.test(m.id))
+    errors.push('id must be snake_case and start with a letter');
+  if (typeof m.version !== 'string' || m.version.trim() === '')
+    errors.push('version must be a non-empty string');
+  if (typeof m.displayName !== 'string' || m.displayName.trim() === '')
+    errors.push('displayName must be a non-empty string');
+  if (!Array.isArray(m.supportedEventTypes) || m.supportedEventTypes.length === 0)
+    errors.push('supportedEventTypes must be a non-empty array');
+  if (m.renderOrder !== 'base' && m.renderOrder !== 'overlay' && m.renderOrder !== 'hud')
+    errors.push('renderOrder must be "base", "overlay", or "hud"');
+  if (m.dependencies !== undefined && !Array.isArray(m.dependencies))
+    errors.push('dependencies must be an array if provided');
+  return errors.length === 0 ? { valid: true } : { valid: false, errors };
+}
+
+// ---------------------------------------------------------------------------
+// #159 - Historical context schema and taxonomy
+// ---------------------------------------------------------------------------
+
+/**
+ * Supported top-level categories for historical events.
+ * New categories can be added here without breaking existing records.
+ */
+export type HistoricalCategory = 'disaster' | 'conflict' | 'transport' | 'exploration' | 'other';
+
+/**
+ * Confidence level for a historical record's geospatial and temporal data.
+ * 'confirmed' = primary source; 'probable' = corroborated secondary; 'uncertain' = estimated.
+ */
+export type HistoricalConfidenceLevel = 'confirmed' | 'probable' | 'uncertain';
+
+/**
+ * Quality classification of the upstream data source for a historical record.
+ */
+export type HistoricalSourceQuality = 'high' | 'medium' | 'low';
+
+/**
+ * Core schema for a single historical geo-context record.
+ * Designed as an open system: `meta` carries any category-specific extras.
+ */
+export interface HistoricalContext {
+  /** Unique stable identifier for this record (e.g. 'wreck_titanic'). */
+  id: string;
+  /** Short display title. */
+  title: string;
+  /** Top-level category. */
+  category: HistoricalCategory;
+  /** Subcategory within the category (e.g. 'shipwreck', 'naval_battle'). */
+  subcategory: string;
+  /** Geospatial coordinates — required; records without location are filtered during ingestion. */
+  location: GeoLocation;
+  /**
+   * ISO 8601 date or partial date string when the event occurred.
+   * Partial dates are allowed: '1912', '1912-04', '1912-04-15'.
+   */
+  date: string;
+  /** Human-readable era label (e.g. 'World War II', 'Age of Sail'). */
+  era?: string;
+  /** One-to-three sentence summary suitable for HUD display. */
+  summary: string;
+  /** Human-readable attribution: author, institution, or dataset name. */
+  attribution: string;
+  /** SPDX license identifier or 'Public Domain'. */
+  license: string;
+  /** Confidence in the geospatial and temporal accuracy of this record. */
+  confidence: HistoricalConfidenceLevel;
+  /** Quality of the upstream data source. */
+  sourceQuality: HistoricalSourceQuality;
+  /** URL for the upstream data source or record. */
+  sourceUrl?: string;
+  /** Category-specific extra fields. */
+  meta?: Record<string, unknown>;
+}
+
+/**
+ * Historical event as emitted by the historical collector.
+ * Wraps HistoricalContext in the standard Event envelope so the globe
+ * and event panel can handle it without special-casing.
+ */
+export interface HistoricalEvent extends Event {
+  type: 'historical';
+  data: {
+    context: HistoricalContext;
+  };
+}
