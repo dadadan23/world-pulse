@@ -9,6 +9,16 @@ interface PluginRegistration<T = unknown> {
 }
 
 /**
+ * Concise, non-blocking record of why a plugin isn't rendering (#151).
+ * Surfaced via `getFailures()` for UI-level error reporting that never
+ * crashes the globe — unsupported modules just fall back to no-op.
+ */
+export interface PluginFailure {
+  id: string;
+  reason: string;
+}
+
+/**
  * Registry for visualization plugin modules.
  *
  * Mirrors the server-side CollectorRegistry pattern: plugins are registered
@@ -22,6 +32,8 @@ interface PluginRegistration<T = unknown> {
 export class VisualizationRegistry<T = unknown> {
   private registrations: PluginRegistration<T>[] = [];
   private initialized: Map<string, T> = new Map();
+  private disabled: Set<string> = new Set();
+  private failures: Map<string, PluginFailure> = new Map();
 
   /**
    * Register a visualization plugin.
@@ -44,20 +56,53 @@ export class VisualizationRegistry<T = unknown> {
 
   /**
    * Initialize all registered plugins in dependency-safe order.
-   * Plugins whose dependencies are not registered will throw.
+   * Plugins whose dependencies are not registered or form a cycle indicate a
+   * configuration bug and still throw. A plugin whose *factory* throws is
+   * treated as unsupported: it is skipped (recorded in `getFailures()`) so
+   * the rest of the globe keeps rendering with default marker treatment (#151).
    * Returns a map of plugin id → instance.
    */
   initialize(): Map<string, T> {
     const ordered = this.topoSort();
     for (const { manifest, factory } of ordered) {
+      if (this.disabled.has(manifest.id)) continue;
       try {
         const instance = factory();
         this.initialized.set(manifest.id, instance);
+        this.failures.delete(manifest.id);
       } catch (err) {
-        throw new Error(`Failed to initialize plugin "${manifest.id}": ${String(err)}`);
+        const reason = err instanceof Error ? err.message : String(err);
+        this.initialized.delete(manifest.id);
+        this.failures.set(manifest.id, { id: manifest.id, reason });
       }
     }
     return new Map(this.initialized);
+  }
+
+  /**
+   * Kill switch: rapidly disable a problematic plugin so it stops rendering.
+   * Safe to call before or after `initialize()`. Recorded as a failure so
+   * UI surfaces a concise, non-blocking explanation.
+   */
+  disable(id: string, reason = 'Disabled via kill switch'): void {
+    this.disabled.add(id);
+    this.initialized.delete(id);
+    this.failures.set(id, { id, reason });
+  }
+
+  /** Re-enable a previously disabled plugin. Does not re-run initialize(). */
+  enable(id: string): void {
+    this.disabled.delete(id);
+    this.failures.delete(id);
+  }
+
+  isDisabled(id: string): boolean {
+    return this.disabled.has(id);
+  }
+
+  /** Concise, non-blocking failure reasons for plugins that aren't rendering. */
+  getFailures(): PluginFailure[] {
+    return [...this.failures.values()];
   }
 
   /** Returns all registered manifests, ordered by renderOrder tier then registration order. */

@@ -4,34 +4,26 @@
 
 World Pulse is a real-time information radiator that visualizes global events on an interactive 3D globe. It is designed to run 24/7 as an ambient dashboard on dedicated hardware (TV, iPad, monitor). The app streams live data from multiple sources (earthquakes, ISS tracking, aurora, volcanoes, asteroids, planet visibility) and renders them on a Three.js globe with a dark "Oblivion" aesthetic.
 
-**Current status:** v0.1.0 — Phase 0 (foundation) is complete; Phase 1 (backend + MVP globe) is substantially in progress.
+**Current status:** v0.1.0 — Phase 1 (backend + MVP globe) is substantially complete; Phase 2 backlog (extensibility platform + historical context, epics #142/#143) is defined but needs refinement before engineering starts.
 
 ---
 
-## Project Status (as of 2026-05-03)
+## Project Status (as of 2026-06-21)
 
 | Area | Status | Notes |
 |---|---|---|
-| CI/CD | Fixing | Actions upgraded to Node.js 24-compatible versions (branch `claude/plan-world-pulse-mission-qoZIF`). Green CI is a prerequisite for all other merges. |
-| Globe fidelity | 0% (blocked) | Requires GeoJSON pipeline (#41, #42) then render layer (#43–#45). See epic #40. |
-| Oblivion design system | ~25% | HUD layout done; LoadingScreen, StatusBadge, EventPanel, Typography stories remain (#48–#53, #59). |
-| Degraded UX | ~25% | Disconnect overlay (#63) and reconnection recovery (#58) in progress. |
-| Reliability | In progress | Collector health (#64), Electron crash recovery (#67), Event TTL (#60) open. |
-| Release readiness | ~50% | `release.yml` Electron packaging (#66) open; smoke tests not yet written. |
-| AgentX knowledge layer | New | `.agentx/knowledge/` now exists with 9 skills, 3 instructions, 4 templates. |
-| Agent coordination | Active | Lifecycle tracking wired in `agentx.sh`/`agentx.ps1`. Risk-surface gates active in `story.toml`, `bug.toml`, `docs.toml`. |
+| CI/CD | Needs attention | Feature work is CI-green, but open Dependabot PRs (#176–#187) are currently failing on the Docker and Copilot Setup Steps workflows. |
+| Globe fidelity | ~95% done | Coastlines, boundaries, markers, atmosphere shipped (#41–44, #56, #57, #62 closed). Only graticule grid overlay remains (#45, P2/cosmetic). |
+| Oblivion design system | Done | Feature #46 and all its stories closed. |
+| Degraded UX | Done | Feature #26 and all its stories closed. |
+| Reliability (original scope) | Done | Feature #23, collector health/lifecycle (#28, #29), and registry/manifest work (#144, #147–149, via PR #170) all closed. |
+| Release readiness | Remaining: #39, #66 | #37 (Electron smoke) and #38 (quality gate checklist) shipped via PR #170. #39 (dedicated-display perf) is now unblocked since #67 closed. #66 (release.yml packaging) still open. |
+| Phase 2 backlog | Needs refinement | Epics #142 (Extensible Platform) and #143 (Historical Context), 26 open stories (#144–167) created 2026-06-02. Thin on Given-When-Then ACs and dependency/sprint mapping compared to the Epic #24 backlog — recommend a refinement pass before starting implementation. |
+| AgentX automation | Bug filed (#191) | `agent-x.yml` re-fires on every label added to an issue, posting duplicate routing comments (6–7x on each of #142–167). |
 
 ## Active Branches
 
-| Branch | Purpose | Status |
-|---|---|---|
-| `claude/plan-world-pulse-mission-qoZIF` | Mission execution (CI fix, AgentX, knowledge layer, CLAUDE.md) | Active — this branch |
-| `copilot/fix-ci-failure-and-merge-conflicts` | Copilot's earlier CI fix attempt | Superseded by our branch |
-| `copilot/upgrade-github-actions-to-v6` | PR #86 — Copilot CI upgrade | Open, superseded |
-| `feature/sprint2-batch3` | Sprint 2 batch 3 features | In progress |
-| `fix/pr78-ci-retrigger` | CI retrigger for PR #78 | In progress |
-
-**Before starting work:** run `git fetch --all` and check `.agentx/state/agent-status.json` for active branches on the same issue.
+No feature PRs are currently open — only Dependabot dependency-bump PRs. Before starting new work: run `git fetch --all`, check `.agentx/state/agent-status.json` for active agents on the same issue, and confirm the target issue isn't already closed (the tracker has previously lagged behind merged work — see PR #170 closing #37/#38/#147–149).
 
 ## AgentX Knowledge Layer
 
@@ -75,6 +67,47 @@ This is enforced in `.agentx/workflows/story.toml`, `bug.toml`, and `docs.toml` 
 ```
 
 Do not start Globe Track B before Track A GeoJSON output is available.
+
+## Issue Lifecycle (REQUIRED — automated via `.github/workflows/pr-issue-link.yml`)
+
+Issue status is tracked automatically from PR open → merge via GitHub Actions + Projects v2.
+**These steps are mandatory for every story, bug, and task.**
+
+### When you pick up a story
+
+1. Comment on the GitHub issue: `gh issue comment <N> --body "Starting work on this — branch: <branch-name>"`
+2. This is a signal to other agents; the workflow moves the issue to "In progress" automatically when the PR is opened.
+
+### When creating a PR
+
+Every PR body **must** include a `Closes #N` line for every story it addresses.
+For a PR covering multiple stories:
+
+```
+Closes #150
+Closes #159
+Closes #160
+```
+
+- `Closes`, `Fixes`, and `Resolves` all work.
+- The `pr-issue-link.yml` workflow enforces this and will **fail the check** if missing.
+- GitHub auto-closes the issues when the PR is merged.
+- The workflow also moves each issue to **"Done"** in the World Pulse! Projects v2 board on merge.
+
+### What the workflow does automatically
+
+| PR event | Action |
+|---|---|
+| PR opened/reopened | Issues → `status:in-progress` label + Projects v2 "In progress" |
+| PR merged | Issues → closed by GitHub; Projects v2 → "Done" |
+| PR closed (no merge) | Issues → `status:in-progress` label removed; Projects v2 → "Ready" |
+
+### One-time setup required (repository secret)
+
+The Projects v2 status updates require a GitHub classic PAT with `project` scope:
+1. Go to https://github.com/settings/tokens → Generate new token (classic) → check **project**
+2. Add it as repository secret: **Settings → Secrets → Actions → New** → name: `GH_PROJECT_TOKEN`
+Without this secret, labels still apply but Projects v2 card moves are skipped (logged as warnings).
 
 ## Agent Coordination
 
@@ -169,10 +202,11 @@ world-pulse/
 | Backend | Express 4, Socket.io |
 | Database | SQLite (via sqlite3 npm package) |
 | Language | TypeScript 5 (strict mode) |
-| Build | Vite 6 (frontend), tsc (backend/main) |
+| Build | Vite 6 (frontend), esbuild (backend bundle), electron-vite (desktop main/preload) |
 | Desktop | Electron |
 | Testing | Vitest (unit/integration), Playwright (E2E) |
 | Linting | ESLint + Prettier |
+| Container | Docker (multi-stage build, see Dockerfile) |
 
 ## Code Conventions
 
