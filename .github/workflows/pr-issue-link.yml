@@ -1,74 +1,107 @@
-name: PR–Issue Link
+name: PR–Issue Lifecycle
+
+# Manages issue status throughout the PR lifecycle:
+#   PR opened/edited/reopened  → issues move to "In progress" (label + Projects v2)
+#   PR merged                  → issues move to "Done" in Projects v2
+#                                (GitHub auto-closes issues via Closes #XXX natively)
+#   PR closed without merge    → issues move back to "Ready"
+#
+# Projects v2 mutations require a token with `project` scope.
+# Create a classic PAT at https://github.com/settings/tokens with the `project`
+# scope and add it as repository secret GH_PROJECT_TOKEN.
+# If the secret is absent the workflow still applies labels; project card moves are skipped.
 
 on:
   pull_request:
-    types: [opened, edited, reopened]
+    types: [opened, edited, reopened, closed]
     branches: [main, develop]
 
 permissions:
   pull-requests: write
   issues: write
 
+# ── Projects v2 constants ──────────────────────────────────────────────────
+env:
+  PROJECT_ID: PVT_kwHOAC-9Rc4BVtzm
+  STATUS_FIELD_ID: PVTSSF_lAHOAC-9Rc4BVtzmzhRHoVk
+  STATUS_IN_PROGRESS: 47fc9ee4
+  STATUS_IN_REVIEW: df73e18b
+  STATUS_DONE: 98236657
+  STATUS_READY: 61e4505c
+
 jobs:
-  enforce-issue-link:
-    name: Require linked issue
+  # ── 1. Extract all issue numbers from closing keywords ──────────────────
+  extract-issues:
+    name: Extract linked issues
     runs-on: self-hosted
     outputs:
-      issue_number: ${{ steps.check.outputs.issue_number }}
+      issue_numbers: ${{ steps.extract.outputs.issue_numbers }}
+      has_issues: ${{ steps.extract.outputs.has_issues }}
     steps:
-      - name: Check PR body for closing keyword
-        id: check
-        uses: actions/github-script@v7
+      - name: Parse closing keywords
+        id: extract
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
         with:
           script: |
             const body = context.payload.pull_request.body || '';
+            const title = context.payload.pull_request.title || '';
 
-            // Match GitHub closing keywords followed by an issue number
+            // Match all GitHub closing keywords in the PR body
             const closingRe = /\b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)\s+#(\d+)/gi;
-            const bodyMatches = [...body.matchAll(closingRe)];
+            const matches = [...body.matchAll(closingRe)];
+            const issueNumbers = [...new Set(matches.map(m => parseInt(m[1], 10)))];
 
-            if (bodyMatches.length === 0) {
-              if (context.payload.action === 'opened') {
-                await github.rest.issues.createComment({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  issue_number: context.payload.pull_request.number,
-                  body: [
-                    '## ⚠️ Missing Issue Link',
-                    '',
-                    'This PR must reference the issue it addresses using a [closing keyword](https://docs.github.com/en/issues/tracking-your-work-with-issues/linking-a-pull-request-to-an-issue).',
-                    '',
-                    'Add one of the following to the PR body:',
-                    '',
-                    '```',
-                    'Closes #123',
-                    'Fixes #123',
-                    'Resolves #123',
-                    '```',
-                    '',
-                    '_The linked issue will be automatically closed when this PR is merged._',
-                  ].join('\n'),
-                });
+            if (issueNumbers.length === 0) {
+              // Only block on opened/edited — don't block on closed (merge/no-merge)
+              if (['opened', 'edited'].includes(context.payload.action)) {
+                if (context.payload.action === 'opened') {
+                  await github.rest.issues.createComment({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    issue_number: context.payload.pull_request.number,
+                    body: [
+                      '## Missing Issue Link',
+                      '',
+                      'This PR must reference every story/issue it addresses using a',
+                      '[closing keyword](https://docs.github.com/en/issues/tracking-your-work-with-issues/linking-a-pull-request-to-an-issue).',
+                      '',
+                      'Add one line per story to the PR body:',
+                      '',
+                      '```',
+                      'Closes #123',
+                      'Closes #124',
+                      'Closes #125',
+                      '```',
+                      '',
+                      '_All linked issues are automatically closed when this PR is merged._',
+                    ].join('\n'),
+                  });
+                }
+                core.setFailed(
+                  'PR body must contain closing keywords referencing issues (e.g. "Closes #123"). ' +
+                  'Multiple issues: "Closes #123\\nCloses #124"'
+                );
               }
-              core.setFailed(
-                'PR body must contain a closing keyword referencing an issue (e.g. "Closes #123"). ' +
-                'See https://docs.github.com/en/issues/tracking-your-work-with-issues/linking-a-pull-request-to-an-issue'
-              );
+              core.setOutput('has_issues', 'false');
+              core.setOutput('issue_numbers', '[]');
               return;
             }
 
-            const issueNumber = bodyMatches[0][1];
-            core.setOutput('issue_number', issueNumber);
-            core.info(`PR closes issue #${issueNumber}`);
+            core.info(`PR closes issues: ${issueNumbers.join(', ')}`);
+            core.setOutput('has_issues', 'true');
+            core.setOutput('issue_numbers', JSON.stringify(issueNumbers));
 
-  track-in-progress:
-    name: Label issue as in-progress
-    needs: enforce-issue-link
-    if: needs.enforce-issue-link.outputs.issue_number != '' && github.event.action == 'opened'
+  # ── 2a. On PR open/reopen → move to In Progress ─────────────────────────
+  move-to-in-progress:
+    name: Move issues to In Progress
+    needs: extract-issues
+    if: |
+      needs.extract-issues.outputs.has_issues == 'true' &&
+      (github.event.action == 'opened' || github.event.action == 'reopened')
     runs-on: self-hosted
     steps:
       - name: Ensure status:in-progress label exists
-        uses: actions/github-script@v7
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
         with:
           script: |
             try {
@@ -87,15 +120,241 @@ jobs:
               });
             }
 
-      - name: Apply label to linked issue
-        uses: actions/github-script@v7
+      - name: Label issues as in-progress and update Projects v2
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
+        env:
+          GH_PROJECT_TOKEN: ${{ secrets.GH_PROJECT_TOKEN }}
         with:
           script: |
-            const issueNumber = parseInt('${{ needs.enforce-issue-link.outputs.issue_number }}');
-            await github.rest.issues.addLabels({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: issueNumber,
-              labels: ['status:in-progress'],
-            });
-            core.info(`Labeled issue #${issueNumber} as status:in-progress`);
+            const issueNumbers = JSON.parse('${{ needs.extract-issues.outputs.issue_numbers }}');
+            const projectToken = process.env.GH_PROJECT_TOKEN || '';
+
+            for (const num of issueNumbers) {
+              // Apply label
+              try {
+                await github.rest.issues.addLabels({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: num,
+                  labels: ['status:in-progress'],
+                });
+                // Remove ready label if present
+                try {
+                  await github.rest.issues.removeLabel({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    issue_number: num,
+                    name: 'status:ready',
+                  });
+                } catch { /* label may not exist */ }
+                core.info(`Labeled issue #${num} as status:in-progress`);
+              } catch (err) {
+                core.warning(`Could not label issue #${num}: ${err.message}`);
+              }
+
+              // Move in Projects v2
+              if (!projectToken) {
+                core.warning('GH_PROJECT_TOKEN not set — skipping Projects v2 status update. ' +
+                  'Add a classic PAT with `project` scope as repository secret GH_PROJECT_TOKEN.');
+                continue;
+              }
+              try {
+                // Get issue node ID
+                const issueData = await github.rest.issues.get({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: num,
+                });
+                const issueNodeId = issueData.data.node_id;
+
+                // Add to project (idempotent)
+                const addResult = await github.graphql(`
+                  mutation AddItem($projectId: ID!, $contentId: ID!) {
+                    addProjectV2ItemById(input: { projectId: $projectId, contentId: $contentId }) {
+                      item { id }
+                    }
+                  }
+                `, {
+                  projectId: process.env.PROJECT_ID,
+                  contentId: issueNodeId,
+                  headers: { authorization: `bearer ${projectToken}` },
+                });
+                const itemId = addResult.addProjectV2ItemById.item.id;
+
+                // Set status to In Progress
+                await github.graphql(`
+                  mutation SetStatus($projectId: ID!, $itemId: ID!, $fieldId: ID!, $optionId: String!) {
+                    updateProjectV2ItemFieldValue(input: {
+                      projectId: $projectId
+                      itemId: $itemId
+                      fieldId: $fieldId
+                      value: { singleSelectOptionId: $optionId }
+                    }) {
+                      projectV2Item { id }
+                    }
+                  }
+                `, {
+                  projectId: process.env.PROJECT_ID,
+                  itemId,
+                  fieldId: process.env.STATUS_FIELD_ID,
+                  optionId: process.env.STATUS_IN_PROGRESS,
+                  headers: { authorization: `bearer ${projectToken}` },
+                });
+                core.info(`Moved issue #${num} to "In progress" in Projects v2`);
+              } catch (err) {
+                core.warning(`Projects v2 update failed for #${num}: ${err.message}`);
+              }
+            }
+
+  # ── 2b. On PR merge → move to Done (issues are auto-closed by GitHub) ───
+  move-to-done:
+    name: Move issues to Done
+    needs: extract-issues
+    if: |
+      needs.extract-issues.outputs.has_issues == 'true' &&
+      github.event.action == 'closed' &&
+      github.event.pull_request.merged == true
+    runs-on: self-hosted
+    steps:
+      - name: Update Projects v2 status to Done
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
+        env:
+          GH_PROJECT_TOKEN: ${{ secrets.GH_PROJECT_TOKEN }}
+        with:
+          script: |
+            const issueNumbers = JSON.parse('${{ needs.extract-issues.outputs.issue_numbers }}');
+            const projectToken = process.env.GH_PROJECT_TOKEN || '';
+
+            if (!projectToken) {
+              core.warning('GH_PROJECT_TOKEN not set — skipping Projects v2 Done update.');
+              return;
+            }
+
+            for (const num of issueNumbers) {
+              try {
+                // Remove in-progress label
+                try {
+                  await github.rest.issues.removeLabel({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    issue_number: num,
+                    name: 'status:in-progress',
+                  });
+                } catch { /* label may not exist */ }
+
+                const issueData = await github.rest.issues.get({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: num,
+                });
+                const issueNodeId = issueData.data.node_id;
+
+                const addResult = await github.graphql(`
+                  mutation AddItem($projectId: ID!, $contentId: ID!) {
+                    addProjectV2ItemById(input: { projectId: $projectId, contentId: $contentId }) {
+                      item { id }
+                    }
+                  }
+                `, {
+                  projectId: process.env.PROJECT_ID,
+                  contentId: issueNodeId,
+                  headers: { authorization: `bearer ${projectToken}` },
+                });
+                const itemId = addResult.addProjectV2ItemById.item.id;
+
+                await github.graphql(`
+                  mutation SetStatus($projectId: ID!, $itemId: ID!, $fieldId: ID!, $optionId: String!) {
+                    updateProjectV2ItemFieldValue(input: {
+                      projectId: $projectId
+                      itemId: $itemId
+                      fieldId: $fieldId
+                      value: { singleSelectOptionId: $optionId }
+                    }) {
+                      projectV2Item { id }
+                    }
+                  }
+                `, {
+                  projectId: process.env.PROJECT_ID,
+                  itemId,
+                  fieldId: process.env.STATUS_FIELD_ID,
+                  optionId: process.env.STATUS_DONE,
+                  headers: { authorization: `bearer ${projectToken}` },
+                });
+                core.info(`Moved issue #${num} to "Done" in Projects v2`);
+              } catch (err) {
+                core.warning(`Projects v2 Done update failed for #${num}: ${err.message}`);
+              }
+            }
+
+  # ── 2c. On PR closed without merge → move back to Ready ─────────────────
+  move-to-ready-on-close:
+    name: Revert issues to Ready on PR close (no merge)
+    needs: extract-issues
+    if: |
+      needs.extract-issues.outputs.has_issues == 'true' &&
+      github.event.action == 'closed' &&
+      github.event.pull_request.merged == false
+    runs-on: self-hosted
+    steps:
+      - name: Revert Projects v2 status to Ready
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
+        env:
+          GH_PROJECT_TOKEN: ${{ secrets.GH_PROJECT_TOKEN }}
+        with:
+          script: |
+            const issueNumbers = JSON.parse('${{ needs.extract-issues.outputs.issue_numbers }}');
+            const projectToken = process.env.GH_PROJECT_TOKEN || '';
+
+            for (const num of issueNumbers) {
+              // Remove in-progress label
+              try {
+                await github.rest.issues.removeLabel({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: num,
+                  name: 'status:in-progress',
+                });
+              } catch { /* label may not exist */ }
+
+              if (!projectToken) continue;
+
+              try {
+                const issueData = await github.rest.issues.get({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: num,
+                });
+                const addResult = await github.graphql(`
+                  mutation AddItem($projectId: ID!, $contentId: ID!) {
+                    addProjectV2ItemById(input: { projectId: $projectId, contentId: $contentId }) {
+                      item { id }
+                    }
+                  }
+                `, {
+                  projectId: process.env.PROJECT_ID,
+                  contentId: issueData.data.node_id,
+                  headers: { authorization: `bearer ${projectToken}` },
+                });
+                await github.graphql(`
+                  mutation SetStatus($projectId: ID!, $itemId: ID!, $fieldId: ID!, $optionId: String!) {
+                    updateProjectV2ItemFieldValue(input: {
+                      projectId: $projectId
+                      itemId: $itemId
+                      fieldId: $fieldId
+                      value: { singleSelectOptionId: $optionId }
+                    }) {
+                      projectV2Item { id }
+                    }
+                  }
+                `, {
+                  projectId: process.env.PROJECT_ID,
+                  itemId: addResult.addProjectV2ItemById.item.id,
+                  fieldId: process.env.STATUS_FIELD_ID,
+                  optionId: process.env.STATUS_READY,
+                  headers: { authorization: `bearer ${projectToken}` },
+                });
+                core.info(`Reverted issue #${num} to "Ready" (PR closed without merge)`);
+              } catch (err) {
+                core.warning(`Projects v2 revert failed for #${num}: ${err.message}`);
+              }
+            }

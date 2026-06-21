@@ -46,8 +46,13 @@ describe('CityLabels', () => {
     }
   });
 
-  it('should have 60 total cities', () => {
-    expect(CITIES.length).toBe(60);
+  it('should have 58 total cities', () => {
+    expect(CITIES.length).toBe(58);
+  });
+
+  it('should not have duplicate city codes', () => {
+    const names = CITIES.map((c) => c.name);
+    expect(new Set(names).size).toBe(names.length);
   });
 });
 
