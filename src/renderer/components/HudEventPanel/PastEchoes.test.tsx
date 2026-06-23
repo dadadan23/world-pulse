@@ -79,4 +79,88 @@ describe('PastEchoes', () => {
     expect(screen.getByText('480')).toBeDefined();
     expect(screen.getByText('HISTORICAL CONTEXT')).toBeDefined();
   });
+
+  describe('category filter overlay controls (#166)', () => {
+    function renderPanel(historicalEvents: HistoricalEvent[]) {
+      return render(
+        <PastEchoes event={makeLiveEvent({ type: 'news' })} historicalEvents={historicalEvents} />
+      );
+    }
+
+    it('defaults to the "ALL" filter and shows every match', async () => {
+      const user = userEvent.setup();
+      renderPanel([
+        makeHistoricalEvent({ id: 'disaster_1', category: 'disaster' }),
+        makeHistoricalEvent({ id: 'conflict_1', category: 'conflict' }),
+      ]);
+      await user.click(screen.getByRole('button', { name: /PAST ECHOES/ }));
+
+      expect(screen.getByRole('button', { name: 'ALL', pressed: true })).toBeDefined();
+      expect(screen.getAllByText('HISTORICAL CONTEXT')).toHaveLength(2);
+    });
+
+    it('narrows the visible list to the selected category', async () => {
+      const user = userEvent.setup();
+      renderPanel([
+        makeHistoricalEvent({ id: 'disaster_1', category: 'disaster', title: 'Disaster Match' }),
+        makeHistoricalEvent({ id: 'conflict_1', category: 'conflict', title: 'Conflict Match' }),
+      ]);
+      await user.click(screen.getByRole('button', { name: /PAST ECHOES/ }));
+      await user.click(screen.getByRole('button', { name: 'DISASTERS' }));
+
+      expect(screen.getByText('Disaster Match')).toBeDefined();
+      expect(screen.queryByText('Conflict Match')).toBeNull();
+    });
+
+    it('shows a non-blocking empty state when no match fits the selected category', async () => {
+      const user = userEvent.setup();
+      renderPanel([makeHistoricalEvent({ id: 'disaster_1', category: 'disaster' })]);
+      await user.click(screen.getByRole('button', { name: /PAST ECHOES/ }));
+      await user.click(screen.getByRole('button', { name: 'CONFLICT' }));
+
+      expect(screen.getByText('NO MATCHES IN THIS CATEGORY')).toBeDefined();
+    });
+
+    it('returns to the full list when "ALL" is reselected', async () => {
+      const user = userEvent.setup();
+      renderPanel([
+        makeHistoricalEvent({ id: 'disaster_1', category: 'disaster', title: 'Disaster Match' }),
+        makeHistoricalEvent({ id: 'conflict_1', category: 'conflict', title: 'Conflict Match' }),
+      ]);
+      await user.click(screen.getByRole('button', { name: /PAST ECHOES/ }));
+      await user.click(screen.getByRole('button', { name: 'DISASTERS' }));
+      await user.click(screen.getByRole('button', { name: 'ALL' }));
+
+      expect(screen.getByText('Disaster Match')).toBeDefined();
+      expect(screen.getByText('Conflict Match')).toBeDefined();
+    });
+
+    it('clears the filter session when the panel closes and a new one mounts (#166)', async () => {
+      const user = userEvent.setup();
+      const { unmount } = renderPanel([
+        makeHistoricalEvent({ id: 'disaster_1', category: 'disaster' }),
+      ]);
+      await user.click(screen.getByRole('button', { name: /PAST ECHOES/ }));
+      await user.click(screen.getByRole('button', { name: 'DISASTERS' }));
+      unmount();
+
+      renderPanel([makeHistoricalEvent({ id: 'disaster_2', category: 'disaster' })]);
+      await user.click(screen.getByRole('button', { name: /PAST ECHOES/ }));
+      expect(screen.getByRole('button', { name: 'ALL', pressed: true })).toBeDefined();
+    });
+  });
+
+  describe('readability budget under filtering (#167)', () => {
+    it('never shows more items than the existing density cap, regardless of category filter', async () => {
+      const user = userEvent.setup();
+      const disasters = Array.from({ length: 5 }, (_, i) =>
+        makeHistoricalEvent({ id: `disaster_${i}`, category: 'disaster', title: `Disaster ${i}` })
+      );
+      render(<PastEchoes event={makeLiveEvent({ type: 'news' })} historicalEvents={disasters} />);
+      await user.click(screen.getByRole('button', { name: /PAST ECHOES/ }));
+      await user.click(screen.getByRole('button', { name: 'DISASTERS' }));
+
+      expect(screen.getAllByText('HISTORICAL CONTEXT')).toHaveLength(3);
+    });
+  });
 });

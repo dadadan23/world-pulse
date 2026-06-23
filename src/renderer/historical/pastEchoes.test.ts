@@ -1,5 +1,6 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { getPastEchoes } from './pastEchoes';
+import { clearContextQualityLog, getContextQualityLog } from './contextTelemetry';
 import type { Event, HistoricalEvent } from '@shared/types';
 
 function makeHistoricalEvent(
@@ -46,6 +47,19 @@ function makeLiveEvent(overrides: Partial<Event> = {}): Event {
 }
 
 describe('getPastEchoes', () => {
+  beforeEach(() => {
+    clearContextQualityLog();
+  });
+
+  it('records a context-quality telemetry sample for every call (#164)', () => {
+    const liveEvent = makeLiveEvent({ type: 'news' });
+    getPastEchoes(liveEvent, [makeHistoricalEvent()]);
+    const log = getContextQualityLog();
+    expect(log).toHaveLength(1);
+    expect(log[0].eventId).toBe(liveEvent.id);
+    expect(log[0].shownCount).toBe(1);
+  });
+
   it('returns no matches for a historical live event (no historical-to-historical matching)', () => {
     const liveEvent = makeLiveEvent({ type: 'historical' });
     const historical = [makeHistoricalEvent()];

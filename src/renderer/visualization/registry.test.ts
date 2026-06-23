@@ -174,6 +174,78 @@ describe('VisualizationRegistry', () => {
     });
   });
 
+  describe('layer budget guardrails (#152)', () => {
+    it('has no limit by default', () => {
+      const reg = new VisualizationRegistry<string>();
+      reg.register(baseManifest({ id: 'a' }), () => 'a');
+      reg.register(baseManifest({ id: 'b' }), () => 'b');
+      reg.initialize();
+      expect(reg.getPlugins()).toEqual(['a', 'b']);
+      expect(reg.getBudgetViolations()).toEqual([]);
+    });
+
+    it('throttles layers beyond a configured per-tier budget', () => {
+      const reg = new VisualizationRegistry<string>({ maxLayersByOrder: { overlay: 1 } });
+      reg.register(baseManifest({ id: 'a', renderOrder: 'overlay' }), () => 'a');
+      reg.register(baseManifest({ id: 'b', renderOrder: 'overlay' }), () => 'b');
+      reg.initialize();
+      expect(reg.getPlugins()).toEqual(['a']);
+      expect(reg.getPlugin('b')).toBeUndefined();
+    });
+
+    it('does not count a different tier against another tier budget', () => {
+      const reg = new VisualizationRegistry<string>({ maxLayersByOrder: { overlay: 1 } });
+      reg.register(baseManifest({ id: 'a', renderOrder: 'overlay' }), () => 'a');
+      reg.register(baseManifest({ id: 'b', renderOrder: 'base' }), () => 'b');
+      reg.initialize();
+      expect(reg.getPlugins().sort()).toEqual(['a', 'b']);
+    });
+
+    it('throttles layers beyond a configured total budget across tiers', () => {
+      const reg = new VisualizationRegistry<string>({ maxTotalLayers: 1 });
+      reg.register(baseManifest({ id: 'a', renderOrder: 'base' }), () => 'a');
+      reg.register(baseManifest({ id: 'b', renderOrder: 'hud' }), () => 'b');
+      reg.initialize();
+      expect(reg.getPlugins()).toEqual(['a']);
+    });
+
+    it('records a concise budget violation reason for telemetry', () => {
+      const reg = new VisualizationRegistry({ maxLayersByOrder: { overlay: 1 } });
+      reg.register(baseManifest({ id: 'a', renderOrder: 'overlay' }), () => ({}));
+      reg.register(baseManifest({ id: 'b', renderOrder: 'overlay' }), () => ({}));
+      reg.initialize();
+      expect(reg.getBudgetViolations()).toEqual([
+        { id: 'b', renderOrder: 'overlay', reason: 'tier "overlay" layer budget of 1 exceeded' },
+      ]);
+    });
+
+    it('excludes budget-throttled plugins from getPlugins() so rendering falls back to defaults', () => {
+      const reg = new VisualizationRegistry<string>({ maxLayersByOrder: { overlay: 0 } });
+      reg.register(baseManifest({ id: 'a', renderOrder: 'overlay' }), () => 'a');
+      reg.initialize();
+      expect(reg.getPlugins()).toEqual([]);
+    });
+
+    it('setBudget() reconfigures thresholds applied on the next initialize()', () => {
+      const reg = new VisualizationRegistry<string>();
+      reg.register(baseManifest({ id: 'a', renderOrder: 'overlay' }), () => 'a');
+      reg.register(baseManifest({ id: 'b', renderOrder: 'overlay' }), () => 'b');
+      reg.setBudget({ maxLayersByOrder: { overlay: 1 } });
+      reg.initialize();
+      expect(reg.getPlugins()).toEqual(['a']);
+    });
+
+    it('a plugin that fails to initialize does not consume budget for the next plugin', () => {
+      const reg = new VisualizationRegistry<string>({ maxLayersByOrder: { overlay: 1 } });
+      reg.register(baseManifest({ id: 'broken', renderOrder: 'overlay' }), () => {
+        throw new Error('boom');
+      });
+      reg.register(baseManifest({ id: 'fine', renderOrder: 'overlay' }), () => 'fine-instance');
+      reg.initialize();
+      expect(reg.getPlugins()).toEqual(['fine-instance']);
+    });
+  });
+
   describe('getPlugin / getPlugins', () => {
     it('returns undefined for unknown id before initialize', () => {
       const reg = new VisualizationRegistry();

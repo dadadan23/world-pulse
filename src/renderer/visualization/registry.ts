@@ -1,4 +1,4 @@
-import type { VisualizationManifest } from '@shared/types';
+import type { VisualizationLayerOrder, VisualizationManifest } from '@shared/types';
 import { validateVisualizationManifest } from '@shared/types';
 
 export type PluginFactory<T = unknown> = () => T;
@@ -19,6 +19,24 @@ export interface PluginFailure {
 }
 
 /**
+ * Configurable layer budget thresholds (#152). Undefined fields mean "no limit".
+ * Re-evaluated from scratch on every `initialize()` call via `setBudget()`.
+ */
+export interface VisualizationBudget {
+  /** Max number of layers allowed per render-order tier (base/overlay/hud). */
+  maxLayersByOrder?: Partial<Record<VisualizationLayerOrder, number>>;
+  /** Max total number of layers allowed across all tiers combined. */
+  maxTotalLayers?: number;
+}
+
+/** Concise record of a plugin throttled/suppressed for exceeding a layer budget (#152). */
+export interface BudgetViolation {
+  id: string;
+  renderOrder: VisualizationLayerOrder;
+  reason: string;
+}
+
+/**
  * Registry for visualization plugin modules.
  *
  * Mirrors the server-side CollectorRegistry pattern: plugins are registered
@@ -34,6 +52,17 @@ export class VisualizationRegistry<T = unknown> {
   private initialized: Map<string, T> = new Map();
   private disabled: Set<string> = new Set();
   private failures: Map<string, PluginFailure> = new Map();
+  private budget: VisualizationBudget;
+  private budgetViolations: Map<string, BudgetViolation> = new Map();
+
+  constructor(budget: VisualizationBudget = {}) {
+    this.budget = budget;
+  }
+
+  /** Reconfigure layer budget thresholds (#152). Takes effect on the next `initialize()`. */
+  setBudget(budget: VisualizationBudget): void {
+    this.budget = budget;
+  }
 
   /**
    * Register a visualization plugin.
@@ -64,12 +93,37 @@ export class VisualizationRegistry<T = unknown> {
    */
   initialize(): Map<string, T> {
     const ordered = this.topoSort();
+    const tierCounts: Record<VisualizationLayerOrder, number> = { base: 0, overlay: 0, hud: 0 };
+    let totalCount = 0;
+    this.budgetViolations.clear();
+
     for (const { manifest, factory } of ordered) {
       if (this.disabled.has(manifest.id)) continue;
+
+      const tierLimit = this.budget.maxLayersByOrder?.[manifest.renderOrder];
+      if (tierLimit !== undefined && tierCounts[manifest.renderOrder] >= tierLimit) {
+        this.recordBudgetViolation(
+          manifest.id,
+          manifest.renderOrder,
+          `tier "${manifest.renderOrder}" layer budget of ${tierLimit} exceeded`
+        );
+        continue;
+      }
+      if (this.budget.maxTotalLayers !== undefined && totalCount >= this.budget.maxTotalLayers) {
+        this.recordBudgetViolation(
+          manifest.id,
+          manifest.renderOrder,
+          `total layer budget of ${this.budget.maxTotalLayers} exceeded`
+        );
+        continue;
+      }
+
       try {
         const instance = factory();
         this.initialized.set(manifest.id, instance);
         this.failures.delete(manifest.id);
+        tierCounts[manifest.renderOrder] += 1;
+        totalCount += 1;
       } catch (err) {
         const reason = err instanceof Error ? err.message : String(err);
         this.initialized.delete(manifest.id);
@@ -77,6 +131,21 @@ export class VisualizationRegistry<T = unknown> {
       }
     }
     return new Map(this.initialized);
+  }
+
+  /** Throttled/suppressed plugins that exceeded a configured layer budget (#152). */
+  getBudgetViolations(): BudgetViolation[] {
+    return [...this.budgetViolations.values()];
+  }
+
+  private recordBudgetViolation(
+    id: string,
+    renderOrder: VisualizationLayerOrder,
+    reason: string
+  ): void {
+    this.initialized.delete(id);
+    this.budgetViolations.set(id, { id, renderOrder, reason });
+    console.warn(`[VisualizationRegistry] Suppressed "${id}": ${reason}`);
   }
 
   /**
