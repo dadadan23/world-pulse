@@ -16,10 +16,12 @@
   },
   "engineer": {
     "role": "engineer",
-    "status": "active",
+    "status": "complete",
     "issue": "196",
     "branch": "claude/next-batch-stories-90ik69",
-    "startedAt": "2026-06-27T14:53:18Z"
+    "startedAt": "2026-06-27T14:53:18Z",
+    "completedAt": "2026-06-27T15:07:56Z",
+    "artifacts": []
   },
   "reviewer": {
     "status": "idle",
