@@ -592,6 +592,111 @@ body {
 }
 
 /* ============================================
+   SEGMENTED BAR (mission-control telemetry bar)
+   ============================================ */
+.ob-seg-bar {
+  display: flex;
+  gap: 2px;
+}
+
+.ob-seg-bar-cell {
+  flex: 1 1 0;
+  height: 8px;
+  background: var(--ob-bg-elevated);
+  border: 1px solid var(--ob-border-subtle);
+}
+
+.ob-seg-bar-cell-filled {
+  animation: segFillIn var(--ob-timing-snap) var(--ob-easing-snap) backwards;
+}
+
+.ob-seg-bar-cell-filled-cyan {
+  background: var(--ob-accent-cyan);
+  border-color: var(--ob-accent-cyan);
+}
+
+.ob-seg-bar-cell-filled-amber {
+  background: var(--ob-accent-amber);
+  border-color: var(--ob-accent-amber);
+}
+
+.ob-seg-bar-cell-filled-danger {
+  background: var(--ob-danger);
+  border-color: var(--ob-danger);
+}
+
+.ob-seg-bar-cell-filled-success {
+  background: var(--ob-success);
+  border-color: var(--ob-success);
+}
+
+@keyframes segFillIn {
+  0% {
+    opacity: 0;
+    transform: scaleY(0.3);
+  }
+  100% {
+    opacity: 1;
+    transform: scaleY(1);
+  }
+}
+
+/* ============================================
+   SPARKLINE (telemetry trace over time)
+   ============================================ */
+.ob-sparkline {
+  display: block;
+  width: 100%;
+  overflow: visible;
+}
+
+.ob-sparkline-grid {
+  stroke: var(--ob-border-subtle);
+  stroke-width: 1;
+}
+
+.ob-sparkline-path {
+  fill: none;
+  stroke: var(--ob-accent-cyan);
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  animation: drawLine var(--ob-timing-fade) var(--ob-easing-mechanical) forwards;
+}
+
+@keyframes drawLine {
+  from {
+    stroke-dashoffset: var(--ob-sparkline-length, 0);
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+/* ============================================
+   STAT READOUT (large numeric value + unit label)
+   ============================================ */
+.ob-stat-readout {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.ob-stat-readout-value {
+  font-family: var(--ob-font-mono);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  color: var(--ob-text-primary);
+  line-height: 1;
+}
+
+.ob-stat-readout-unit {
+  font-family: var(--ob-font-mono);
+  letter-spacing: var(--ob-letter-spacing-normal);
+  color: var(--ob-text-dim);
+}
+
+/* ============================================
    PULSING RING MARKER
    ============================================ */
 .ob-pulse-ring {
@@ -736,6 +841,8 @@ body {
   .ob-glitch,
   .ob-status-warning,
   .ob-status-critical,
+  .ob-seg-bar-cell-filled,
+  .ob-sparkline-path,
   .animate-scroll {
     animation: none;
   }

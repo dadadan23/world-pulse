@@ -2,30 +2,7 @@ import { Fragment } from 'react';
 import { useAppStore } from '../../store/useAppStore';
 import { prioritizeTickerEvents } from '../../store/eventPrioritizer';
 import { formatRelativeTime } from '../../utils/time';
-
-function getEventIndicator(type: string, severity?: number): { color: string; symbol: string } {
-  // Color based on severity
-  let color = 'text-ob-cyan';
-  if (severity !== undefined) {
-    if (severity >= 7) color = 'text-ob-danger';
-    else if (severity >= 4) color = 'text-ob-amber';
-  }
-
-  // Symbol based on type
-  const symbols: Record<string, string> = {
-    earthquake: '\u25C6', // diamond
-    weather: '\u25B2', // triangle
-    news: '\u25A0', // square
-    astronomy: '\u2605', // star
-    volcano: '\u25B3', // triangle up (hollow)
-    iss: '\u2302', // house/station
-    aurora: '\u2248', // wavy lines
-    asteroid: '\u2736', // six-pointed star
-    planet: '\u25CB', // circle (hollow)
-  };
-
-  return { color, symbol: symbols[type] || '\u25CF' }; // default: circle
-}
+import { getEventIndicator } from '../../utils/eventIndicators';
 
 export function Ticker() {
   const { events } = useAppStore();
