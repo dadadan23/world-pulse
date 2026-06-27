@@ -11,7 +11,8 @@ import { WeatherCollector } from './collectors/weather';
 import { HistoricalCollector } from './collectors/historical';
 import type { CollectorManifest } from '@shared/types';
 
-// Load environment variables
+// Load environment variables — .env.local (gitignored, local dev) takes precedence over .env
+dotenv.config({ path: '.env.local' });
 dotenv.config();
 
 const PORT = process.env.PORT || 3000;

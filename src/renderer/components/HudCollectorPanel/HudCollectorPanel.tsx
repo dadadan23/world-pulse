@@ -32,7 +32,6 @@ export function HudCollectorPanel() {
 
   const collectors = serverStatus?.collectors ?? [];
   const healthyCount = collectors.filter((c) => c.status === 'healthy').length;
-  const allHealthy = collectors.length > 0 && healthyCount === collectors.length;
 
   const collectorNames = collectors.map((c) => c.name);
   const [dismissed, setDismissed] = useState(false);
@@ -59,19 +58,17 @@ export function HudCollectorPanel() {
         ) : (
           <div className="flex flex-col gap-2">
             <CollectorSummary total={collectors.length} healthy={healthyCount} />
-            {!allHealthy && (
-              <div className="flex flex-col gap-1.5 pt-1.5 border-t border-ob-border">
-                {collectors.map((c) => (
-                  <CollectorHealthBadge
-                    key={c.name}
-                    name={c.name}
-                    status={c.status}
-                    errorCount={c.errorCount}
-                    isStale={c.isStale}
-                  />
-                ))}
-              </div>
-            )}
+            <div className="flex flex-col gap-1.5 pt-1.5 border-t border-ob-border">
+              {collectors.map((c) => (
+                <CollectorHealthBadge
+                  key={c.name}
+                  name={c.name}
+                  status={c.status}
+                  errorCount={c.errorCount}
+                  isStale={c.isStale}
+                />
+              ))}
+            </div>
           </div>
         )}
       </div>

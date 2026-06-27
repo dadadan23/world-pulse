@@ -5,6 +5,7 @@ import os from 'os';
 import { fork, type ChildProcess } from 'child_process';
 import { is } from '@electron-toolkit/utils';
 import { createRestartController } from './restartController';
+import { waitForServer } from './serverHealthPoller';
 
 let mainWindow: BrowserWindow | null = null;
 let serverProcess: ChildProcess | null = null;
@@ -20,8 +21,6 @@ const RESTART_WINDOW_MS = 60_000;
 const RESTART_DELAY_MS = 3_000;
 /** How long to poll /health before giving up at startup. */
 const SERVER_START_TIMEOUT_MS = 10_000;
-/** Interval (ms) between /health poll attempts during startup. */
-const HEALTH_CHECK_POLL_INTERVAL_MS = 250;
 
 const restartController = createRestartController({
   maxRestarts: RESTART_MAX,
@@ -59,26 +58,6 @@ process.on('unhandledRejection', (reason: unknown) => {
   process.stderr.write(`[Electron] ${msg}\n`);
   writeCrashLog(msg);
 });
-
-// ---------------------------------------------------------------------------
-// Health check polling
-// ---------------------------------------------------------------------------
-
-/** Poll /health until the server responds OK or the timeout expires. */
-async function waitForServer(maxMs: number): Promise<boolean> {
-  const url = `http://localhost:${SERVER_PORT}/health`;
-  const deadline = Date.now() + maxMs;
-  while (Date.now() < deadline) {
-    try {
-      const res = await fetch(url);
-      if (res.ok) return true;
-    } catch {
-      // Server not ready yet; keep polling.
-    }
-    await new Promise<void>((resolve) => setTimeout(resolve, HEALTH_CHECK_POLL_INTERVAL_MS));
-  }
-  return false;
-}
 
 // ---------------------------------------------------------------------------
 // Window management
@@ -191,10 +170,13 @@ function stopBackendServer(): void {
 app.whenReady().then(async () => {
   startBackendServer();
 
-  const ready = await waitForServer(SERVER_START_TIMEOUT_MS);
-  if (!ready) {
+  const healthUrl = `http://localhost:${SERVER_PORT}/health`;
+  const { ready, elapsedMs } = await waitForServer(healthUrl, SERVER_START_TIMEOUT_MS);
+  if (ready) {
+    process.stdout.write(`[Electron] Backend ready in ${elapsedMs}ms\n`);
+  } else {
     process.stderr.write(
-      `[Electron] Backend server did not respond within ${SERVER_START_TIMEOUT_MS}ms; loading UI anyway.\n`
+      `[Electron] Backend server did not respond within ${SERVER_START_TIMEOUT_MS}ms (${elapsedMs}ms elapsed); loading UI anyway.\n`
     );
   }
 

@@ -57,14 +57,28 @@ export class AsteroidCollector extends BaseCollector {
     const today = new Date().toISOString().split('T')[0];
     const endDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
-    const response = await axios.get<NeoWsResponse>(this.apiUrl, {
-      params: {
-        start_date: today,
-        end_date: endDate,
-        api_key: this.apiKey,
-      },
-      timeout: 15000,
-    });
+    let response;
+    try {
+      response = await axios.get<NeoWsResponse>(this.apiUrl, {
+        params: {
+          start_date: today,
+          end_date: endDate,
+          api_key: this.apiKey,
+        },
+        timeout: 15000,
+      });
+    } catch (err) {
+      // 429 means the DEMO_KEY daily quota is exhausted. Return empty so the
+      // base class doesn't count it as a failure — cached asteroid data
+      // remains on the globe. Set NASA_API_KEY in .env.local for 1000 req/hr.
+      if (axios.isAxiosError(err) && err.response?.status === 429) {
+        console.warn(
+          `[${this.name}] Rate-limited (429) — using DEMO_KEY? Set NASA_API_KEY in .env.local`
+        );
+        return [];
+      }
+      throw err;
+    }
 
     if (!this.validate(response.data)) {
       throw new Error('Invalid response from NASA NeoWs');

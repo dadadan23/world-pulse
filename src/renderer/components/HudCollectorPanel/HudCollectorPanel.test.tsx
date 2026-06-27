@@ -60,8 +60,9 @@ describe('HudCollectorPanel', () => {
 
     render(<HudCollectorPanel />);
     expect(screen.getByText('ALL SOURCES ACTIVE')).toBeDefined();
-    // No per-collector detail rows when all healthy
-    expect(screen.queryByText('EARTHQUAKES')).toBeNull();
+    // Per-collector list is always visible
+    expect(screen.getByText('EARTHQUAKES')).toBeDefined();
+    expect(screen.getByText('ISS')).toBeDefined();
   });
 
   it('shows N/M summary and per-collector rows when some are degraded', () => {

@@ -1,4 +1,5 @@
 import express from 'express';
+import cors from 'cors';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 import path from 'path';
@@ -69,6 +70,7 @@ export function createApp(options?: { corsOrigin?: string }) {
   }
 
   // Middleware
+  app.use(cors({ origin: options?.corsOrigin || 'http://localhost:5173' }));
   app.use(express.json());
 
   // Health check endpoint

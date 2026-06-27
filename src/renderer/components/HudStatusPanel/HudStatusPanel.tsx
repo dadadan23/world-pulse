@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAppStore } from '../../store/useAppStore';
+import { useReverseGeocode } from '../../hooks/useReverseGeocode';
 
 function formatUTC(date: Date): string {
   return date.toLocaleTimeString('en-US', {
@@ -25,6 +26,7 @@ export function HudStatusPanel() {
   const userLat = useAppStore((state) => state.userLat);
   const userLon = useAppStore((state) => state.userLon);
   const geolocationStatus = useAppStore((state) => state.geolocationStatus);
+  const placeName = useReverseGeocode(userLat, userLon);
   const [time, setTime] = useState(new Date());
 
   useEffect(() => {
@@ -65,9 +67,18 @@ export function HudStatusPanel() {
           <span className="ob-label text-ob-cyan font-medium">{events.length}</span>
         </div>
         {geolocationStatus !== 'pending' && (
-          <div className="flex justify-between items-center">
-            <span className="ob-label text-ob-text-dim">LOCATION</span>
-            <span className="ob-label text-ob-cyan">{formatCoord(userLat, userLon)}</span>
+          <div className="flex flex-col gap-0.5">
+            <div className="flex justify-between items-center">
+              <span className="ob-label text-ob-text-dim">LOCATION</span>
+              <span className="ob-label text-ob-text-dim tabular-nums">
+                {formatCoord(userLat, userLon)}
+              </span>
+            </div>
+            {placeName && (
+              <div className="flex justify-end">
+                <span className="ob-label text-ob-cyan text-right">{placeName}</span>
+              </div>
+            )}
           </div>
         )}
       </div>
