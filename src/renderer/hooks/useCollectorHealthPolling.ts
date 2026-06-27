@@ -29,6 +29,7 @@ export function useCollectorHealthPolling() {
       }
     };
 
+    poll(); // fetch immediately on mount, don't wait for first interval
     const timer = setInterval(poll, POLL_INTERVAL_MS);
     return () => clearInterval(timer);
   }, [setServerStatus]);

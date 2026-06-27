@@ -27,7 +27,7 @@ afterEach(() => {
 });
 
 describe('useCollectorHealthPolling', () => {
-  it('polls /api/status on 30-second interval', async () => {
+  it('polls /api/status immediately on mount and then on 30-second interval', async () => {
     const mockFetch = vi.fn().mockResolvedValue({
       ok: true,
       json: async () => ({
@@ -47,13 +47,16 @@ describe('useCollectorHealthPolling', () => {
 
     renderHook(() => useCollectorHealthPolling());
 
-    expect(mockFetch).not.toHaveBeenCalled();
-
-    await vi.advanceTimersByTimeAsync(30_000);
+    // Should fire immediately on mount
+    await vi.advanceTimersByTimeAsync(0);
     expect(mockFetch).toHaveBeenCalledTimes(1);
 
+    // And again after each 30-second interval
     await vi.advanceTimersByTimeAsync(30_000);
     expect(mockFetch).toHaveBeenCalledTimes(2);
+
+    await vi.advanceTimersByTimeAsync(30_000);
+    expect(mockFetch).toHaveBeenCalledTimes(3);
 
     vi.unstubAllGlobals();
   });
@@ -71,7 +74,7 @@ describe('useCollectorHealthPolling', () => {
     );
 
     renderHook(() => useCollectorHealthPolling());
-    await vi.advanceTimersByTimeAsync(30_000);
+    await vi.advanceTimersByTimeAsync(0); // immediate poll resolves
 
     expect(mockSetServerStatus).toHaveBeenCalledWith({
       ready: true,
@@ -101,21 +104,22 @@ describe('useCollectorHealthPolling', () => {
     vi.unstubAllGlobals();
   });
 
-  it('clears interval on unmount', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue({
-        ok: true,
-        json: async () => ({ status: 'ready', collectors: [] }),
-      })
-    );
+  it('clears interval on unmount so no further fetches occur', async () => {
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ status: 'ready', collectors: [] }),
+    });
+    vi.stubGlobal('fetch', mockFetch);
 
     const { unmount } = renderHook(() => useCollectorHealthPolling());
+    await vi.advanceTimersByTimeAsync(0); // let the immediate poll fire
+    const callsAtUnmount = mockFetch.mock.calls.length;
+
     unmount();
 
     await vi.advanceTimersByTimeAsync(60_000);
-    // After unmount, fetch should not be called
-    expect(vi.mocked(fetch)).not.toHaveBeenCalled();
+    // No additional calls after unmount
+    expect(mockFetch).toHaveBeenCalledTimes(callsAtUnmount);
 
     vi.unstubAllGlobals();
   });
