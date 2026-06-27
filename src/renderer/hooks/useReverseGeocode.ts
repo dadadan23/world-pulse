@@ -4,6 +4,8 @@ interface NominatimAddress {
   city?: string;
   town?: string;
   village?: string;
+  municipality?: string;
+  suburb?: string;
   county?: string;
   state?: string;
   country?: string;
@@ -15,21 +17,25 @@ interface NominatimResult {
 }
 
 function formatPlace(address: NominatimAddress): string {
-  const locality = address.city ?? address.town ?? address.village ?? address.county ?? '';
+  // Prefer a named place over the administrative county boundary
+  const locality =
+    address.city ?? address.town ?? address.village ?? address.municipality ?? address.suburb ?? '';
+
   const isUS = address.country_code?.toLowerCase() === 'us';
 
   if (isUS) {
-    const parts = [locality, address.state].filter(Boolean);
+    // Always append 'US' so country is visible in the panel
+    const parts = [locality || address.county, address.state, 'US'].filter(Boolean);
     return parts.join(', ');
   }
 
-  const parts = [locality, address.country].filter(Boolean);
+  const parts = [locality || address.county, address.country].filter(Boolean);
   return parts.join(', ');
 }
 
 /**
  * Reverse-geocodes a lat/lon pair using the Nominatim OSM API.
- * Returns a human-readable place name (e.g. "Chicago, Illinois" or
+ * Returns a human-readable place name (e.g. "Chicago, Illinois, US" or
  * "London, England") or null while loading / on error.
  */
 export function useReverseGeocode(lat: number | null, lon: number | null): string | null {
@@ -40,7 +46,9 @@ export function useReverseGeocode(lat: number | null, lon: number | null): strin
 
     let cancelled = false;
 
-    fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=10`, {
+    // No zoom param — let Nominatim resolve at the most specific level, then
+    // we pick the right named place from address fields ourselves.
+    fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`, {
       headers: { 'Accept-Language': 'en' },
     })
       .then((r) => r.json())
