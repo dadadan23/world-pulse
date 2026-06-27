@@ -69,22 +69,24 @@ test.describe('Renderer - connected state', () => {
   });
 
   test('HUD status panel shows LIVE once connected', async ({ page }) => {
-    // Wait for socket to connect and app to initialize
-    await expect(page.getByText('LIVE', { exact: true })).toBeVisible({
+    // Wait for socket to connect and app to initialize.
+    // Scoped to the connection-status testid: collector health badges
+    // (HudCollectorPanel) also render "LIVE" text once sources report healthy.
+    await expect(page.getByTestId('connection-status')).toHaveText('LIVE', {
       timeout: CONNECT_TIMEOUT_MS,
     });
   });
 
   test('globe canvas is rendered', async ({ page }) => {
     // Dashboard loads once connected; globe is a <canvas> element
-    await expect(page.getByText('LIVE', { exact: true })).toBeVisible({
+    await expect(page.getByTestId('connection-status')).toHaveText('LIVE', {
       timeout: CONNECT_TIMEOUT_MS,
     });
     await expect(page.locator('canvas')).toBeVisible({ timeout: 5_000 });
   });
 
   test('live feed ticker is visible', async ({ page }) => {
-    await expect(page.getByText('LIVE', { exact: true })).toBeVisible({
+    await expect(page.getByTestId('connection-status')).toHaveText('LIVE', {
       timeout: CONNECT_TIMEOUT_MS,
     });
     await expect(page.getByText('LIVE FEED')).toBeVisible({ timeout: 5_000 });
