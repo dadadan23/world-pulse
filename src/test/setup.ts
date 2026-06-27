@@ -3,7 +3,7 @@ import '@testing-library/jest-dom/vitest';
 // Polyfill ResizeObserver for jsdom tests (used by react-use-measure)
 import ResizeObserver from 'resize-observer-polyfill';
 
-/* eslint-disable @typescript-eslint/ban-ts-comment, @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // ResizeObserver assignment to global
 (global as any).ResizeObserver = ResizeObserver;
 

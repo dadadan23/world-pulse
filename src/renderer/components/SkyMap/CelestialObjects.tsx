@@ -2,8 +2,10 @@
 /*
   Allow Three.js JSX props in this file (spriteMaterial depthTest etc.)
 */
+/* eslint-disable react-hooks/purity -- Date.now() fallback only used for events missing id/timestamp */
 
 import { useMemo } from 'react';
+import type * as THREE from 'three';
 import type { Event } from '@shared/types';
 import { altAzToVector3 } from './altAzToVector3';
 import { createTextTexture } from '../Globe/textTexture';

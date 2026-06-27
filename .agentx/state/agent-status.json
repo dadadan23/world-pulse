@@ -16,21 +16,10 @@
   },
   "engineer": {
     "role": "engineer",
-    "status": "complete",
-    "issue": "45,191,66,196",
-    "branch": "claude/next-batch-stories-y07p4j",
-    "startedAt": "2026-06-27T00:00:00Z",
-    "completedAt": "2026-06-27T02:20:00Z",
-    "artifacts": [
-      "src/renderer/components/Globe/drawLayers.ts",
-      "src/renderer/components/Globe/drawLayers.test.ts",
-      ".github/workflows/agent-x.yml",
-      ".github/workflows/release.yml",
-      "tsconfig.json",
-      "eslint.config.js",
-      "vitest.config.ts",
-      "src/renderer/components/ErrorBoundary/ErrorBoundary.test.tsx"
-    ]
+    "status": "active",
+    "issue": "196",
+    "branch": "claude/next-batch-stories-90ik69",
+    "startedAt": "2026-06-27T14:53:18Z"
   },
   "reviewer": {
     "status": "idle",
