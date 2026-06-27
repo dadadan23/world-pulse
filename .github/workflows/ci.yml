@@ -23,7 +23,7 @@ jobs:
         run: npm ci
 
       - name: Run ESLint
-        run: npx eslint src --ext .ts,.tsx --max-warnings 0
+        run: npx eslint src --max-warnings 0
 
       - name: Check formatting
         run: npx prettier --check "src/**/*.{ts,tsx,json,css,md}"
