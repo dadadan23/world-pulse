@@ -24,6 +24,7 @@ interface AppState {
   isInitialized: boolean;
   hasEverConnected: boolean;
   skyMapOpen: boolean;
+  sourceDirectoryOpen: boolean;
 
   // Geolocation
   userLat: number | null;
@@ -40,6 +41,7 @@ interface AppState {
   setSelectedEvent: (event: Event | null) => void;
   setInitialized: (initialized: boolean) => void;
   setSkyMapOpen: (open: boolean) => void;
+  setSourceDirectoryOpen: (open: boolean) => void;
   setGeolocation: (lat: number, lon: number) => void;
   setGeolocationDenied: () => void;
 }
@@ -54,6 +56,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   isInitialized: false,
   hasEverConnected: false,
   skyMapOpen: false,
+  sourceDirectoryOpen: false,
   userLat: null,
   userLon: null,
   geolocationStatus: 'pending',
@@ -106,6 +109,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   setInitialized: (initialized) => set({ isInitialized: initialized }),
 
   setSkyMapOpen: (open) => set({ skyMapOpen: open }),
+
+  setSourceDirectoryOpen: (open) => set({ sourceDirectoryOpen: open }),
 
   setGeolocation: (lat, lon) => set({ userLat: lat, userLon: lon, geolocationStatus: 'granted' }),
 

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { HudCollectorPanel } from './HudCollectorPanel';
 import { useAppStore } from '../../store/useAppStore';
 import type { CollectorHealth } from '@shared/types';
@@ -29,10 +29,13 @@ const defaultStore = {
   serverStatus: null,
   skyMapOpen: false,
   setSkyMapOpen: vi.fn(),
+  sourceDirectoryOpen: false,
+  setSourceDirectoryOpen: vi.fn(),
 };
 
 beforeEach(() => {
   vi.clearAllMocks();
+  localStorage.clear();
   mockUseAppStore.mockReturnValue(defaultStore as ReturnType<typeof useAppStore>);
 });
 
@@ -109,5 +112,51 @@ describe('HudCollectorPanel', () => {
 
     render(<HudCollectorPanel />);
     expect(screen.getByText('0/2')).toBeDefined();
+  });
+
+  it('shows a new-source indicator when a collector has not been seen before', () => {
+    mockUseAppStore.mockReturnValue({
+      ...defaultStore,
+      serverStatus: {
+        ready: true,
+        collectors: [makeCollector('Earthquakes', 'healthy')],
+      },
+    } as ReturnType<typeof useAppStore>);
+
+    render(<HudCollectorPanel />);
+    expect(screen.getByLabelText('New source available')).toBeDefined();
+  });
+
+  it('clears the new-source indicator and opens the directory when SOURCES is clicked', () => {
+    const setSourceDirectoryOpen = vi.fn();
+    mockUseAppStore.mockReturnValue({
+      ...defaultStore,
+      setSourceDirectoryOpen,
+      serverStatus: {
+        ready: true,
+        collectors: [makeCollector('Earthquakes', 'healthy')],
+      },
+    } as ReturnType<typeof useAppStore>);
+
+    render(<HudCollectorPanel />);
+    expect(screen.getByLabelText('New source available')).toBeDefined();
+
+    fireEvent.click(screen.getByText('[ SOURCES ]'));
+    expect(setSourceDirectoryOpen).toHaveBeenCalledWith(true);
+    expect(screen.queryByLabelText('New source available')).toBeNull();
+  });
+
+  it('does not show the new-source indicator once collectors have been seen', () => {
+    localStorage.setItem('world-pulse:seen-sources', JSON.stringify(['Earthquakes']));
+    mockUseAppStore.mockReturnValue({
+      ...defaultStore,
+      serverStatus: {
+        ready: true,
+        collectors: [makeCollector('Earthquakes', 'healthy')],
+      },
+    } as ReturnType<typeof useAppStore>);
+
+    render(<HudCollectorPanel />);
+    expect(screen.queryByLabelText('New source available')).toBeNull();
   });
 });
