@@ -156,7 +156,6 @@ export function createApp(options?: { corsOrigin?: string }) {
         io.emit('events:new', { events, timestamp: Date.now() });
       } catch (err) {
         // If emit fails, log and continue
-        // eslint-disable-next-line no-console
         console.error('Failed to emit events:new', err);
       }
     },

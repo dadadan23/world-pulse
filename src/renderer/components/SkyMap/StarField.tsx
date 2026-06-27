@@ -1,4 +1,5 @@
 /* eslint-disable react/no-unknown-property */
+/* eslint-disable react-hooks/purity -- decorative star positions are generated once via useMemo([]) */
 
 import { useMemo } from 'react';
 
@@ -40,11 +41,16 @@ export function StarField() {
       <bufferGeometry>
         <bufferAttribute
           attach="attributes-position"
-          array={positions}
+          args={[positions, 3]}
           count={STAR_COUNT}
           itemSize={3}
         />
-        <bufferAttribute attach="attributes-size" array={sizes} count={STAR_COUNT} itemSize={1} />
+        <bufferAttribute
+          attach="attributes-size"
+          args={[sizes, 1]}
+          count={STAR_COUNT}
+          itemSize={1}
+        />
       </bufferGeometry>
       <pointsMaterial color={STAR_COLOR} size={0.05} transparent opacity={0.6} sizeAttenuation />
     </points>

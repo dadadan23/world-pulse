@@ -47,6 +47,7 @@ export function ConnectionBanner() {
   useEffect(() => {
     if (connectionStatus === 'dormant-reconnecting') {
       // Reset countdown when entering dormant mode
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional reset on status transition, not a render-loop sync
       setDormantCountdown(30);
 
       const interval = setInterval(() => {

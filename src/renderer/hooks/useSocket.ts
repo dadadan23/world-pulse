@@ -110,6 +110,4 @@ export function useSocket() {
       socketRef.current = null;
     };
   }, [setConnectionStatus, setServerStatus, setEvents, addEvents, setInitialized]);
-
-  return socketRef.current;
 }
