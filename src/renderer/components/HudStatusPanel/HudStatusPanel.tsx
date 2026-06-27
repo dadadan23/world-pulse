@@ -56,7 +56,9 @@ export function HudStatusPanel() {
       <div className="flex flex-col gap-1.5">
         <div className="flex justify-between items-center">
           <span className="ob-label text-ob-text-dim">STATUS</span>
-          <span className={`ob-label font-medium ${status.cls}`}>{status.label}</span>
+          <span data-testid="connection-status" className={`ob-label font-medium ${status.cls}`}>
+            {status.label}
+          </span>
         </div>
         <div className="flex justify-between items-center">
           <span className="ob-label text-ob-text-dim">UTC</span>
