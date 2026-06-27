@@ -10,6 +10,7 @@ const OBLIVION_COLORS = {
   gridDot: 'rgba(200, 230, 240, 0.03)',
   gridLine: 'rgba(0, 212, 255, 0.06)',
   gridMajor: 'rgba(0, 212, 255, 0.12)',
+  gridTropic: 'rgba(0, 212, 255, 0.18)',
   coastline: 'rgba(0, 212, 255, 0.85)',
   coastlineGlow: 'rgba(0, 212, 255, 0.45)',
   landFillLow: '#0d2430',
@@ -122,6 +123,19 @@ export function drawGridLines(
     ctx.stroke();
   }
   ctx.setLineDash([]);
+
+  // Tropic of Cancer / Capricorn — brighter than standard parallels, dimmer than the equator.
+  ctx.strokeStyle = OBLIVION_COLORS.gridTropic;
+  ctx.lineWidth = 1;
+  ctx.setLineDash([3, 5]);
+  for (const tropicLat of [23.5, -23.5]) {
+    ctx.beginPath();
+    ctx.moveTo(0, toY(tropicLat));
+    ctx.lineTo(width, toY(tropicLat));
+    ctx.stroke();
+  }
+  ctx.setLineDash([]);
+
   ctx.strokeStyle = 'rgba(0, 212, 255, 0.25)';
   ctx.lineWidth = 2;
   ctx.beginPath();

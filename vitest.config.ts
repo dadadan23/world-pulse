@@ -15,10 +15,7 @@ export default defineConfig({
   },
   test: {
     globals: true,
-    environmentMatchGlobs: [
-      ['src/renderer/**', 'jsdom'],
-      ['src/server/**', 'node'],
-    ],
+    environment: 'jsdom',
     setupFiles: ['./src/test/setup.ts'],
     include: ['src/**/*.test.{ts,tsx}'],
     coverage: {
