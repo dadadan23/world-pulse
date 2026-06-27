@@ -137,7 +137,15 @@ jobs:
           git add docs/prd/
           git diff --cached --quiet || git commit -m "docs: scaffold PRD for Epic #${ISSUE}"
           git push || true
-          gh issue comment ${ISSUE} --body "**PM Agent**: PRD scaffold created at docs/prd/PRD-${ISSUE}.md - Update status to Ready in Projects board when complete."
+          MARKER="<!-- agentx-marker:pm -->"
+          EXISTING=$(gh api repos/${{ github.repository }}/issues/${ISSUE}/comments --jq '.[].body' | grep -F "$MARKER" || true)
+          if [ -n "$EXISTING" ]; then
+            echo "[SKIP] Comment already posted for pm agent on issue #${ISSUE}"
+          else
+            gh issue comment ${ISSUE} --body "**PM Agent**: PRD scaffold created at docs/prd/PRD-${ISSUE}.md - Update status to Ready in Projects board when complete.
+
+          ${MARKER}"
+          fi
 
   ux:
     name: UX Designer
@@ -169,7 +177,15 @@ jobs:
           git add docs/ux/
           git diff --cached --quiet || git commit -m "docs: scaffold UX design for #${ISSUE}"
           git push || true
-          gh issue comment ${ISSUE} --body "**UX Agent**: Design scaffold created at docs/ux/UX-${ISSUE}.md - Update status to Ready in Projects board when complete."
+          MARKER="<!-- agentx-marker:ux -->"
+          EXISTING=$(gh api repos/${{ github.repository }}/issues/${ISSUE}/comments --jq '.[].body' | grep -F "$MARKER" || true)
+          if [ -n "$EXISTING" ]; then
+            echo "[SKIP] Comment already posted for ux agent on issue #${ISSUE}"
+          else
+            gh issue comment ${ISSUE} --body "**UX Agent**: Design scaffold created at docs/ux/UX-${ISSUE}.md - Update status to Ready in Projects board when complete.
+
+          ${MARKER}"
+          fi
 
   architect:
     name: Architect
@@ -204,7 +220,15 @@ jobs:
           git add docs/adr/ docs/specs/
           git diff --cached --quiet || git commit -m "docs: scaffold ADR + Spec for #${ISSUE}"
           git push || true
-          gh issue comment ${ISSUE} --body "**Architect Agent**: Scaffolds created (ADR: docs/adr/ADR-${ISSUE}.md, Spec: docs/specs/SPEC-${ISSUE}.md) - Update status to Ready in Projects board when complete."
+          MARKER="<!-- agentx-marker:architect -->"
+          EXISTING=$(gh api repos/${{ github.repository }}/issues/${ISSUE}/comments --jq '.[].body' | grep -F "$MARKER" || true)
+          if [ -n "$EXISTING" ]; then
+            echo "[SKIP] Comment already posted for architect agent on issue #${ISSUE}"
+          else
+            gh issue comment ${ISSUE} --body "**Architect Agent**: Scaffolds created (ADR: docs/adr/ADR-${ISSUE}.md, Spec: docs/specs/SPEC-${ISSUE}.md) - Update status to Ready in Projects board when complete.
+
+          ${MARKER}"
+          fi
 
   engineer:
     name: Engineer
@@ -217,7 +241,15 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           ISSUE="${{ needs.route.outputs.issue_number }}"
-          gh issue comment ${ISSUE} --repo ${{ github.repository }} --body "**Engineer Agent**: Ready for implementation. Move status to In Progress, implement with tests (80%+ coverage), then move to In Review when done."
+          MARKER="<!-- agentx-marker:engineer -->"
+          EXISTING=$(gh api repos/${{ github.repository }}/issues/${ISSUE}/comments --jq '.[].body' | grep -F "$MARKER" || true)
+          if [ -n "$EXISTING" ]; then
+            echo "[SKIP] Comment already posted for engineer agent on issue #${ISSUE}"
+          else
+            gh issue comment ${ISSUE} --repo ${{ github.repository }} --body "**Engineer Agent**: Ready for implementation. Move status to In Progress, implement with tests (80%+ coverage), then move to In Review when done.
+
+          ${MARKER}"
+          fi
 
   reviewer:
     name: Reviewer
@@ -249,7 +281,15 @@ jobs:
           git add docs/reviews/
           git diff --cached --quiet || git commit -m "docs: scaffold review for #${ISSUE}"
           git push || true
-          gh issue comment ${ISSUE} --body "**Reviewer Agent**: Review scaffold created at docs/reviews/REVIEW-${ISSUE}.md - Complete review and move status to Done when approved."
+          MARKER="<!-- agentx-marker:reviewer -->"
+          EXISTING=$(gh api repos/${{ github.repository }}/issues/${ISSUE}/comments --jq '.[].body' | grep -F "$MARKER" || true)
+          if [ -n "$EXISTING" ]; then
+            echo "[SKIP] Comment already posted for reviewer agent on issue #${ISSUE}"
+          else
+            gh issue comment ${ISSUE} --body "**Reviewer Agent**: Review scaffold created at docs/reviews/REVIEW-${ISSUE}.md - Complete review and move status to Done when approved.
+
+          ${MARKER}"
+          fi
 
   devops:
     name: DevOps Engineer
@@ -298,4 +338,12 @@ jobs:
           git add docs/deployment/
           git diff --cached --quiet || git commit -m "docs: scaffold deployment plan for #${ISSUE}"
           git push || true
-          gh issue comment ${ISSUE} --body "**DevOps Agent**: Deployment scaffold created at docs/deployment/DEPLOY-${ISSUE}.md - Implement pipeline and move to In Review when ready."
+          MARKER="<!-- agentx-marker:devops -->"
+          EXISTING=$(gh api repos/${{ github.repository }}/issues/${ISSUE}/comments --jq '.[].body' | grep -F "$MARKER" || true)
+          if [ -n "$EXISTING" ]; then
+            echo "[SKIP] Comment already posted for devops agent on issue #${ISSUE}"
+          else
+            gh issue comment ${ISSUE} --body "**DevOps Agent**: Deployment scaffold created at docs/deployment/DEPLOY-${ISSUE}.md - Implement pipeline and move to In Review when ready.
+
+          ${MARKER}"
+          fi

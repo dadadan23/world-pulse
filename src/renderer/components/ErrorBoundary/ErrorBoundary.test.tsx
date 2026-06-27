@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import { ErrorBoundary } from './ErrorBoundary';
 
 function ThrowingChild({ shouldThrow }: { shouldThrow: boolean }) {
@@ -80,10 +80,11 @@ describe('ErrorBoundary', () => {
 
     // Click retry manually (fireEvent works better with fake timers)
     const retryBtn = screen.getByText('Retry (3 remaining)');
-    retryBtn.click();
-
-    // Advance past the retry delay
-    await vi.advanceTimersByTimeAsync(150);
+    await act(async () => {
+      retryBtn.click();
+      // Advance past the retry delay
+      await vi.advanceTimersByTimeAsync(150);
+    });
 
     // After retry, the component re-renders — child throws again,
     // so we see the fallback with decremented count
