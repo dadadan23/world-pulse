@@ -1,6 +1,8 @@
+import { useState } from 'react';
 import { useAppStore } from '../../store/useAppStore';
 import CollectorHealthBadge from '../CollectorHealthBadge/CollectorHealthBadge';
 import StatusBadge from '../StatusBadge/StatusBadge';
+import { hasUnseenSources, markSourcesSeen } from '../../sourceDirectory/seenSources';
 
 function CollectorSummary({ total, healthy }: { total: number; healthy: number }) {
   if (healthy === total) {
@@ -23,13 +25,27 @@ function CollectorSummary({ total, healthy }: { total: number; healthy: number }
   );
 }
 
-/** Top-right HUD: data source / collector health badges + sky map toggle */
+/** Top-right HUD: data source / collector health badges + sky map / source directory toggles */
 export function HudCollectorPanel() {
-  const { serverStatus, skyMapOpen, setSkyMapOpen } = useAppStore();
+  const { serverStatus, skyMapOpen, setSkyMapOpen, sourceDirectoryOpen, setSourceDirectoryOpen } =
+    useAppStore();
 
   const collectors = serverStatus?.collectors ?? [];
   const healthyCount = collectors.filter((c) => c.status === 'healthy').length;
   const allHealthy = collectors.length > 0 && healthyCount === collectors.length;
+
+  const collectorNames = collectors.map((c) => c.name);
+  const [dismissed, setDismissed] = useState(false);
+  const hasNewSources = !dismissed && collectorNames.length > 0 && hasUnseenSources(collectorNames);
+
+  const openSourceDirectory = () => {
+    const next = !sourceDirectoryOpen;
+    setSourceDirectoryOpen(next);
+    if (next) {
+      markSourcesSeen(collectorNames);
+      setDismissed(true);
+    }
+  };
 
   return (
     <div className="fixed top-5 right-5 z-20 w-[220px] flex flex-col gap-2">
@@ -68,6 +84,23 @@ export function HudCollectorPanel() {
         style={{ padding: '8px 16px' }}
       >
         [ SKY MAP ]
+      </button>
+
+      {/* Source Directory toggle */}
+      <button
+        onClick={openSourceDirectory}
+        className={`ob-hud-panel relative text-center ob-label tracking-ultrawide cursor-pointer transition-colors duration-150
+          ${sourceDirectoryOpen ? 'text-ob-cyan border-ob-cyan/50' : 'text-ob-text-dim hover:text-ob-text'}`}
+        style={{ padding: '8px 16px' }}
+      >
+        [ SOURCES ]
+        {hasNewSources && (
+          <span
+            className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-ob-amber animate-pulse"
+            title="New source available"
+            aria-label="New source available"
+          />
+        )}
       </button>
     </div>
   );

@@ -17,11 +17,17 @@
   "engineer": {
     "role": "engineer",
     "status": "complete",
-    "issue": "196",
-    "branch": "claude/next-batch-stories-90ik69",
-    "startedAt": "2026-06-27T14:53:18Z",
-    "completedAt": "2026-06-27T15:07:56Z",
-    "artifacts": []
+    "issue": "153,154,155",
+    "branch": "claude/next-batch-stories-5ah0bi",
+    "startedAt": "2026-06-27T00:00:00Z",
+    "artifacts": [
+      "docs/extensions/AUTHORING_GUIDE.md",
+      "docs/extensions/templates/collector-extension.template.ts",
+      "docs/extensions/templates/visualization-extension.template.ts",
+      "src/renderer/sourceDirectory/sourceCatalog.ts",
+      "src/renderer/sourceDirectory/seenSources.ts",
+      "src/renderer/components/SourceDirectoryModal/SourceDirectoryModal.tsx"
+    ]
   },
   "reviewer": {
     "status": "idle",

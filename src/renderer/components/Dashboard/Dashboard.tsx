@@ -4,6 +4,7 @@ import { HudStatusPanel } from '../HudStatusPanel/HudStatusPanel';
 import { HudCollectorPanel } from '../HudCollectorPanel/HudCollectorPanel';
 import { HudEventPanel } from '../HudEventPanel/HudEventPanel';
 import { SkyMapModal } from '../SkyMapModal/SkyMapModal';
+import { SourceDirectoryModal } from '../SourceDirectoryModal/SourceDirectoryModal';
 import { Ticker } from '../Ticker/Ticker';
 import { PrimaryDegradedBanner } from '../PrimaryDegradedBanner/PrimaryDegradedBanner';
 
@@ -47,6 +48,9 @@ export function Dashboard() {
 
       {/* Sky Map modal (fullscreen overlay) */}
       <SkyMapModal />
+
+      {/* Source Directory modal (fullscreen overlay) */}
+      <SourceDirectoryModal />
 
       {/* Primary source degradation warning -- z-40, below ConnectionBanner (z-50) */}
       <PrimaryDegradedBanner />
