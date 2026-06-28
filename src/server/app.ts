@@ -5,8 +5,9 @@ import { Server } from 'socket.io';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
-import type { Event, CollectorHealth, CollectorHealthStatus } from '@shared/types';
+import type { Event, CollectorHealth, CollectorHealthStatus, WeatherEvent } from '@shared/types';
 import type { BaseCollector } from './collectors/base';
+import { fetchWeatherData } from './collectors/weatherClient';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 /** Built frontend assets, produced by `vite build` (see vite.config.ts outDir). */
@@ -57,6 +58,10 @@ export function createApp(options?: { corsOrigin?: string }) {
   const SWEEP_INTERVAL_MS = 60 * 1000;
   let collectors: BaseCollector[] = [];
   let sweepTimer: ReturnType<typeof setInterval> | null = null;
+
+  /** Short-lived cache for on-demand weather lookups, keyed by rounded coordinates. */
+  const weatherCache = new Map<string, { data: WeatherEvent['data']; expiresAt: number }>();
+  const WEATHER_CACHE_TTL_MS = 10 * 60 * 1000;
 
   /** Remove events older than EVENT_TTL_MS and notify clients */
   function sweepStaleEvents() {
@@ -119,6 +124,52 @@ export function createApp(options?: { corsOrigin?: string }) {
       events: eventCache,
       timestamp: new Date().toISOString(),
     });
+  });
+
+  // On-demand weather lookup for a given coordinate (client geolocation or a
+  // selected event's location). Distinct from the WeatherCollector's ambient
+  // broadcast, which always reflects the server's own IP-detected location.
+  app.get('/api/weather', async (req, res) => {
+    const lat = Number(req.query.lat);
+    const lon = Number(req.query.lon);
+    const name = typeof req.query.name === 'string' ? req.query.name : 'Unknown location';
+
+    if (
+      !Number.isFinite(lat) ||
+      !Number.isFinite(lon) ||
+      lat < -90 ||
+      lat > 90 ||
+      lon < -180 ||
+      lon > 180
+    ) {
+      res.status(400).json({ error: 'invalid_coordinates' });
+      return;
+    }
+
+    const apiKey = process.env.OPENWEATHER_API_KEY;
+    if (!apiKey) {
+      res.status(503).json({
+        error: 'not_configured',
+        message: 'OPENWEATHER_API_KEY is not set on the server',
+      });
+      return;
+    }
+
+    const cacheKey = `${lat.toFixed(2)},${lon.toFixed(2)}`;
+    const cached = weatherCache.get(cacheKey);
+    if (cached && cached.expiresAt > Date.now()) {
+      res.json({ data: cached.data, timestamp: new Date().toISOString() });
+      return;
+    }
+
+    try {
+      const { data } = await fetchWeatherData(lat, lon, apiKey, name);
+      weatherCache.set(cacheKey, { data, expiresAt: Date.now() + WEATHER_CACHE_TTL_MS });
+      res.json({ data, timestamp: new Date().toISOString() });
+    } catch (err) {
+      console.error('[API] /api/weather fetch failed:', err);
+      res.status(502).json({ error: 'fetch_failed', message: 'Failed to fetch weather data' });
+    }
   });
 
   // Serve the built frontend (single-container deployment). In dev/test the
