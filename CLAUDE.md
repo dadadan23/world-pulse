@@ -4,7 +4,7 @@
 
 World Pulse is a real-time information radiator that visualizes global events on an interactive 3D globe. It is designed to run 24/7 as an ambient dashboard on dedicated hardware (TV, iPad, monitor). The app streams live data from multiple sources (earthquakes, ISS tracking, aurora, volcanoes, asteroids, planet visibility) and renders them on a Three.js globe with a dark "Oblivion" aesthetic.
 
-**Current status:** v0.1.0 — Phase 1 (backend + MVP globe) is substantially complete; Phase 2 backlog (extensibility platform + historical context, epics #142/#143) is defined but needs refinement before engineering starts.
+**Current status:** v0.2.0 — Phase 1 (backend + MVP globe) is substantially complete; Phase 2 backlog (extensibility platform + historical context, epics #142/#143) is defined but needs refinement before engineering starts.
 
 ---
 

@@ -7,6 +7,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-06-28
+
 ### Added
 
 - **Mission-control side-column telemetry widgets** (`feat(dashboard): side columns`)

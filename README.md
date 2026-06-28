@@ -3,7 +3,7 @@
 > A real-time information radiator visualizing global events on an interactive 3D globe.
 
 **Status:** 🟢 Phase 1 (backend + MVP globe) substantially complete  
-**Version:** 0.1.0
+**Version:** 0.2.0
 
 ---
 
