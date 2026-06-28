@@ -7,8 +7,8 @@ import { WeatherWidget } from '../WeatherWidget/WeatherWidget';
 export function RightColumn() {
   return (
     <div
-      className="fixed right-5 top-[210px] z-10 w-[220px] overflow-y-auto"
-      style={{ maxHeight: 'calc(100vh - 210px - 70px)' }}
+      className="fixed right-5 top-[460px] z-10 w-[220px] overflow-y-auto"
+      style={{ maxHeight: 'calc(100vh - 460px - 70px)' }}
     >
       <div className="flex flex-col gap-3">
         <ISSWidget />
