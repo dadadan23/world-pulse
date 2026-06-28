@@ -2,22 +2,22 @@
 
 > A real-time information radiator visualizing global events on an interactive 3D globe.
 
-**Status:** 🏗️ Planning Phase  
-**Version:** 0.1.0
+**Status:** 🟢 Phase 1 (backend + MVP globe) substantially complete  
+**Version:** 0.2.0
 
 ---
 
 ## What Is This?
 
-World Pulse is your command center for understanding what's happening in the world and your day. It combines:
+World Pulse is a 24/7 ambient dashboard, designed to run on dedicated hardware (TV, iPad, monitor), that streams live global events from plugin-based collectors and renders them on a dark "Oblivion"-styled 3D globe. It combines:
 
-- 🌍 Real-time global events (earthquakes, weather, news)
-- 📊 News sentiment heat mapping
-- 🔭 Astronomical phenomena
-- 📅 Your personal schedule and context
-- 🎵 Music discoveries
+- 🌍 Real-time global events (earthquakes, ISS position, aurora/space weather, near-Earth asteroids, weather, volcanoes, planet visibility)
+- 🛰️ Mission-control side-column telemetry widgets (seismic activity, event rate, type/severity distribution, ISS/aurora/asteroid readouts)
+- 📜 A live scrolling event ticker and degraded/connection-status HUD panels
 
-All visualized on a beautiful 3D globe with supporting dashboards.
+All visualized on a 3D globe with supporting dashboards.
+
+![World Pulse dashboard](./docs/screenshots/dashboard.png)
 
 ---
 
@@ -58,12 +58,14 @@ You'll need free API keys for:
 
 1. **OpenWeather** - [Get key](https://openweathermap.org/api)
 2. **NewsAPI** - [Get key](https://newsapi.org/)
-3. **Spotify** (optional) - [Get credentials](https://developer.spotify.com/)
+3. **NASA** (optional, for the Near-Earth Asteroids collector) - [Get key](https://api.nasa.gov/) — defaults to `DEMO_KEY` (rate-limited) if unset
+4. **Spotify** (optional) - [Get credentials](https://developer.spotify.com/)
 
 Add them to `.env.local`:
 ```env
 OPENWEATHER_API_KEY=your_key_here
 NEWSAPI_KEY=your_key_here
+NASA_API_KEY=your_key_here
 SPOTIFY_CLIENT_ID=your_id_here
 SPOTIFY_CLIENT_SECRET=your_secret_here
 ```
@@ -75,13 +77,17 @@ SPOTIFY_CLIENT_SECRET=your_secret_here
 ```
 world-pulse/
 ├── src/
-│   ├── main/          # Electron main process
-│   ├── renderer/      # React frontend
-│   ├── server/        # Node.js backend + data collectors
-│   └── shared/        # Shared types/constants
-├── tests/             # Unit, integration, E2E tests
-├── docs/              # Additional documentation
-└── SPEC.md            # Technical specification
+│   ├── renderer/          # React frontend (Vite + Three.js)
+│   │   ├── components/    # Dashboard, Globe, HUD panels, SideColumns, Ticker
+│   │   ├── hooks/         # useSocket, etc.
+│   │   ├── store/         # Zustand state management (useAppStore)
+│   │   └── index.css      # Oblivion design system
+│   ├── server/            # Node.js backend (Express + Socket.io)
+│   │   └── collectors/    # Plugin-based data source collectors
+│   └── shared/            # Shared TypeScript types/constants
+├── docs/                  # ADRs, specs, prototypes, screenshots
+├── .github/                # CI/CD workflows
+└── SPEC.md                 # Technical specification
 ```
 
 ---
@@ -90,10 +96,19 @@ world-pulse/
 
 ```bash
 npm run dev              # Start dev server (frontend + backend)
+npm run dev:server       # Start backend only
+npm run dev:renderer     # Start frontend only
 npm run dev:electron     # Launch Electron wrapper
 npm test                 # Run all tests
+npm run test:watch       # Run tests in watch mode
+npm run test:coverage    # Run tests with coverage
+npm run test:e2e         # Run Playwright E2E tests
 npm run lint             # Check code style
-npm run build            # Production build
+npm run lint:fix         # Autofix lint issues
+npm run format           # Format with Prettier
+npm run typecheck        # TypeScript type checking
+npm run validate         # Full pre-push check: typecheck + test + lint + build
+npm run build            # Production build (renderer + server)
 npm run build:electron   # Package desktop app
 ```
 
@@ -102,8 +117,9 @@ npm run build:electron   # Package desktop app
 ## Documentation
 
 - [Technical Specification](./SPEC.md) - Architecture, tech stack, roadmap
-- [API Documentation](./docs/API.md) - Backend endpoints (coming soon)
-- [Contributing Guide](./docs/CONTRIBUTING.md) - Development workflow (coming soon)
+- [Contributing Guide](./CONTRIBUTING.md) - Development workflow
+- [Architecture Overview](./ARCHITECTURE.md) - System design
+- [docs/](./docs) - ADRs, specs, and prototypes per feature
 
 ---
 

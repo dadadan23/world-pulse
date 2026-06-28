@@ -1,6 +1,6 @@
 # World Pulse - Technical Specification
 
-**Version:** 0.1.0  
+**Version:** 0.2.0  
 **Created:** 2026-01-31  
 **Status:** Planning
 

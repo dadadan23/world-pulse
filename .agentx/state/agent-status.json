@@ -17,17 +17,9 @@
   "engineer": {
     "role": "engineer",
     "status": "complete",
-    "issue": "153,154,155",
-    "branch": "claude/next-batch-stories-5ah0bi",
-    "startedAt": "2026-06-27T00:00:00Z",
-    "artifacts": [
-      "docs/extensions/AUTHORING_GUIDE.md",
-      "docs/extensions/templates/collector-extension.template.ts",
-      "docs/extensions/templates/visualization-extension.template.ts",
-      "src/renderer/sourceDirectory/sourceCatalog.ts",
-      "src/renderer/sourceDirectory/seenSources.ts",
-      "src/renderer/components/SourceDirectoryModal/SourceDirectoryModal.tsx"
-    ]
+    "issue": "39,161",
+    "branch": "claude/story-39-dedicated-display-perf",
+    "startedAt": "2026-06-27T16:47:16Z"
   },
   "reviewer": {
     "status": "idle",

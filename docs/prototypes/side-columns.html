@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>World Pulse -- Side Column Telemetry Concept (FAM x Oblivion)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&display=swap" rel="stylesheet">
+<style>
+  /* ========================================================
+     OBLIVION DESIGN SYSTEM (subset, mirrors src/renderer/index.css)
+     New for this prototype: seg-bar, sparkline, arc-gauge, stat-readout
+  ======================================================== */
+  :root {
+    --ob-bg:          #0a0a0f;
+    --ob-bg-elevated: #141c26;
+    --ob-panel:       rgba(10, 10, 15, 0.82);
+    --ob-border:      rgba(200, 230, 240, 0.12);
+    --ob-border-act:  rgba(0, 212, 255, 0.4);
+    --ob-text:        #c8e6f0;
+    --ob-text-dim:    rgba(200, 230, 240, 0.5);
+    --ob-cyan:        #00d4ff;
+    --ob-cyan-glow:   rgba(0, 212, 255, 0.3);
+    --ob-amber:       #ff8c42;
+    --ob-amber-glow:  rgba(255, 140, 66, 0.3);
+    --ob-success:     #4ae68a;
+    --ob-danger:      #ff3d3d;
+    --ob-warning:     #ffb020;
+    --font:           'JetBrains Mono', 'SF Mono', 'Courier New', monospace;
+    --letter-wide:    0.18em;
+    --letter-norm:    0.05em;
+    --snap:           120ms;
+    --fade:           300ms;
+  }
+
+  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html, body {
+    width: 100%; height: 100%;
+    background: var(--ob-bg);
+    font-family: var(--font);
+    color: var(--ob-text);
+    overflow: hidden;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .label { font-size: 10px; letter-spacing: var(--letter-norm); color: var(--ob-text-dim); }
+  .heading { font-size: 11px; letter-spacing: var(--letter-wide); color: var(--ob-text); }
+
+  /* ---- backdrop: stand-in for the Three.js globe ---- */
+  .globe-stub {
+    position: fixed; inset: 0; z-index: 0;
+    background: radial-gradient(circle at 50% 50%, #0d1622 0%, #0a0a0f 70%);
+  }
+  .globe-sphere-stub {
+    position: absolute; top: 50%; left: 50%;
+    width: 46vh; height: 46vh; min-width: 320px; min-height: 320px;
+    transform: translate(-50%, -50%);
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, #163047, #060a10 75%);
+    box-shadow: 0 0 80px rgba(0, 212, 255, 0.08), inset 0 0 60px rgba(0,0,0,0.6);
+    border: 1px solid rgba(0, 212, 255, 0.15);
+  }
+  .dot-grid {
+    position: fixed; inset: 0; z-index: 1; pointer-events: none;
+    background-image: radial-gradient(circle at center, rgba(200,230,240,0.05) 1px, transparent 1px);
+    background-size: 28px 28px;
+  }
+
+  /* ---- HUD panel base (mirrors .ob-hud-panel) ---- */
+  .hud-panel {
+    background: var(--ob-panel);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid var(--ob-border);
+    padding: 16px;
+    position: relative;
+  }
+  .panel-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 10px; padding-bottom: 8px;
+    border-bottom: 1px solid var(--ob-border);
+  }
+
+  /* ---- reference-only top/bottom chrome, for spatial clearance ---- */
+  #ref-status { position: fixed; top: 20px; left: 20px; z-index: 20; width: 270px; height: 112px; }
+  #ref-collectors { position: fixed; top: 20px; right: 20px; z-index: 20; width: 220px; height: 168px; }
+  #ref-ticker {
+    position: fixed; bottom: 0; left: 0; right: 0; z-index: 20; height: 42px;
+    border-top: 1px solid var(--ob-border); background: var(--ob-panel);
+    display: flex; align-items: center; padding: 0 16px;
+  }
+  .ref-fill .label { opacity: 0.6; }
+
+  /* ---- side columns ---- */
+  #left-column {
+    position: fixed; left: 20px; top: 150px; z-index: 10;
+    width: 220px; max-height: calc(100vh - 150px - 70px);
+    overflow-y: auto;
+    display: flex; flex-direction: column; gap: 12px;
+  }
+  #right-column {
+    position: fixed; right: 20px; top: 210px; z-index: 10;
+    width: 220px; max-height: calc(100vh - 210px - 70px);
+    overflow-y: auto;
+    display: flex; flex-direction: column; gap: 12px;
+  }
+  #left-column::-webkit-scrollbar, #right-column::-webkit-scrollbar { width: 4px; }
+  #left-column::-webkit-scrollbar-thumb, #right-column::-webkit-scrollbar-thumb { background: var(--ob-border-act); }
+
+  /* ---- segmented bar ---- */
+  .seg-row { display: flex; align-items: center; gap: 8px; margin: 6px 0; }
+  .seg-row-label { width: 56px; flex-shrink: 0; font-size: 9px; letter-spacing: 0.05em; color: var(--ob-text-dim); }
+  .seg-bar { display: flex; gap: 2px; flex: 1; }
+  .seg-cell { flex: 1 1 0; height: 8px; background: var(--ob-bg-elevated); border: 1px solid var(--ob-border); }
+  .seg-cell.fill-cyan   { background: var(--ob-cyan);   border-color: var(--ob-cyan);   box-shadow: 0 0 4px var(--ob-cyan-glow); }
+  .seg-cell.fill-amber  { background: var(--ob-amber);  border-color: var(--ob-amber);  box-shadow: 0 0 4px var(--ob-amber-glow); }
+  .seg-cell.fill-danger { background: var(--ob-danger); border-color: var(--ob-danger); box-shadow: 0 0 4px rgba(255,61,61,0.35); }
+  .seg-row-value { width: 30px; flex-shrink: 0; text-align: right; font-size: 10px; color: var(--ob-text); }
+  @keyframes segFillIn { from { opacity: 0; transform: scaleY(0.3); } to { opacity: 1; transform: scaleY(1); } }
+  .seg-cell.fill-cyan, .seg-cell.fill-amber, .seg-cell.fill-danger {
+    animation: segFillIn var(--snap) ease-out backwards;
+  }
+
+  /* ---- sparkline ---- */
+  .sparkline-wrap { padding-top: 4px; }
+  .sparkline-path {
+    fill: none; stroke: var(--ob-cyan); stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round;
+    stroke-dasharray: 240; stroke-dashoffset: 240;
+    animation: drawLine var(--fade) ease-out forwards;
+  }
+  @keyframes drawLine { to { stroke-dashoffset: 0; } }
+  .sparkline-grid { stroke: var(--ob-border); stroke-width: 1; }
+  .sparkline-axis { display: flex; justify-content: space-between; margin-top: 2px; }
+
+  /* ---- arc gauge (mirrors .ob-arc-gauge contract) ---- */
+  .arc-gauge { position: relative; display: flex; align-items: center; justify-content: center; width: 96px; height: 96px; margin: 0 auto; }
+  .arc-gauge svg { transform: rotate(-90deg); }
+  .arc-gauge-track { fill: none; stroke: var(--ob-border); stroke-width: 4; }
+  .arc-gauge-fill { fill: none; stroke: var(--ob-cyan); stroke-width: 4; stroke-linecap: round; }
+  .arc-gauge-value { position: absolute; display: flex; flex-direction: column; align-items: center; }
+  .arc-gauge-value .v { font-size: 16px; font-weight: 500; color: var(--ob-text); }
+  .arc-gauge-value .u { font-size: 8px; color: var(--ob-text-dim); letter-spacing: 0.1em; }
+
+  /* ---- stat readout ---- */
+  .stat-readout { display: flex; align-items: baseline; gap: 4px; justify-content: center; margin-top: 8px; }
+  .stat-readout .value { font-size: 14px; font-weight: 500; color: var(--ob-text); text-shadow: 0 0 8px var(--ob-cyan-glow); }
+  .stat-readout .unit { font-size: 9px; color: var(--ob-text-dim); letter-spacing: 0.05em; }
+
+  /* ---- linear gauge (Aurora KP) ---- */
+  .linear-gauge-track { position: relative; height: 8px; background: var(--ob-bg-elevated); border: 1px solid var(--ob-border); margin: 8px 0 4px; }
+  .linear-gauge-fill { position: absolute; inset: 0; }
+  .linear-gauge-marker {
+    position: absolute; top: -3px; width: 2px; height: 14px; background: var(--ob-text);
+    box-shadow: 0 0 6px var(--ob-text);
+  }
+  .linear-gauge-scale { display: flex; justify-content: space-between; font-size: 8px; color: var(--ob-text-dim); }
+
+  .status-dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; margin-right: 4px; }
+  .status-dot.ok { background: var(--ob-success); box-shadow: 0 0 5px var(--ob-success); }
+  .status-dot.warn { background: var(--ob-amber); box-shadow: 0 0 5px var(--ob-amber); }
+  .status-dot.danger { background: var(--ob-danger); box-shadow: 0 0 5px var(--ob-danger); }
+
+  .hazard-flag { color: var(--ob-amber); margin-left: 4px; }
+  .text-cyan { color: var(--ob-cyan); }
+  .text-amber { color: var(--ob-amber); }
+  .text-danger { color: var(--ob-danger); }
+  .text-success { color: var(--ob-success); }
+</style>
+</head>
+<body>
+
+<div class="globe-stub"><div class="globe-sphere-stub"></div></div>
+<div class="dot-grid"></div>
+
+<!-- Reference chrome: shows where existing HudStatusPanel / HudCollectorPanel / Ticker sit,
+     so the columns below can be checked for clearance. Not part of the deliverable. -->
+<div id="ref-status" class="hud-panel ref-fill">
+  <div class="panel-header"><span class="heading">WORLD PULSE</span></div>
+  <div class="label">STATUS &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; LIVE</div>
+  <div class="label">UTC &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 14:32:08</div>
+  <div class="label">EVENTS &nbsp;&nbsp;&nbsp; 47</div>
+</div>
+<div id="ref-collectors" class="hud-panel ref-fill">
+  <div class="panel-header"><span class="heading">DATA SOURCES</span></div>
+  <div class="label">ALL SOURCES ACTIVE</div>
+  <div class="label" style="margin-top:30px;">[ SKY MAP ]</div>
+  <div class="label" style="margin-top:8px;">[ SOURCES ]</div>
+</div>
+<div id="ref-ticker"><span class="label text-cyan">LIVE FEED</span></div>
+
+<!-- ===================================================== -->
+<!-- LEFT COLUMN -->
+<!-- ===================================================== -->
+<div id="left-column">
+
+  <!-- SEISMIC ACTIVITY -->
+  <div class="hud-panel">
+    <div class="panel-header"><span class="heading">&#9670; SEISMIC ACTIVITY</span></div>
+    <div class="seg-row">
+      <span class="seg-row-label">M7.2</span>
+      <div class="seg-bar">
+        <!-- 20 cells, ~14 filled (7.2/10 * 20 rounded) -->
+        <div class="seg-cell fill-danger"></div><div class="seg-cell fill-danger"></div><div class="seg-cell fill-danger"></div><div class="seg-cell fill-danger"></div><div class="seg-cell fill-danger"></div><div class="seg-cell fill-danger"></div><div class="seg-cell fill-danger"></div><div class="seg-cell fill-danger"></div><div class="seg-cell fill-danger"></div><div class="seg-cell fill-danger"></div><div class="seg-cell fill-danger"></div><div class="seg-cell fill-danger"></div><div class="seg-cell fill-danger"></div><div class="seg-cell fill-danger"></div>
+        <div class="seg-cell"></div><div class="seg-cell"></div><div class="seg-cell"></div><div class="seg-cell"></div><div class="seg-cell"></div><div class="seg-cell"></div>
+      </div>
+      <span class="seg-row-value text-danger">7.2</span>
+    </div>
+    <div class="seg-row">
+      <span class="seg-row-label">M5.8</span>
+      <div class="seg-bar">
+        <div class="seg-cell fill-amber"></div><div class="seg-cell fill-amber"></div><div class="seg-cell fill-amber"></div><div class="seg-cell fill-amber"></div><div class="seg-cell fill-amber"></div><div class="seg-cell fill-amber"></div><div class="seg-cell fill-amber"></div><div class="seg-cell fill-amber"></div><div class="seg-cell fill-amber"></div><div class="seg-cell fill-amber"></div><div class="seg-cell fill-amber"></div>
+        <div class="seg-cell"></div><div class="seg-cell"></div><div class="seg-cell"></div><div class="seg-cell"></div><div class="seg-cell"></div><div class="seg-cell"></div><div class="seg-cell"></div><div class="seg-cell"></div>
+      </div>
+      <span class="seg-row-value text-amber">5.8</span>
+    </div>
+    <div class="seg-row">
+      <span class="seg-row-label">M4.1</span>
+      <div class="seg-bar">
+        <div class="seg-cell fill-amber"></div><div class="seg-cell fill-amber"></div><div class="seg-cell fill-amber"></div><div class="seg-cell fill-amber"></div><div class="seg-cell fill-amber"></div><div class="seg-cell fill-amber"></div><div class="seg-cell fill-amber"></div><div class="seg-cell fill-amber"></div>
+        <div class="seg-cell"></div><div class="seg-cell"></div><div class="seg-cell"></div><div class="seg-cell"></div><div class="seg-cell"></div><div class="seg-cell"></div><div class="seg-cell"></div><div class="seg-cell"></div><div class="seg-cell"></div><div class="seg-cell"></div><div class="seg-cell"></div><div class="seg-cell"></div>
+      </div>
+      <span class="seg-row-value text-amber">4.1</span>
+    </div>
+    <div class="seg-row">
+      <span class="seg-row-label">M2.1</span>
+      <div class="seg-bar">
+        <div class="seg-cell fill-cyan"></div><div class="seg-cell fill-cyan"></div><div class="seg-cell fill-cyan"></div><div class="seg-cell fill-cyan"></div>
+        <div class="seg-cell"></div><div class="seg-cell"></div><div class="seg-cell"></div><div class="seg-cell"></div><div class="seg-cell"></div><div class="seg-cell"></div><div class="seg-cell"></div><div class="seg-cell"></div><div class="seg-cell"></div><div class="seg-cell"></div><div class="seg-cell"></div><div class="seg-cell"></div><div class="seg-cell"></div><div class="seg-cell"></div><div class="seg-cell"></div><div class="seg-cell"></div>
+      </div>
+      <span class="seg-row-value text-cyan">2.1</span>
+    </div>
+  </div>
+
+  <!-- EVENT RATE / 24H -->
+  <div class="hud-panel">
+    <div class="panel-header"><span class="heading">&#9670; EVENT RATE / 24H</span></div>
+    <div class="sparkline-wrap">
+      <svg viewBox="0 0 180 50" width="100%" height="50">
+        <line x1="0" y1="12" x2="180" y2="12" class="sparkline-grid" />
+        <line x1="0" y1="25" x2="180" y2="25" class="sparkline-grid" />
+        <line x1="0" y1="38" x2="180" y2="38" class="sparkline-grid" />
+        <polyline class="sparkline-path"
+          points="0,40 15,38 30,30 45,32 60,18 75,22 90,10 105,15 120,28 135,20 150,5 165,12 180,8" />
+      </svg>
+      <div class="sparkline-axis">
+        <span class="label">-24H</span>
+        <span class="label">NOW</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- BY TYPE -->
+  <div class="hud-panel">
+    <div class="panel-header"><span class="heading">&#9670; BY TYPE</span></div>
+    <div class="seg-row">
+      <span class="seg-row-label text-danger">&#9670; QUAKE</span>
+      <div class="seg-bar">
+        <div class="seg-cell fill-amber"></div><div class="seg-cell fill-amber"></div><div class="seg-cell fill-amber"></div><div class="seg-cell fill-amber"></div><div class="seg-cell fill-amber"></div><div class="seg-cell fill-amber"></div><div class="seg-cell fill-amber"></div><div class="seg-cell fill-amber"></div><div class="seg-cell fill-amber"></div><div class="seg-cell fill-amber"></div><div class="seg-cell fill-amber"></div><div class="seg-cell fill-amber"></div><div class="seg-cell fill-amber"></div><div class="seg-cell fill-amber"></div>
+        <div class="seg-cell"></div><div class="seg-cell"></div>
+      </div>
+      <span class="seg-row-value">14</span>
+    </div>
+    <div class="seg-row">
+      <span class="seg-row-label text-amber">&#9650; WX</span>
+      <div class="seg-bar">
+        <div class="seg-cell fill-cyan"></div><div class="seg-cell fill-cyan"></div><div class="seg-cell fill-cyan"></div><div class="seg-cell fill-cyan"></div><div class="seg-cell fill-cyan"></div><div class="seg-cell fill-cyan"></div><div class="seg-cell fill-cyan"></div><div class="seg-cell fill-cyan"></div><div class="seg-cell fill-cyan"></div><div class="seg-cell fill-cyan"></div><div class="seg-cell fill-cyan"></div><div class="seg-cell fill-cyan"></div>
+        <div class="seg-cell"></div><div class="seg-cell"></div><div class="seg-cell"></div><div class="seg-cell"></div>
+      </div>
+      <span class="seg-row-value">12</span>
+    </div>
+    <div class="seg-row">
+      <span class="seg-row-label text-cyan">&#9032; ISS</span>
+      <div class="seg-bar">
+        <div class="seg-cell fill-cyan"></div><div class="seg-cell fill-cyan"></div><div class="seg-cell fill-cyan"></div><div class="seg-cell fill-cyan"></div><div class="seg-cell fill-cyan"></div><div class="seg-cell fill-cyan"></div><div class="seg-cell fill-cyan"></div><div class="seg-cell fill-cyan"></div>
+        <div class="seg-cell"></div><div class="seg-cell"></div><div class="seg-cell"></div><div class="seg-cell"></div><div class="seg-cell"></div><div class="seg-cell"></div><div class="seg-cell"></div><div class="seg-cell"></div>
+      </div>
+      <span class="seg-row-value">8</span>
+    </div>
+    <div class="seg-row">
+      <span class="seg-row-label text-amber">&#9651; VOLC</span>
+      <div class="seg-bar">
+        <div class="seg-cell fill-amber"></div><div class="seg-cell fill-amber"></div><div class="seg-cell fill-amber"></div><div class="seg-cell fill-amber"></div><div class="seg-cell fill-amber"></div>
+        <div class="seg-cell"></div><div class="seg-cell"></div><div class="seg-cell"></div><div class="seg-cell"></div><div class="seg-cell"></div><div class="seg-cell"></div><div class="seg-cell"></div><div class="seg-cell"></div><div class="seg-cell"></div><div class="seg-cell"></div><div class="seg-cell"></div><div class="seg-cell"></div><div class="seg-cell"></div><div class="seg-cell"></div>
+      </div>
+      <span class="seg-row-value">5</span>
+    </div>
+  </div>
+
+  <!-- SEVERITY DISTRIBUTION -->
+  <div class="hud-panel">
+    <div class="panel-header"><span class="heading">&#9670; SEVERITY DIST</span></div>
+    <div class="seg-row">
+      <span class="seg-row-label text-danger">CRIT</span>
+      <div class="seg-bar">
+        <div class="seg-cell fill-danger"></div><div class="seg-cell fill-danger"></div>
+        <div class="seg-cell"></div><div class="seg-cell"></div><div class="seg-cell"></div><div class="seg-cell"></div><div class="seg-cell"></div><div class="seg-cell"></div><div class="seg-cell"></div><div class="seg-cell"></div><div class="seg-cell"></div><div class="seg-cell"></div><div class="seg-cell"></div><div class="seg-cell"></div><div class="seg-cell"></div><div class="seg-cell"></div><div class="seg-cell"></div><div class="seg-cell"></div><div class="seg-cell"></div><div class="seg-cell"></div>
+      </div>
+      <span class="seg-row-value">2</span>
+    </div>
+    <div class="seg-row">
+      <span class="seg-row-label text-amber">HIGH</span>
+      <div class="seg-bar">
+        <div class="seg-cell fill-amber"></div><div class="seg-cell fill-amber"></div><div class="seg-cell fill-amber"></div><div class="seg-cell fill-amber"></div><div class="seg-cell fill-amber"></div><div class="seg-cell fill-amber"></div><div class="seg-cell fill-amber"></div><div class="seg-cell fill-amber"></div>
+        <div class="seg-cell"></div><div class="seg-cell"></div><div class="seg-cell"></div><div class="seg-cell"></div><div class="seg-cell"></div><div class="seg-cell"></div><div class="seg-cell"></div><div class="seg-cell"></div><div class="seg-cell"></div><div class="seg-cell"></div><div class="seg-cell"></div><div class="seg-cell"></div>
+      </div>
+      <span class="seg-row-value">8</span>
+    </div>
+    <div class="seg-row">
+      <span class="seg-row-label text-amber">MOD</span>
+      <div class="seg-bar">
+        <div class="seg-cell fill-amber"></div><div class="seg-cell fill-amber"></div><div class="seg-cell fill-amber"></div><div class="seg-cell fill-amber"></div><div class="seg-cell fill-amber"></div><div class="seg-cell fill-amber"></div><div class="seg-cell fill-amber"></div><div class="seg-cell fill-amber"></div><div class="seg-cell fill-amber"></div><div class="seg-cell fill-amber"></div><div class="seg-cell fill-amber"></div><div class="seg-cell fill-amber"></div><div class="seg-cell fill-amber"></div><div class="seg-cell fill-amber"></div>
+        <div class="seg-cell"></div><div class="seg-cell"></div><div class="seg-cell"></div><div class="seg-cell"></div><div class="seg-cell"></div><div class="seg-cell"></div>
+      </div>
+      <span class="seg-row-value">14</span>
+    </div>
+    <div class="seg-row">
+      <span class="seg-row-label text-cyan">LOW</span>
+      <div class="seg-bar">
+        <div class="seg-cell fill-cyan"></div><div class="seg-cell fill-cyan"></div><div class="seg-cell fill-cyan"></div><div class="seg-cell fill-cyan"></div><div class="seg-cell fill-cyan"></div><div class="seg-cell fill-cyan"></div><div class="seg-cell fill-cyan"></div><div class="seg-cell fill-cyan"></div><div class="seg-cell fill-cyan"></div><div class="seg-cell fill-cyan"></div><div class="seg-cell fill-cyan"></div><div class="seg-cell fill-cyan"></div><div class="seg-cell fill-cyan"></div><div class="seg-cell fill-cyan"></div><div class="seg-cell fill-cyan"></div><div class="seg-cell fill-cyan"></div><div class="seg-cell fill-cyan"></div><div class="seg-cell fill-cyan"></div><div class="seg-cell fill-cyan"></div><div class="seg-cell fill-cyan"></div>
+      </div>
+      <span class="seg-row-value">20</span>
+    </div>
+  </div>
+
+</div>
+
+<!-- ===================================================== -->
+<!-- RIGHT COLUMN -->
+<!-- ===================================================== -->
+<div id="right-column">
+
+  <!-- ISS TELEMETRY -->
+  <div class="hud-panel">
+    <div class="panel-header"><span class="heading">&#9670; ISS TELEMETRY</span></div>
+    <div class="arc-gauge">
+      <svg width="96" height="96" viewBox="0 0 96 96">
+        <circle class="arc-gauge-track" cx="48" cy="48" r="40" stroke-dasharray="251" stroke-dashoffset="0" />
+        <circle class="arc-gauge-fill" cx="48" cy="48" r="40" stroke-dasharray="251" stroke-dashoffset="88" />
+      </svg>
+      <div class="arc-gauge-value"><span class="v">408</span><span class="u">KM ALT</span></div>
+    </div>
+    <div class="stat-readout"><span class="value">27,600</span><span class="unit">KM/H</span></div>
+    <div style="text-align:center; margin-top:8px;">
+      <span class="status-dot ok"></span><span class="label">DAYLIGHT</span>
+    </div>
+  </div>
+
+  <!-- AURORA / KP INDEX -->
+  <div class="hud-panel">
+    <div class="panel-header"><span class="heading">&#9672; AURORA &middot; KP INDEX</span></div>
+    <div style="display:flex; justify-content:space-between; align-items:baseline;">
+      <span class="stat-readout" style="margin:0;"><span class="value">7.2</span><span class="unit">KP</span></span>
+      <span class="label text-danger">STORM</span>
+    </div>
+    <div class="linear-gauge-track">
+      <div class="linear-gauge-fill" style="width: 80%; background: linear-gradient(90deg, var(--ob-success), var(--ob-amber), var(--ob-danger));"></div>
+      <div class="linear-gauge-marker" style="left: 80%;"></div>
+    </div>
+    <div class="linear-gauge-scale"><span>0 QUIET</span><span>9 SEVERE</span></div>
+  </div>
+
+  <!-- ASTEROID PROXIMITY -->
+  <div class="hud-panel">
+    <div class="panel-header"><span class="heading">&#9672; ASTEROID PROX</span></div>
+    <div class="seg-row">
+      <span class="seg-row-label" style="width:70px;">2024 BQ3</span>
+      <div class="seg-bar">
+        <div class="seg-cell fill-amber"></div><div class="seg-cell fill-amber"></div>
+        <div class="seg-cell"></div><div class="seg-cell"></div><div class="seg-cell"></div><div class="seg-cell"></div><div class="seg-cell"></div><div class="seg-cell"></div><div class="seg-cell"></div><div class="seg-cell"></div>
+      </div>
+      <span class="seg-row-value">2.1<span class="hazard-flag">&#9888;</span></span>
+    </div>
+    <div class="seg-row">
+      <span class="seg-row-label" style="width:70px;">2024 AB1</span>
+      <div class="seg-bar">
+        <div class="seg-cell fill-amber"></div>
+        <div class="seg-cell"></div><div class="seg-cell"></div><div class="seg-cell"></div><div class="seg-cell"></div><div class="seg-cell"></div><div class="seg-cell"></div><div class="seg-cell"></div><div class="seg-cell"></div><div class="seg-cell"></div>
+      </div>
+      <span class="seg-row-value">1.4<span class="hazard-flag">&#9888;</span></span>
+    </div>
+    <div class="seg-row">
+      <span class="seg-row-label" style="width:70px;">2024 XP7</span>
+      <div class="seg-bar">
+        <div class="seg-cell fill-cyan"></div><div class="seg-cell fill-cyan"></div><div class="seg-cell fill-cyan"></div><div class="seg-cell fill-cyan"></div>
+        <div class="seg-cell"></div><div class="seg-cell"></div><div class="seg-cell"></div><div class="seg-cell"></div><div class="seg-cell"></div><div class="seg-cell"></div>
+      </div>
+      <span class="seg-row-value">4.8</span>
+    </div>
+    <div class="label" style="margin-top:6px; font-size:8px;">1 LD = 384,400 KM</div>
+  </div>
+
+  <!-- WEATHER (existing WeatherWidget, shown here only for column-rhythm reference) -->
+  <div class="hud-panel">
+    <div class="panel-header"><span class="heading">WEATHER</span><span class="label">SAN FRANCISCO</span></div>
+    <div style="display:flex; justify-content:space-between;">
+      <div>
+        <div class="value" style="font-size:22px; color:var(--ob-cyan);">18&deg;<span class="unit">C</span></div>
+        <div class="label">feels 17&deg;</div>
+        <div class="label text-amber">&#9728; Clear</div>
+      </div>
+      <div style="text-align:right;">
+        <div class="label">HUM <span style="color:var(--ob-text)">62%</span></div>
+        <div class="label">WIND <span style="color:var(--ob-text)">3.2 m/s</span></div>
+        <div class="label">PRES <span style="color:var(--ob-text)">1013 hPa</span></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+</body>
+</html>

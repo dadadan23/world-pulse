@@ -7,7 +7,48 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-06-28
+
 ### Added
+
+- **Mission-control side-column telemetry widgets** (`feat(dashboard): side columns`)
+
+  Filled the two empty vertical edges of the globe-dominant dashboard with
+  compact, animated HUD widgets in a "For All Mankind" × Oblivion style,
+  sourced entirely from the existing Zustand `events` store -- no new
+  dependencies, no new API calls.
+
+  **Left column** (`SideColumns/LeftColumn.tsx`):
+  - `SeismicWidget` -- last 6 earthquakes as magnitude segmented bars
+  - `EventRateWidget` -- 24-hour event count sparkline
+  - `TypeDistWidget` -- event counts by type, sorted descending
+  - `SeverityWidget` -- critical/high/moderate/low severity histogram
+
+  **Right column** (`SideColumns/RightColumn.tsx`):
+  - `ISSWidget` -- altitude arc gauge + velocity readout
+  - `AuroraWidget` -- Kp-index linear gauge with storm-level coloring
+  - `AsteroidWidget` -- top 3 near-Earth approaches by miss distance
+  - `WeatherWidget` -- relocated into the right column (previously built but unused)
+
+  **Other changes:**
+  - New `.ob-seg-bar`, `.ob-sparkline`, `.ob-stat-readout` CSS primitives
+    in `src/renderer/index.css`, respecting `prefers-reduced-motion`
+  - Extracted `getEventIndicator`'s type-to-symbol map out of `Ticker.tsx`
+    into `src/renderer/utils/eventIndicators.ts`, shared with `TypeDistWidget`
+  - Fixed `RightColumn`'s vertical offset (`top-[210px]` to `top-[460px]`)
+    after manual verification showed it rendering behind `HudCollectorPanel`,
+    whose height grows with the number of registered collectors
+
+  **Build stats:**
+  - Test suite: **481 tests passing** across 50 files
+  - Lint: clean (zero warnings)
+  - Typecheck: clean
+
+  **Before:** both vertical screen edges were empty; only top-corner HUD
+  panels, the slide-in event panel, and the bottom ticker were populated.
+
+  **After:** both edges show live, independently-scrollable telemetry
+  widgets that hide individually when their underlying event type has no data.
 
 - **Natural Earth 110m coastline pipeline** (`feat(globe): #115`)
 
