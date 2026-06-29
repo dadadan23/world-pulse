@@ -9,6 +9,7 @@ import { VolcanoCollector } from './collectors/volcanoes';
 import { PlanetCollector } from './collectors/planets';
 import { WeatherCollector } from './collectors/weather';
 import { HistoricalCollector } from './collectors/historical';
+import { NewsCollector } from './collectors/news';
 import type { CollectorManifest } from '@shared/types';
 
 // Load environment variables — .env.local (gitignored, local dev) takes precedence over .env
@@ -38,6 +39,7 @@ const manifests: {
     | typeof PlanetCollector
     | typeof WeatherCollector
     | typeof HistoricalCollector
+    | typeof NewsCollector
   >;
 }[] = [
   {
@@ -142,6 +144,20 @@ const manifests: {
       description: 'Curated historical events (shipwrecks, battles) for globe enrichment.',
     },
     factory: () => new HistoricalCollector(),
+  },
+  {
+    manifest: {
+      id: 'news',
+      version: '1.0.0',
+      displayName: 'Global Headlines',
+      capabilities: ['news'],
+      qualityTier: 'primary',
+      enabledByDefault: true,
+      description: 'Global top headline news from NewsAPI.',
+      sourceUrl: 'https://newsapi.org/',
+      requiredEnvVars: ['NEWSAPI_KEY'],
+    },
+    factory: () => new NewsCollector(),
   },
 ];
 
