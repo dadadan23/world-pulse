@@ -1,68 +1,13 @@
-import { Fragment } from 'react';
 import { useAppStore } from '../../../store/useAppStore';
-import { formatRelativeTime } from '../../../utils/time';
-import { getEventIndicator } from '../../../utils/eventIndicators';
-import { isSelectedEvent } from '../../../utils/isSelectedEvent';
-
-const MAX_ROWS = 5;
+import { VerticalEventTicker } from './VerticalEventTicker';
 
 /** Left column widget: scrolling feed of recent earthquake + volcano events. */
 export function GeologicTicker() {
   const events = useAppStore((state) => state.events);
-  const selectedEvent = useAppStore((state) => state.selectedEvent);
-  const setSelectedEvent = useAppStore((state) => state.setSelectedEvent);
 
   const quakesAndVolcanoes = events
     .filter((e) => e.type === 'earthquake' || e.type === 'volcano')
-    .sort((a, b) => b.timestamp - a.timestamp)
-    .slice(0, MAX_ROWS);
+    .sort((a, b) => b.timestamp - a.timestamp);
 
-  // Only loop the scroll animation (and duplicate rows) once there's enough
-  // content to actually scroll through — otherwise a couple of rows just glitch in place.
-  const shouldScroll = quakesAndVolcanoes.length >= MAX_ROWS;
-  const displayEvents = shouldScroll
-    ? [...quakesAndVolcanoes, ...quakesAndVolcanoes]
-    : quakesAndVolcanoes;
-
-  return (
-    <div className="ob-hud-panel ob-scanline">
-      <div className="flex items-center justify-between mb-3 pb-2 border-b border-ob-border">
-        <span className="ob-label text-ob-text-dim tracking-ultrawide">◆ GEOLOGIC PULSE</span>
-      </div>
-      {quakesAndVolcanoes.length > 0 ? (
-        <div className="overflow-hidden" style={{ maxHeight: `${MAX_ROWS * 28}px` }}>
-          <div className={`flex flex-col ${shouldScroll ? 'animate-scroll-vertical' : ''}`}>
-            {displayEvents.map((event, index) => {
-              const indicator = getEventIndicator(event.type, event.severity);
-              const isSelected = isSelectedEvent(event, selectedEvent);
-              return (
-                <Fragment key={`${event.id}-${index}`}>
-                  <button
-                    type="button"
-                    onClick={() => setSelectedEvent(event)}
-                    className={`flex items-center gap-2 py-1.5 px-1 text-left cursor-pointer transition-colors duration-150 hover:bg-ob-cyan/5 ${
-                      isSelected ? 'bg-ob-cyan/10' : ''
-                    }`}
-                    style={
-                      isSelected ? { boxShadow: 'inset 0 0 8px var(--ob-glow-cyan)' } : undefined
-                    }
-                  >
-                    <span className={`${indicator.color} text-[12px] shrink-0`} aria-hidden>
-                      {indicator.symbol}
-                    </span>
-                    <span className="ob-label truncate flex-1 min-w-0">{event.title}</span>
-                    <span className="ob-label text-ob-text-dim tabular-nums shrink-0">
-                      {formatRelativeTime(event.timestamp)}
-                    </span>
-                  </button>
-                </Fragment>
-              );
-            })}
-          </div>
-        </div>
-      ) : (
-        <span className="ob-label text-ob-cyan">NO ACTIVE EVENTS</span>
-      )}
-    </div>
-  );
+  return <VerticalEventTicker headerLabel="◆ GEOLOGIC PULSE" events={quakesAndVolcanoes} />;
 }
