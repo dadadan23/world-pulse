@@ -8,8 +8,11 @@ import { latLonToVector3 } from './projection';
 import { ne110mCoastlineSource } from './geoJsonCoastlineSource';
 import { ne110mBoundarySource } from './geoJsonBoundarySource';
 import { CityLabels } from './CityLabels';
+import { CITIES } from './cityData';
 import { lonToGlobeRotationY, shortestAngleDiff } from './globeRotation';
-import type { Event } from '@shared/types';
+import { buildIssGroundTrack, ISS_ARC_BACK_DEG, ISS_ARC_FORWARD_DEG } from './issGroundTrack';
+import { auroraZoneOpacity, auroraHemispheres } from './auroraZone';
+import type { Event, ISSEvent, AuroraEvent } from '@shared/types';
 
 const GLOBE_RADIUS = 1;
 
@@ -182,8 +185,8 @@ function EarthSphere() {
           map={textures.map}
           normalMap={textures.normalMap}
           normalScale={new THREE.Vector2(0.5, 0.5)}
-          metalness={0.1}
-          roughness={0.8}
+          metalness={0.22}
+          roughness={0.55}
           emissive={'#001826'}
           emissiveIntensity={0.2}
           toneMapped={false}
@@ -207,17 +210,32 @@ function getMarkerColor(severity?: number, isFeatured?: boolean): string {
   return OB_COLORS.cyan;
 }
 
+/** Duration of the marker spawn-in expand+fade, in seconds (PRD R8.4: 300ms). */
+const MARKER_ENTRY_DURATION_S = 0.3;
+/** Starting scale fraction for the spawn-in "expand" effect (grows to 1.0). */
+const MARKER_ENTRY_START_SCALE = 0.3;
+
+function easeOutCubic(t: number): number {
+  return 1 - Math.pow(1 - t, 3);
+}
+
 /** A single event marker on the globe surface */
 function EventMarker({
   event,
   isFeatured,
   onClick,
+  reducedMotion,
 }: {
   event: Event;
   isFeatured: boolean;
   onClick: () => void;
+  reducedMotion: boolean;
 }) {
   const ref = useRef<THREE.Mesh>(null);
+  const materialRef = useRef<THREE.MeshBasicMaterial>(null);
+  // Captured on the marker's first rendered frame so the spawn-in animation
+  // times from when this specific marker mounted, not from canvas start.
+  const spawnClockTimeRef = useRef<number | null>(null);
   const position = useMemo(() => {
     if (!event.location) return new THREE.Vector3(0, 0, 0);
     return latLonToVector3(event.location.lat, event.location.lon, GLOBE_RADIUS * 1.01);
@@ -225,15 +243,20 @@ function EventMarker({
 
   const color = getMarkerColor(event.severity, isFeatured);
 
-  // Pulse animation for featured markers
   useFrame(({ clock }) => {
     if (!ref.current) return;
-    if (isFeatured) {
-      const scale = 1 + Math.sin(clock.elapsedTime * 3) * 0.3;
-      ref.current.scale.setScalar(scale);
-    } else {
-      ref.current.scale.setScalar(1);
+
+    if (spawnClockTimeRef.current === null) {
+      spawnClockTimeRef.current = clock.elapsedTime;
     }
+    const age = clock.elapsedTime - spawnClockTimeRef.current;
+    const entryT = reducedMotion ? 1 : Math.min(1, age / MARKER_ENTRY_DURATION_S);
+    const entryEase = easeOutCubic(entryT);
+    const entryScale = MARKER_ENTRY_START_SCALE + (1 - MARKER_ENTRY_START_SCALE) * entryEase;
+
+    const pulseScale = isFeatured ? 1 + Math.sin(clock.elapsedTime * 3) * 0.3 : 1;
+    ref.current.scale.setScalar(pulseScale * entryScale);
+    if (materialRef.current) materialRef.current.opacity = entryEase;
   });
 
   const size = isFeatured ? 0.025 : 0.015;
@@ -248,7 +271,7 @@ function EventMarker({
       }}
     >
       <sphereGeometry args={[size, 12, 12]} />
-      <meshBasicMaterial color={color} />
+      <meshBasicMaterial ref={materialRef} color={color} transparent opacity={0} />
     </mesh>
   );
 }
@@ -382,6 +405,181 @@ function HomeBeacon() {
   );
 }
 
+const ISS_ARC_RADIUS_MULT = 1.012; // matches the primary EventMarker surface offset
+const ISS_ARC_TUBE_RADIUS = 0.0035;
+const ISS_ARC_TOTAL_DEG = ISS_ARC_BACK_DEG + ISS_ARC_FORWARD_DEG;
+/** Real ISS orbital angular speed (degrees/second), used to pace the leading-point sweep. */
+const ISS_ORBIT_DEG_PER_SEC = 360 / (92.68 * 60);
+/** Fraction of the rendered arc behind the ISS's current (live marker) position. */
+const ISS_ARC_START_FRACTION = ISS_ARC_BACK_DEG / ISS_ARC_TOTAL_DEG;
+
+/**
+ * ISS ground-track arc: a short great-circle trail rendered through the ISS's
+ * current position (see issGroundTrack.ts), with a bright point that sweeps
+ * from the current position to the forward tip of the arc, paced at the ISS's
+ * real orbital angular speed.
+ */
+function IssOrbitArc({ event }: { event: ISSEvent }) {
+  const leadRef = useRef<THREE.Mesh>(null);
+
+  const curve = useMemo(() => {
+    if (!event.location) return null;
+    const track = buildIssGroundTrack(event.location.lat, event.location.lon);
+    const vectors = track.map((p) =>
+      latLonToVector3(p.lat, p.lon, GLOBE_RADIUS * ISS_ARC_RADIUS_MULT)
+    );
+    return new THREE.CatmullRomCurve3(vectors);
+  }, [event.location]);
+
+  useFrame(({ clock }) => {
+    if (!leadRef.current || !curve) return;
+    const cycleSeconds = ISS_ARC_FORWARD_DEG / ISS_ORBIT_DEG_PER_SEC;
+    const t = (clock.elapsedTime % cycleSeconds) / cycleSeconds;
+    const u = ISS_ARC_START_FRACTION + t * (1 - ISS_ARC_START_FRACTION);
+    leadRef.current.position.copy(curve.getPointAt(u));
+  });
+
+  if (!curve) return null;
+
+  return (
+    <group>
+      <mesh>
+        <tubeGeometry args={[curve, 48, ISS_ARC_TUBE_RADIUS, 6, false]} />
+        <meshBasicMaterial color={OB_COLORS.cyan} transparent opacity={0.45} />
+      </mesh>
+      <mesh ref={leadRef}>
+        <sphereGeometry args={[0.011, 10, 10]} />
+        <meshBasicMaterial color={OB_COLORS.cyan} />
+      </mesh>
+    </group>
+  );
+}
+
+/** Finds the live ISS event (if any) and renders its orbital arc. */
+function IssOrbitArcLayer() {
+  const issEvent = useAppStore((state) =>
+    state.events.find((e): e is ISSEvent => e.type === 'iss')
+  );
+
+  if (!issEvent?.location) return null;
+
+  return <IssOrbitArc event={issEvent} />;
+}
+
+const AURORA_RADIUS_MULT = 1.018;
+
+const AURORA_VERTEX_SHADER = `
+varying float vGradient;
+uniform float uIsSouth;
+
+void main() {
+  // SphereGeometry's v (uv.y) runs from thetaStart (0) to thetaStart+thetaLength (1).
+  // For the north cap, v=0 is at the pole; for the south cap (built from the other
+  // side), v=1 is at the pole — uIsSouth picks the orientation where 1.0 = pole.
+  vGradient = mix(1.0 - uv.y, uv.y, uIsSouth);
+  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+}
+`;
+
+const AURORA_FRAGMENT_SHADER = `
+varying float vGradient;
+uniform vec3 uColor;
+uniform float uOpacity;
+uniform float uTime;
+uniform float uShimmerAmplitude;
+
+void main() {
+  float shimmer = 1.0 + sin(uTime * 1.4 + vGradient * 6.0) * uShimmerAmplitude;
+  float alpha = smoothstep(0.0, 1.0, vGradient) * uOpacity * shimmer;
+  gl_FragColor = vec4(uColor, alpha);
+}
+`;
+
+/** Translucent elliptical polar-cap disc for an aurora event, fading from pole to its visible-latitude edge. */
+function AuroraDisc({
+  pole,
+  capAngleRad,
+  opacity,
+  reducedMotion,
+}: {
+  pole: 'north' | 'south';
+  capAngleRad: number;
+  opacity: number;
+  reducedMotion: boolean;
+}) {
+  const materialRef = useRef<THREE.ShaderMaterial | null>(null);
+
+  const material = useMemo(
+    () =>
+      new THREE.ShaderMaterial({
+        transparent: true,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+        blending: THREE.AdditiveBlending,
+        vertexShader: AURORA_VERTEX_SHADER,
+        fragmentShader: AURORA_FRAGMENT_SHADER,
+        uniforms: {
+          uColor: { value: new THREE.Color(OB_COLORS.cyan) },
+          uOpacity: { value: opacity },
+          uIsSouth: { value: pole === 'south' ? 1 : 0 },
+          uShimmerAmplitude: { value: reducedMotion ? 0 : 0.15 },
+          uTime: { value: 0 },
+        },
+      }),
+    [opacity, pole, reducedMotion]
+  );
+
+  useEffect(() => {
+    materialRef.current = material;
+    return () => material.dispose();
+  }, [material]);
+
+  useFrame((state) => {
+    if (materialRef.current) {
+      materialRef.current.uniforms.uTime.value = state.clock.elapsedTime;
+    }
+  });
+
+  const thetaStart = pole === 'north' ? 0 : Math.PI - capAngleRad;
+
+  return (
+    <mesh>
+      <sphereGeometry
+        args={[GLOBE_RADIUS * AURORA_RADIUS_MULT, 48, 24, 0, Math.PI * 2, thetaStart, capAngleRad]}
+      />
+      <primitive attach="material" object={material} />
+    </mesh>
+  );
+}
+
+/** Renders translucent polar-cap discs for the latest aurora event, per PRD R5. */
+function AuroraZones({ reducedMotion }: { reducedMotion: boolean }) {
+  const auroraEvent = useAppStore((state) =>
+    state.events.find((e): e is AuroraEvent => e.type === 'aurora')
+  );
+
+  if (!auroraEvent?.location) return null;
+
+  const visibleLatBoundary = Math.abs(auroraEvent.location.lat);
+  const capAngleRad = (90 - visibleLatBoundary) * (Math.PI / 180);
+  const opacity = auroraZoneOpacity(auroraEvent.severity ?? 0);
+  const poles = auroraHemispheres(auroraEvent.data.hemisphere);
+
+  return (
+    <group>
+      {poles.map((pole) => (
+        <AuroraDisc
+          key={pole}
+          pole={pole}
+          capAngleRad={capAngleRad}
+          opacity={opacity}
+          reducedMotion={reducedMotion}
+        />
+      ))}
+    </group>
+  );
+}
+
 /** Container that auto-rotates and holds the globe + markers */
 function RotatingGlobe({ children, isPaused }: { children: React.ReactNode; isPaused: boolean }) {
   const ref = useRef<THREE.Group>(null);
@@ -472,7 +670,7 @@ function deduplicateNearbyEvents(events: Event[], featuredId: string | undefined
 }
 
 /** All event markers as a group */
-function EventMarkers() {
+function EventMarkers({ reducedMotion }: { reducedMotion: boolean }) {
   const events = useAppStore((state) => state.events);
   const featuredEvent = useAppStore((state) => state.featuredEvent);
   const setFeaturedEvent = useAppStore((state) => state.setFeaturedEvent);
@@ -497,6 +695,7 @@ function EventMarkers() {
             <EventMarker
               event={event}
               isFeatured={isFeatured}
+              reducedMotion={reducedMotion}
               onClick={() => {
                 setFeaturedEvent(event);
                 setSelectedEvent(event);
@@ -561,22 +760,86 @@ function Graticule() {
   );
 }
 
-/** Small background stars for ambiance */
-function Stars() {
-  const positions = useMemo(() => {
-    const arr = new Float32Array(800 * 3);
-    /* eslint-disable react-hooks/purity -- decorative star positions generated once via useMemo([]) */
-    for (let i = 0; i < 800; i++) {
+const STAR_COUNT = 800;
+
+const STAR_VERTEX_SHADER = `
+attribute float aSize;
+attribute float aPhase;
+varying float vTwinkle;
+uniform float uTime;
+uniform float uTwinkleAmplitude;
+
+void main() {
+  vTwinkle = 1.0 + sin(uTime * 0.8 + aPhase) * uTwinkleAmplitude;
+  vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+  gl_PointSize = aSize * (300.0 / -mvPosition.z);
+  gl_Position = projectionMatrix * mvPosition;
+}
+`;
+
+const STAR_FRAGMENT_SHADER = `
+varying float vTwinkle;
+uniform vec3 uColor;
+uniform float uBaseOpacity;
+
+void main() {
+  vec2 coord = gl_PointCoord - vec2(0.5);
+  float dist = length(coord);
+  if (dist > 0.5) discard;
+  float edgeFade = smoothstep(0.5, 0.0, dist);
+  gl_FragColor = vec4(uColor, uBaseOpacity * vTwinkle * edgeFade);
+}
+`;
+
+/** Small background stars for ambiance, with varied size and a slow per-star twinkle for depth. */
+function Stars({ reducedMotion }: { reducedMotion: boolean }) {
+  const materialRef = useRef<THREE.ShaderMaterial | null>(null);
+
+  const { positions, sizes, phases } = useMemo(() => {
+    const pos = new Float32Array(STAR_COUNT * 3);
+    const sizeArr = new Float32Array(STAR_COUNT);
+    const phaseArr = new Float32Array(STAR_COUNT);
+    /* eslint-disable react-hooks/purity -- decorative star field generated once via useMemo([]) */
+    for (let i = 0; i < STAR_COUNT; i++) {
       const r = 8 + Math.random() * 15;
       const theta = Math.random() * Math.PI * 2;
       const phi = Math.acos(2 * Math.random() - 1);
-      arr[i * 3] = r * Math.sin(phi) * Math.cos(theta);
-      arr[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta);
-      arr[i * 3 + 2] = r * Math.cos(phi);
+      pos[i * 3] = r * Math.sin(phi) * Math.cos(theta);
+      pos[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta);
+      pos[i * 3 + 2] = r * Math.cos(phi);
+      // Most stars stay small and dim; a handful render larger/brighter for a sense of depth.
+      sizeArr[i] = Math.random() < 0.08 ? 2.2 + Math.random() * 1.8 : 0.8 + Math.random();
+      phaseArr[i] = Math.random() * Math.PI * 2;
     }
     /* eslint-enable react-hooks/purity */
-    return arr;
+    return { positions: pos, sizes: sizeArr, phases: phaseArr };
   }, []);
+
+  const material = useMemo(
+    () =>
+      new THREE.ShaderMaterial({
+        transparent: true,
+        depthWrite: false,
+        vertexShader: STAR_VERTEX_SHADER,
+        fragmentShader: STAR_FRAGMENT_SHADER,
+        uniforms: {
+          uColor: { value: new THREE.Color(OB_COLORS.stars) },
+          uBaseOpacity: { value: 0.3 },
+          uTwinkleAmplitude: { value: reducedMotion ? 0 : 0.25 },
+          uTime: { value: 0 },
+        },
+      }),
+    [reducedMotion]
+  );
+
+  useEffect(() => {
+    materialRef.current = material;
+    return () => material.dispose();
+  }, [material]);
+
+  useFrame((state) => {
+    if (materialRef.current) materialRef.current.uniforms.uTime.value = state.clock.elapsedTime;
+  });
 
   return (
     <points>
@@ -584,11 +847,100 @@ function Stars() {
         <bufferAttribute
           attach="attributes-position"
           args={[positions, 3]}
-          count={800}
+          count={STAR_COUNT}
+          itemSize={3}
+        />
+        <bufferAttribute
+          attach="attributes-aSize"
+          args={[sizes, 1]}
+          count={STAR_COUNT}
+          itemSize={1}
+        />
+        <bufferAttribute
+          attach="attributes-aPhase"
+          args={[phases, 1]}
+          count={STAR_COUNT}
+          itemSize={1}
+        />
+      </bufferGeometry>
+      <primitive attach="material" object={material} />
+    </points>
+  );
+}
+
+const CITY_LIGHT_VERTEX_SHADER = `
+varying float vNightFactor;
+uniform vec3 uSunDirection;
+
+void main() {
+  // Points sit directly on the globe surface, so the normalized local position
+  // doubles as the surface normal at that point.
+  vec3 worldNormal = normalize(mat3(modelMatrix) * normalize(position));
+  float sunDot = dot(worldNormal, normalize(uSunDirection));
+  vNightFactor = smoothstep(0.15, -0.15, sunDot);
+  vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+  gl_PointSize = 64.0 / -mvPosition.z;
+  gl_Position = projectionMatrix * mvPosition;
+}
+`;
+
+const CITY_LIGHT_FRAGMENT_SHADER = `
+varying float vNightFactor;
+uniform vec3 uColor;
+
+void main() {
+  vec2 coord = gl_PointCoord - vec2(0.5);
+  float dist = length(coord);
+  if (dist > 0.5) discard;
+  float edgeFade = smoothstep(0.5, 0.0, dist);
+  gl_FragColor = vec4(uColor, vNightFactor * edgeFade * 0.9);
+}
+`;
+
+const NIGHT_LIGHT_RADIUS_MULT = 1.0015;
+
+/** Warm light points at major-city locations (PRD Story C), visible only on the globe's night side. */
+function NightLights() {
+  const positions = useMemo(() => {
+    const arr = new Float32Array(CITIES.length * 3);
+    CITIES.forEach((city, i) => {
+      const v = latLonToVector3(city.lat, city.lon, GLOBE_RADIUS * NIGHT_LIGHT_RADIUS_MULT);
+      arr[i * 3] = v.x;
+      arr[i * 3 + 1] = v.y;
+      arr[i * 3 + 2] = v.z;
+    });
+    return arr;
+  }, []);
+
+  const material = useMemo(
+    () =>
+      new THREE.ShaderMaterial({
+        transparent: true,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+        vertexShader: CITY_LIGHT_VERTEX_SHADER,
+        fragmentShader: CITY_LIGHT_FRAGMENT_SHADER,
+        uniforms: {
+          uColor: { value: new THREE.Color(OB_COLORS.amber) },
+          uSunDirection: { value: SUN_DIRECTION.clone() },
+        },
+      }),
+    []
+  );
+
+  useEffect(() => () => material.dispose(), [material]);
+
+  return (
+    <points>
+      <bufferGeometry>
+        <bufferAttribute
+          attach="attributes-position"
+          args={[positions, 3]}
+          count={CITIES.length}
           itemSize={3}
         />
       </bufferGeometry>
-      <pointsMaterial color={OB_COLORS.stars} size={0.02} transparent opacity={0.3} />
+      <primitive attach="material" object={material} />
     </points>
   );
 }
@@ -636,13 +988,16 @@ export function Globe() {
         <directionalLight position={[5, 5, 5]} intensity={0.8} color={OB_COLORS.cyan} />
         <hemisphereLight args={['#102030', '#000000', 0.3]} />
 
-        <Stars />
+        <Stars reducedMotion={prefersReducedMotion} />
         <RotatingGlobe isPaused={isInteracting}>
           <EarthSphere />
+          <NightLights />
           <Graticule />
           <Atmosphere reducedMotion={prefersReducedMotion} />
           <HomeBeacon />
-          <EventMarkers />
+          <EventMarkers reducedMotion={prefersReducedMotion} />
+          <IssOrbitArcLayer />
+          <AuroraZones reducedMotion={prefersReducedMotion} />
           <CityLabelsWithTracking />
         </RotatingGlobe>
         <OrbitControls
