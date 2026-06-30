@@ -387,6 +387,10 @@ body {
   animation: scroll var(--ob-timing-scroll) linear infinite;
 }
 
+.animate-scroll:hover {
+  animation-play-state: paused;
+}
+
 @keyframes scrollVertical {
   from {
     transform: translateY(0);

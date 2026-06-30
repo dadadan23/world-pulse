@@ -23,8 +23,14 @@ export interface NewsAPIResponse {
   articles: NewsAPIArticle[];
 }
 
+interface IPGeoResponse {
+  country_code: string;
+}
+
 export class NewsCollector extends BaseCollector {
   private readonly apiUrl = 'https://newsapi.org/v2/top-headlines';
+  private readonly ipGeoUrl = 'https://ipapi.co/json/';
+  private cachedCountryCode: string | null = null;
 
   constructor() {
     super('Global Headlines', 'news', 15 * 60 * 1000); // 15 minutes
@@ -36,16 +42,16 @@ export class NewsCollector extends BaseCollector {
       throw new Error('NEWSAPI_KEY not configured');
     }
 
-    const response = await axios.get<NewsAPIResponse>(this.apiUrl, {
-      params: { language: 'en', pageSize: 10, apiKey },
-      timeout: 10000,
-    });
-
-    if (!this.validate(response.data)) {
-      throw new Error('Invalid response from NewsAPI');
+    if (!this.cachedCountryCode) {
+      this.cachedCountryCode = await this.detectCountryCode();
     }
 
-    return response.data.articles.map((article) => this.transform(article));
+    const [globalEvents, localEvents] = await Promise.all([
+      this.fetchHeadlines(apiKey, 'global'),
+      this.fetchHeadlines(apiKey, 'local', this.cachedCountryCode),
+    ]);
+
+    return [...globalEvents, ...localEvents];
   }
 
   validate(data: unknown): data is NewsAPIResponse {
@@ -60,9 +66,41 @@ export class NewsCollector extends BaseCollector {
     );
   }
 
-  private transform(article: NewsAPIArticle): NewsEvent {
+  private async fetchHeadlines(
+    apiKey: string,
+    scope: 'global' | 'local',
+    countryCode?: string
+  ): Promise<NewsEvent[]> {
+    const params: Record<string, string | number> =
+      scope === 'global'
+        ? { language: 'en', pageSize: 10, apiKey }
+        : { country: countryCode!, pageSize: 10, apiKey };
+
+    const response = await axios.get<NewsAPIResponse>(this.apiUrl, { params, timeout: 10000 });
+
+    if (!this.validate(response.data)) {
+      throw new Error(`Invalid response from NewsAPI (${scope})`);
+    }
+
+    return response.data.articles.map((article) => this.transform(article, scope));
+  }
+
+  private async detectCountryCode(): Promise<string> {
+    try {
+      const res = await axios.get<IPGeoResponse>(this.ipGeoUrl, { timeout: 5000 });
+      return res.data.country_code;
+    } catch (_err) {
+      console.warn('[NewsCollector] IP geolocation failed, defaulting to GB');
+      return 'GB';
+    }
+  }
+
+  private transform(article: NewsAPIArticle, scope: 'global' | 'local'): NewsEvent {
     return {
-      id: `news-${hashString(article.url)}`,
+      id:
+        scope === 'global'
+          ? `news-${hashString(article.url)}`
+          : `news-local-${hashString(article.url)}`,
       timestamp: Date.parse(article.publishedAt) || Date.now(),
       type: 'news',
       source: article.source.name,
@@ -74,7 +112,7 @@ export class NewsCollector extends BaseCollector {
         publisher: article.source.name,
         url: article.url,
         category: 'general',
-        scope: 'global',
+        scope,
       },
     };
   }
