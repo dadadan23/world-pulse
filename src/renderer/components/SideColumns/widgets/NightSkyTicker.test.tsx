@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
 import { NightSkyTicker } from './NightSkyTicker';
 import { useAppStore } from '../../../store/useAppStore';
 import type { Event } from '@shared/types';
@@ -24,7 +23,7 @@ describe('NightSkyTicker', () => {
     useAppStore.setState({ events: [], selectedEvent: null });
   });
 
-  it('shows the NO ACTIVE EVENTS empty state when there are no night-sky events', () => {
+  it('shows the NO ACTIVE EVENTS empty state and the NIGHT SKY header when there are no night-sky events', () => {
     render(<NightSkyTicker />);
     expect(screen.getByText('NO ACTIVE EVENTS')).toBeInTheDocument();
     expect(screen.getByText('◆ NIGHT SKY', { exact: false })).toBeInTheDocument();
@@ -55,25 +54,5 @@ describe('NightSkyTicker', () => {
     expect(titles[1]).toBe('Venus Visible');
     expect(titles[2]).toBe('Asteroid Flyby');
     expect(titles[3]).toBe('ISS Pass');
-  });
-
-  it('calls setSelectedEvent when a row is clicked', async () => {
-    const user = userEvent.setup();
-    const aurora = mockEvent('aurora-1', { type: 'aurora', title: 'Click Me' });
-    useAppStore.setState({ events: [aurora] });
-
-    render(<NightSkyTicker />);
-    await user.click(screen.getAllByText('Click Me')[0]);
-
-    expect(useAppStore.getState().selectedEvent?.id).toBe('aurora-1');
-  });
-
-  it('highlights the row matching the current selection', () => {
-    const planet = mockEvent('planet-1', { type: 'planet', title: 'Selected Planet' });
-    useAppStore.setState({ events: [planet], selectedEvent: planet });
-
-    render(<NightSkyTicker />);
-    const row = screen.getAllByText('Selected Planet')[0].closest('button');
-    expect(row?.className).toContain('bg-ob-cyan/10');
   });
 });

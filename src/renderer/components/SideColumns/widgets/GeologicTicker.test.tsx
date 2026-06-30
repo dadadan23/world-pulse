@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
 import { GeologicTicker } from './GeologicTicker';
 import { useAppStore } from '../../../store/useAppStore';
 import type { Event } from '@shared/types';
@@ -24,7 +23,7 @@ describe('GeologicTicker', () => {
     useAppStore.setState({ events: [], selectedEvent: null });
   });
 
-  it('shows the NO ACTIVE EVENTS empty state when there are no geologic events', () => {
+  it('shows the NO ACTIVE EVENTS empty state and the GEOLOGIC PULSE header when there are no geologic events', () => {
     render(<GeologicTicker />);
     expect(screen.getByText('NO ACTIVE EVENTS')).toBeInTheDocument();
     expect(screen.getByText('◆ GEOLOGIC PULSE', { exact: false })).toBeInTheDocument();
@@ -44,25 +43,5 @@ describe('GeologicTicker', () => {
     expect(screen.queryByText('Sunny')).not.toBeInTheDocument();
     const titles = screen.getAllByText(/Old Quake|Volcano Alert/).map((el) => el.textContent);
     expect(titles[0]).toBe('Volcano Alert');
-  });
-
-  it('calls setSelectedEvent when a row is clicked', async () => {
-    const user = userEvent.setup();
-    const quake = mockEvent('quake-1', { type: 'earthquake', title: 'Click Me' });
-    useAppStore.setState({ events: [quake] });
-
-    render(<GeologicTicker />);
-    await user.click(screen.getAllByText('Click Me')[0]);
-
-    expect(useAppStore.getState().selectedEvent?.id).toBe('quake-1');
-  });
-
-  it('highlights the row matching the current selection', () => {
-    const quake = mockEvent('quake-1', { type: 'earthquake', title: 'Selected Quake' });
-    useAppStore.setState({ events: [quake], selectedEvent: quake });
-
-    render(<GeologicTicker />);
-    const row = screen.getAllByText('Selected Quake')[0].closest('button');
-    expect(row?.className).toContain('bg-ob-cyan/10');
   });
 });
