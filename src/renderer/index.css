@@ -42,6 +42,7 @@
   --ob-timing-fade: 300ms;
   --ob-timing-pulse: 3s;
   --ob-timing-sweep: 6s;
+  --ob-timing-scroll: 30s;
   --ob-easing-mechanical: cubic-bezier(0.25, 0.1, 0.25, 1);
   --ob-easing-snap: cubic-bezier(0.4, 0, 0.2, 1);
 }
@@ -383,7 +384,24 @@ body {
 }
 
 .animate-scroll {
-  animation: scroll 30s linear infinite;
+  animation: scroll var(--ob-timing-scroll) linear infinite;
+}
+
+@keyframes scrollVertical {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(-50%);
+  }
+}
+
+.animate-scroll-vertical {
+  animation: scrollVertical var(--ob-timing-scroll) linear infinite;
+}
+
+.animate-scroll-vertical:hover {
+  animation-play-state: paused;
 }
 
 /* ============================================
@@ -843,7 +861,8 @@ body {
   .ob-status-critical,
   .ob-seg-bar-cell-filled,
   .ob-sparkline-path,
-  .animate-scroll {
+  .animate-scroll,
+  .animate-scroll-vertical {
     animation: none;
   }
 

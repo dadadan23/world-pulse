@@ -17,9 +17,9 @@
   "engineer": {
     "role": "engineer",
     "status": "complete",
-    "issue": "39,161",
-    "branch": "claude/story-39-dedicated-display-perf",
-    "startedAt": "2026-06-27T16:47:16Z"
+    "issue": "209,212",
+    "branch": "claude/latest-feature-impl-94ckpq",
+    "startedAt": "2026-06-29T20:00:00Z"
   },
   "reviewer": {
     "status": "idle",
