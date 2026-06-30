@@ -165,6 +165,17 @@ describe('NewsCollector', () => {
       expect(localCall?.[1]).toMatchObject({ params: { country: 'GB' } });
     });
 
+    it('falls back to GB when the geolocation response is missing country_code', async () => {
+      mockHeadlineRoutes({ geo: { data: {} } as typeof GEO_RESPONSE });
+
+      await collector.fetch();
+
+      const localCall = mockedGet.mock.calls.find(
+        ([, config]) => (config as { params?: Record<string, unknown> })?.params?.country
+      );
+      expect(localCall?.[1]).toMatchObject({ params: { country: 'GB' } });
+    });
+
     it('produces the same id for the same article across polls (de-dup)', async () => {
       mockHeadlineRoutes({});
 
@@ -185,12 +196,35 @@ describe('NewsCollector', () => {
       expect(events[0].id).not.toBe(events[1].id);
     });
 
-    it('throws on invalid NewsAPI response', async () => {
+    it('returns local-only events when only the global fetch fails, without discarding local headlines', async () => {
       mockHeadlineRoutes({
         global: { data: { status: 'error' } } as ReturnType<typeof makeResponse>,
       });
 
-      await expect(collector.fetch()).rejects.toThrow('Invalid response from NewsAPI (global)');
+      const events = await collector.fetch();
+
+      expect(events.every((e) => e.data.scope === 'local')).toBe(true);
+      expect(events).toHaveLength(1);
+    });
+
+    it('returns global-only events when only the local fetch fails, without discarding global headlines', async () => {
+      mockHeadlineRoutes({
+        local: { data: { status: 'error' } } as ReturnType<typeof makeResponse>,
+      });
+
+      const events = await collector.fetch();
+
+      expect(events.every((e) => e.data.scope === 'global')).toBe(true);
+      expect(events).toHaveLength(1);
+    });
+
+    it('throws when both global and local fetches fail', async () => {
+      mockHeadlineRoutes({
+        global: { data: { status: 'error' } } as ReturnType<typeof makeResponse>,
+        local: { data: { status: 'error' } } as ReturnType<typeof makeResponse>,
+      });
+
+      await expect(collector.fetch()).rejects.toThrow('Invalid response from NewsAPI');
     });
   });
 });

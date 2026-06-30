@@ -17,6 +17,13 @@ export function GeologicTicker() {
     .sort((a, b) => b.timestamp - a.timestamp)
     .slice(0, MAX_ROWS);
 
+  // Only loop the scroll animation (and duplicate rows) once there's enough
+  // content to actually scroll through — otherwise a couple of rows just glitch in place.
+  const shouldScroll = quakesAndVolcanoes.length >= MAX_ROWS;
+  const displayEvents = shouldScroll
+    ? [...quakesAndVolcanoes, ...quakesAndVolcanoes]
+    : quakesAndVolcanoes;
+
   return (
     <div className="ob-hud-panel ob-scanline">
       <div className="flex items-center justify-between mb-3 pb-2 border-b border-ob-border">
@@ -24,8 +31,8 @@ export function GeologicTicker() {
       </div>
       {quakesAndVolcanoes.length > 0 ? (
         <div className="overflow-hidden" style={{ maxHeight: `${MAX_ROWS * 28}px` }}>
-          <div className="flex flex-col animate-scroll-vertical">
-            {[...quakesAndVolcanoes, ...quakesAndVolcanoes].map((event, index) => {
+          <div className={`flex flex-col ${shouldScroll ? 'animate-scroll-vertical' : ''}`}>
+            {displayEvents.map((event, index) => {
               const indicator = getEventIndicator(event.type, event.severity);
               const isSelected = isSelectedEvent(event, selectedEvent);
               return (
