@@ -30,7 +30,7 @@ interface IPGeoResponse {
 export class NewsCollector extends BaseCollector {
   private readonly apiUrl = 'https://newsapi.org/v2/top-headlines';
   private readonly ipGeoUrl = 'https://ipapi.co/json/';
-  private cachedCountryCode: string | null = null;
+  private cachedCountryCode?: string;
 
   constructor() {
     super('Global Headlines', 'news', 15 * 60 * 1000); // 15 minutes
@@ -46,12 +46,22 @@ export class NewsCollector extends BaseCollector {
       this.cachedCountryCode = await this.detectCountryCode();
     }
 
-    const [globalEvents, localEvents] = await Promise.all([
+    const results = await Promise.allSettled([
       this.fetchHeadlines(apiKey, 'global'),
       this.fetchHeadlines(apiKey, 'local', this.cachedCountryCode),
     ]);
 
-    return [...globalEvents, ...localEvents];
+    // Only fail the whole poll (and count toward BaseCollector's backoff) when
+    // both feeds fail; a single feed's failure shouldn't discard the other's headlines.
+    if (results.every((result) => result.status === 'rejected')) {
+      throw (results[0] as PromiseRejectedResult).reason;
+    }
+
+    return results.flatMap((result) => {
+      if (result.status === 'fulfilled') return result.value;
+      console.error('[NewsCollector] Headline fetch failed:', result.reason);
+      return [];
+    });
   }
 
   validate(data: unknown): data is NewsAPIResponse {
@@ -88,7 +98,7 @@ export class NewsCollector extends BaseCollector {
   private async detectCountryCode(): Promise<string> {
     try {
       const res = await axios.get<IPGeoResponse>(this.ipGeoUrl, { timeout: 5000 });
-      return res.data.country_code;
+      return res.data?.country_code || 'GB';
     } catch (_err) {
       console.warn('[NewsCollector] IP geolocation failed, defaulting to GB');
       return 'GB';

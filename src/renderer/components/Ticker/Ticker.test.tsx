@@ -66,7 +66,12 @@ describe('Ticker', () => {
   });
 
   it('should limit ticker to 10 headlines', () => {
-    const events = Array.from({ length: 20 }, (_, i) => mockNewsEvent(`${i}`, 'global'));
+    const now = Date.now();
+    // Explicit descending timestamps so the most-recent-10 cutoff is deterministic
+    // regardless of how fast the test loop runs.
+    const events = Array.from({ length: 20 }, (_, i) =>
+      mockNewsEvent(`${i}`, 'global', { timestamp: now - i * 1000 })
+    );
     useAppStore.setState({ events });
     render(<Ticker />);
     expect(screen.queryByText('Headline 15')).not.toBeInTheDocument();
