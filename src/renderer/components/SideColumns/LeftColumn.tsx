@@ -1,3 +1,4 @@
+import { GeologicTicker } from './widgets/GeologicTicker';
 import { SeismicWidget } from './widgets/SeismicWidget';
 import { EventRateWidget } from './widgets/EventRateWidget';
 import { TypeDistWidget } from './widgets/TypeDistWidget';
@@ -11,6 +12,7 @@ export function LeftColumn() {
       style={{ maxHeight: 'calc(100vh - 150px - 70px)' }}
     >
       <div className="flex flex-col gap-3">
+        <GeologicTicker />
         <SeismicWidget />
         <EventRateWidget />
         <TypeDistWidget />
