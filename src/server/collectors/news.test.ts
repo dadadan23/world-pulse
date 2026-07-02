@@ -226,5 +226,16 @@ describe('NewsCollector', () => {
 
       await expect(collector.fetch()).rejects.toThrow('Invalid response from NewsAPI');
     });
+
+    it('wraps a non-Error rejection reason in an Error when both fetches fail', async () => {
+      mockedGet.mockImplementation((url: string, config?: { params?: Record<string, unknown> }) => {
+        if (url.includes('ipapi.co')) return Promise.resolve(GEO_RESPONSE);
+        // Simulate a rejection with a non-Error value (e.g. a raw string thrown by a mock/library).
+        return Promise.reject(config?.params?.country ? 'local failure' : 'global failure');
+      });
+
+      await expect(collector.fetch()).rejects.toBeInstanceOf(Error);
+      await expect(collector.fetch()).rejects.toThrow(/global failure|local failure/);
+    });
   });
 });

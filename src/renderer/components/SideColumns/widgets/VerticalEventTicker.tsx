@@ -25,7 +25,7 @@ export function VerticalEventTicker({ headerLabel, events }: VerticalEventTicker
   const rows = events.slice(0, MAX_ROWS);
 
   // Only loop the scroll animation (and duplicate rows) once there's enough
-  // content to actually scroll through — otherwise a couple of rows just glitch in place.
+  // content to actually scroll through - otherwise a couple of rows just glitch in place.
   const shouldScroll = rows.length >= MAX_ROWS;
   const displayRows = shouldScroll ? [...rows, ...rows] : rows;
 
