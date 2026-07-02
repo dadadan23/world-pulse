@@ -135,4 +135,82 @@ describe('WeatherWidget', () => {
     await waitFor(() => expect(screen.getByTestId('weather-unavailable')).toBeInTheDocument());
     expect(screen.getByText('OpenWeatherMap API key not configured')).toBeInTheDocument();
   });
+
+  it('shows a moon phase readout when a Moon planet event is present', () => {
+    useAppStore.setState({
+      events: [
+        makeBroadcastWeatherEvent(),
+        {
+          id: 'planet-moon',
+          timestamp: Date.now(),
+          type: 'planet',
+          source: 'Test',
+          location: null,
+          title: '\u{1F319} Moon - Full Moon',
+          data: {
+            planetName: 'Moon',
+            constellation: 'N/A',
+            magnitude: -12,
+            altitude: 45,
+            azimuth: 180,
+            riseTime: '2026-07-01T18:00:00Z',
+            setTime: '2026-07-02T06:00:00Z',
+            phase: 0.5,
+          },
+        },
+      ],
+    });
+
+    render(<WeatherWidget />);
+
+    expect(screen.getByText('MOON')).toBeInTheDocument();
+    expect(screen.getByText('Full Moon')).toBeInTheDocument();
+  });
+
+  it('omits the moon readout when no Moon planet event is present', () => {
+    useAppStore.setState({ events: [makeBroadcastWeatherEvent()] });
+    render(<WeatherWidget />);
+    expect(screen.queryByText('MOON')).not.toBeInTheDocument();
+  });
+
+  it('renders a forecast strip with precipitation for rainy days and no precipitation label for dry days', () => {
+    useAppStore.setState({
+      events: [
+        makeBroadcastWeatherEvent({
+          conditionCode: 500,
+          forecast: [
+            {
+              date: '2026-07-01',
+              tempHigh: 22,
+              tempLow: 14,
+              conditionCode: 500,
+              condition: 'Rain',
+              precipitation: 3.2,
+              windSpeed: 4.1,
+            },
+            {
+              date: '2026-07-02',
+              tempHigh: 25,
+              tempLow: 16,
+              conditionCode: 800,
+              windSpeed: 2.3,
+              condition: 'Clear',
+              precipitation: 0,
+            },
+          ],
+        }),
+      ],
+    });
+
+    render(<WeatherWidget />);
+
+    expect(screen.getByText('5-DAY FORECAST')).toBeInTheDocument();
+    expect(screen.getByText('3.2mm')).toBeInTheDocument();
+  });
+
+  it('omits the forecast strip when no forecast days are available', () => {
+    useAppStore.setState({ events: [makeBroadcastWeatherEvent({ forecast: [] })] });
+    render(<WeatherWidget />);
+    expect(screen.queryByText('5-DAY FORECAST')).not.toBeInTheDocument();
+  });
 });
