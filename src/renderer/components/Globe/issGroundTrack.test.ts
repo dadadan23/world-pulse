@@ -8,12 +8,12 @@ import {
 } from './issGroundTrack';
 
 describe('groundTrackHeadingDeg', () => {
-  it('returns ~38.4° at the equator for the ISS inclination (51.64°)', () => {
-    // sin(heading) = cos(51.64°) / cos(0°) = cos(51.64°)
+  it('returns ~38.4 deg at the equator for the ISS inclination (51.64 deg)', () => {
+    // sin(heading) = cos(51.64 deg) / cos(0 deg) = cos(51.64 deg)
     expect(groundTrackHeadingDeg(0)).toBeCloseTo(38.36, 1);
   });
 
-  it('approaches 90° (due east) at the orbit turning latitude', () => {
+  it('approaches 90 deg (due east) at the orbit turning latitude', () => {
     expect(groundTrackHeadingDeg(51.64)).toBeCloseTo(90, 0);
   });
 

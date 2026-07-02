@@ -3,7 +3,7 @@
  *
  * No TLE feed is available client-side (see PRD OQ-3), so the track is a
  * great-circle approximation through the ISS's current position using its
- * known orbital inclination (~51.64°) rather than true TLE propagation. It's
+ * known orbital inclination (~51.64 deg) rather than true TLE propagation. It's
  * accurate enough to draw a convincing few-minutes-wide ground track, not for
  * precise prediction.
  */

@@ -475,7 +475,7 @@ uniform float uIsSouth;
 void main() {
   // SphereGeometry's v (uv.y) runs from thetaStart (0) to thetaStart+thetaLength (1).
   // For the north cap, v=0 is at the pole; for the south cap (built from the other
-  // side), v=1 is at the pole — uIsSouth picks the orientation where 1.0 = pole.
+  // side), v=1 is at the pole - uIsSouth picks the orientation where 1.0 = pole.
   vGradient = mix(1.0 - uv.y, uv.y, uIsSouth);
   gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
 }

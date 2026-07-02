@@ -54,7 +54,8 @@ export class NewsCollector extends BaseCollector {
     // Only fail the whole poll (and count toward BaseCollector's backoff) when
     // both feeds fail; a single feed's failure shouldn't discard the other's headlines.
     if (results.every((result) => result.status === 'rejected')) {
-      throw (results[0] as PromiseRejectedResult).reason;
+      const reason = (results[0] as PromiseRejectedResult).reason;
+      throw reason instanceof Error ? reason : new Error(String(reason));
     }
 
     return results.flatMap((result) => {
