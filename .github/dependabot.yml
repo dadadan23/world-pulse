@@ -12,12 +12,21 @@ updates:
     labels:
       - "dependencies"
       - "automated"
-    # Group updates by type
+    # Group updates by type. Major bumps are excluded from grouping so an
+    # incompatible major-version update (e.g. a peer-dependency conflict)
+    # surfaces as its own PR instead of blocking a batch of safe patch/minor
+    # updates.
     groups:
       development-dependencies:
         dependency-type: "development"
+        update-types:
+          - "minor"
+          - "patch"
       production-dependencies:
         dependency-type: "production"
+        update-types:
+          - "minor"
+          - "patch"
     # Version strategy
     versioning-strategy: increase
 
