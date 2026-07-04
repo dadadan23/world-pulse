@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { GeologicTicker } from './GeologicTicker';
 import { useAppStore } from '../../../store/useAppStore';
+import { TICKER_HIGH_SEVERITY_THRESHOLD } from '../../../utils/sortByPriority';
 import type { Event } from '@shared/types';
 
 function mockEvent(id: string, overrides?: Partial<Event>): Event {
@@ -43,5 +44,55 @@ describe('GeologicTicker', () => {
     expect(screen.queryByText('Sunny')).not.toBeInTheDocument();
     const titles = screen.getAllByText(/Old Quake|Volcano Alert/).map((el) => el.textContent);
     expect(titles[0]).toBe('Volcano Alert');
+  });
+
+  it('pins a high-severity event above older routine events', () => {
+    const now = Date.now();
+    useAppStore.setState({
+      events: [
+        mockEvent('routine', {
+          type: 'earthquake',
+          timestamp: now,
+          title: 'Minor Tremor',
+          severity: 2,
+        }),
+        mockEvent('critical', {
+          type: 'volcano',
+          timestamp: now - 60_000,
+          title: 'Major Eruption',
+          severity: TICKER_HIGH_SEVERITY_THRESHOLD,
+        }),
+      ],
+    });
+    render(<GeologicTicker />);
+
+    const titles = screen.getAllByText(/Minor Tremor|Major Eruption/).map((el) => el.textContent);
+    expect(titles[0]).toBe('Major Eruption');
+  });
+
+  it('orders multiple high-severity events by severity descending', () => {
+    const now = Date.now();
+    useAppStore.setState({
+      events: [
+        mockEvent('high', {
+          type: 'earthquake',
+          timestamp: now,
+          title: 'Strong Quake',
+          severity: TICKER_HIGH_SEVERITY_THRESHOLD,
+        }),
+        mockEvent('critical', {
+          type: 'volcano',
+          timestamp: now - 1000,
+          title: 'Catastrophic Eruption',
+          severity: 9,
+        }),
+      ],
+    });
+    render(<GeologicTicker />);
+
+    const titles = screen
+      .getAllByText(/Strong Quake|Catastrophic Eruption/)
+      .map((el) => el.textContent);
+    expect(titles[0]).toBe('Catastrophic Eruption');
   });
 });

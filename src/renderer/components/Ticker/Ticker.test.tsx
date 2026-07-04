@@ -3,6 +3,7 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Ticker } from './Ticker';
 import { useAppStore } from '../../store/useAppStore';
+import { TICKER_HIGH_SEVERITY_THRESHOLD } from '../../utils/sortByPriority';
 import type { Event, NewsEvent } from '@shared/types';
 
 function mockEvent(id: string, overrides?: Partial<Event>): Event {
@@ -94,5 +95,24 @@ describe('Ticker', () => {
     await user.click(screen.getAllByText('Headline news-1')[0]);
 
     expect(useAppStore.getState().selectedEvent?.id).toBe('news-1');
+  });
+
+  it('pins a high-severity news event before routine headlines regardless of timestamp', () => {
+    const now = Date.now();
+    useAppStore.setState({
+      events: [
+        mockNewsEvent('routine', 'global', { timestamp: now, title: 'Routine Headline' }),
+        mockNewsEvent('breaking', 'global', {
+          timestamp: now - 60_000,
+          title: 'Breaking Alert',
+          severity: TICKER_HIGH_SEVERITY_THRESHOLD,
+        }),
+      ],
+    });
+    render(<Ticker />);
+
+    const buttons = screen.getAllByRole('button');
+    const firstTitle = buttons[0].querySelector('.text-ob-text')?.textContent;
+    expect(firstTitle).toBe('Breaking Alert');
   });
 });

@@ -9,7 +9,7 @@ const MAX_ROWS = 5;
 
 interface VerticalEventTickerProps {
   headerLabel: string;
-  /** Already filtered to the relevant event types and sorted by recency (most recent first). */
+  /** Already filtered to the relevant event types and sorted by priority (high-severity first, then by recency). */
   events: Event[];
 }
 

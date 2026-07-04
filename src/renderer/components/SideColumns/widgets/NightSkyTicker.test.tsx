@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { NightSkyTicker } from './NightSkyTicker';
 import { useAppStore } from '../../../store/useAppStore';
+import { TICKER_HIGH_SEVERITY_THRESHOLD } from '../../../utils/sortByPriority';
 import type { Event } from '@shared/types';
 
 function mockEvent(id: string, overrides?: Partial<Event>): Event {
@@ -54,5 +55,31 @@ describe('NightSkyTicker', () => {
     expect(titles[1]).toBe('Venus Visible');
     expect(titles[2]).toBe('Asteroid Flyby');
     expect(titles[3]).toBe('ISS Pass');
+  });
+
+  it('pins a high-severity aurora above routine events regardless of timestamp', () => {
+    const now = Date.now();
+    useAppStore.setState({
+      events: [
+        mockEvent('routine-iss', {
+          type: 'iss',
+          timestamp: now,
+          title: 'ISS Overhead',
+          severity: 1,
+        }),
+        mockEvent('severe-aurora', {
+          type: 'aurora',
+          timestamp: now - 30_000,
+          title: 'Severe Geomagnetic Storm',
+          severity: TICKER_HIGH_SEVERITY_THRESHOLD,
+        }),
+      ],
+    });
+    render(<NightSkyTicker />);
+
+    const titles = screen
+      .getAllByText(/ISS Overhead|Severe Geomagnetic Storm/)
+      .map((el) => el.textContent);
+    expect(titles[0]).toBe('Severe Geomagnetic Storm');
   });
 });
