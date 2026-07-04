@@ -1,8 +1,7 @@
 import { useEffect } from 'react';
 import type { CollectorHealth } from '@shared/types';
 import { useAppStore } from '../store/useAppStore';
-
-const SERVER_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:3000';
+import { SERVER_URL } from '../config';
 const POLL_INTERVAL_MS = 30_000;
 
 interface StatusResponse {

@@ -1,5 +1,6 @@
 import express from 'express';
 import cors from 'cors';
+import helmet from 'helmet';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 import path from 'path';
@@ -42,10 +43,11 @@ function toCollectorHealth(collector: BaseCollector): CollectorHealth {
 
 export function createApp(options?: { corsOrigin?: string }) {
   const app = express();
+  const corsOrigin = options?.corsOrigin ?? 'http://localhost:5173';
   const httpServer = createServer(app);
   const io = new Server(httpServer, {
     cors: {
-      origin: options?.corsOrigin || 'http://localhost:5173',
+      origin: corsOrigin,
       methods: ['GET', 'POST'],
     },
   });
@@ -63,19 +65,34 @@ export function createApp(options?: { corsOrigin?: string }) {
   const weatherCache = new Map<string, { data: WeatherEvent['data']; expiresAt: number }>();
   const WEATHER_CACHE_TTL_MS = 10 * 60 * 1000;
 
-  /** Remove events older than EVENT_TTL_MS and notify clients */
+  /** Simple in-process rate limiter for /api/weather: max 10 requests per IP per minute. */
+  const weatherRateMap = new Map<string, { count: number; resetAt: number }>();
+  const WEATHER_RATE_LIMIT = 10;
+  const WEATHER_RATE_WINDOW_MS = 60 * 1000;
+
+  /** Remove events older than EVENT_TTL_MS, evict expired weather cache entries, notify clients */
   function sweepStaleEvents() {
-    const cutoff = Date.now() - EVENT_TTL_MS;
+    const now = Date.now();
+    const cutoff = now - EVENT_TTL_MS;
     const before = eventCache.length;
     eventCache = eventCache.filter((e) => e.timestamp >= cutoff);
     const expired = before - eventCache.length;
     if (expired > 0) {
-      io.emit('events:expired', { count: expired, timestamp: Date.now() });
+      io.emit('events:expired', { count: expired, timestamp: now });
+    }
+    // Evict expired weather cache entries to prevent unbounded growth on 24/7 deployments
+    for (const [key, entry] of weatherCache) {
+      if (entry.expiresAt <= now) weatherCache.delete(key);
+    }
+    // Evict stale rate-limit buckets
+    for (const [ip, bucket] of weatherRateMap) {
+      if (bucket.resetAt <= now) weatherRateMap.delete(ip);
     }
   }
 
   // Middleware
-  app.use(cors({ origin: options?.corsOrigin || 'http://localhost:5173' }));
+  app.use(helmet());
+  app.use(cors({ origin: corsOrigin }));
   app.use(express.json());
 
   // Health check endpoint
@@ -130,6 +147,20 @@ export function createApp(options?: { corsOrigin?: string }) {
   // selected event's location). Distinct from the WeatherCollector's ambient
   // broadcast, which always reflects the server's own IP-detected location.
   app.get('/api/weather', async (req, res) => {
+    // Rate limit: 10 requests per IP per minute to protect the upstream API key
+    const ip = String(req.ip ?? 'unknown');
+    const now = Date.now();
+    const bucket = weatherRateMap.get(ip);
+    if (bucket && bucket.resetAt > now) {
+      if (bucket.count >= WEATHER_RATE_LIMIT) {
+        res.status(429).json({ error: 'rate_limited', message: 'Too many requests' });
+        return;
+      }
+      bucket.count++;
+    } else {
+      weatherRateMap.set(ip, { count: 1, resetAt: now + WEATHER_RATE_WINDOW_MS });
+    }
+
     const lat = Number(req.query.lat);
     const lon = Number(req.query.lon);
     const name = typeof req.query.name === 'string' ? req.query.name : 'Unknown location';
