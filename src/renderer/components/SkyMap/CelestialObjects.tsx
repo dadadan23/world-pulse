@@ -1,7 +1,3 @@
-/* eslint-disable react/no-unknown-property */
-/*
-  Allow Three.js JSX props in this file (spriteMaterial depthTest etc.)
-*/
 /* eslint-disable react-hooks/purity -- Date.now() fallback only used for events missing id/timestamp */
 
 import { useMemo } from 'react';

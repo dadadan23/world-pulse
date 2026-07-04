@@ -12,10 +12,21 @@ export default defineConfig({
       '@renderer': path.resolve(__dirname, './src/renderer'),
       '@server': path.resolve(__dirname, './src/server'),
     },
+    // Prevent "Multiple instances of Three.js" warnings in the test runner.
+    dedupe: ['three'],
   },
   test: {
     globals: true,
+    // Default environment; overridden per-glob below.
     environment: 'jsdom',
+    // Use jsdom only for renderer tests; run server/main tests in Node so
+    // server code cannot accidentally rely on browser globals.
+    environmentMatchGlobs: [
+      ['src/renderer/**', 'jsdom'],
+      ['src/server/**', 'node'],
+      ['src/main/**', 'node'],
+      ['src/shared/**', 'node'],
+    ],
     setupFiles: ['./src/test/setup.ts'],
     include: ['src/**/*.test.{ts,tsx}'],
     coverage: {

@@ -200,14 +200,17 @@ httpServer.listen(PORT, () => {
 });
 
 // Graceful shutdown
-process.on('SIGTERM', () => {
-  console.warn('[Server] SIGTERM received, shutting down gracefully');
+function shutdown(signal: string) {
+  console.warn(`[Server] ${signal} received, shutting down gracefully`);
   registry.stop();
   httpServer.close(() => {
     console.warn('[Server] HTTP server closed');
     process.exit(0);
   });
-});
+}
+
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));
 
 process.on('uncaughtException', (error) => {
   console.error('[Server] Uncaught exception:', error);
