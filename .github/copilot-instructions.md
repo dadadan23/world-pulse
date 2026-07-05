@@ -89,6 +89,8 @@ All source code, scripts, configuration files, and documentation in this reposit
 
 This ensures cross-platform compatibility and prevents encoding issues in terminals, CI/CD pipelines, and editors.
 
+**Exception - astronomical Bayer designations:** Star catalog data (e.g. `src/renderer/components/SkyMap/brightStarCatalog.ts`) **MAY** use Greek letters in `name` fields for standard Bayer designations (e.g. `alpha Cen`, `beta Cen` written as `α Cen`, `β Cen`), since this is the conventional astronomical notation and the source is display-only star data, not code, scripting, or CI/CD-facing text. This exception is scoped to star/constellation name fields only - identifiers, code, and comments in the same files still MUST remain ASCII-only.
+
 ---
 
 ## Directive Language (RFC 2119)
