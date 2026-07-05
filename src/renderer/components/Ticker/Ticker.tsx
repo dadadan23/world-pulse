@@ -1,24 +1,25 @@
 import { Fragment } from 'react';
 import { useAppStore } from '../../store/useAppStore';
+import { useSettingsStore } from '../../store/useSettingsStore';
+import { useVisibleEvents } from '../../hooks/useVisibleEvents';
 import { formatRelativeTime } from '../../utils/time';
 import { getEventIndicator } from '../../utils/eventIndicators';
 import { isSelectedEvent } from '../../utils/isSelectedEvent';
-import {
-  sortBySeverityThenRecency,
-  DEFAULT_HIGH_SEVERITY_THRESHOLD,
-} from '../../utils/severityOrder';
+import { sortBySeverityThenRecency } from '../../utils/severityOrder';
 import { SeverityPulseBadge } from '../SeverityPulseBadge/SeverityPulseBadge';
 import type { NewsEvent } from '@shared/types';
 
 const MAX_HEADLINES = 10;
 
 export function Ticker() {
-  const events = useAppStore((state) => state.events);
+  const events = useVisibleEvents();
   const selectedEvent = useAppStore((state) => state.selectedEvent);
   const setSelectedEvent = useAppStore((state) => state.setSelectedEvent);
+  const severityThreshold = useSettingsStore((state) => state.severityThreshold);
 
   const tickerEvents = sortBySeverityThenRecency(
-    events.filter((e): e is NewsEvent => e.type === 'news')
+    events.filter((e): e is NewsEvent => e.type === 'news'),
+    severityThreshold
   ).slice(0, MAX_HEADLINES);
 
   return (
@@ -41,7 +42,7 @@ export function Ticker() {
                   const indicator = getEventIndicator(event.type, event.severity);
                   const isSelected = isSelectedEvent(event, selectedEvent);
                   const isLocal = event.data.scope === 'local';
-                  const isHighSeverity = (event.severity ?? 0) >= DEFAULT_HIGH_SEVERITY_THRESHOLD;
+                  const isHighSeverity = (event.severity ?? 0) >= severityThreshold;
                   return (
                     <Fragment key={`${event.id}-${index}`}>
                       <button

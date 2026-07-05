@@ -1,4 +1,5 @@
 import { useGeolocation } from '../../hooks/useGeolocation';
+import { useOrientation } from '../../hooks/useOrientation';
 import { Globe } from '../Globe/Globe';
 import { HudStatusPanel } from '../HudStatusPanel/HudStatusPanel';
 import { HudCollectorPanel } from '../HudCollectorPanel/HudCollectorPanel';
@@ -18,6 +19,7 @@ import { PrimaryDegradedBanner } from '../PrimaryDegradedBanner/PrimaryDegradedB
 export function Dashboard() {
   // Request geolocation once on mount; result stored in Zustand
   useGeolocation();
+  const isPortrait = useOrientation();
 
   return (
     <div className="relative w-screen h-screen overflow-hidden bg-ob-bg-primary">
@@ -44,9 +46,10 @@ export function Dashboard() {
       <SettingsTrigger />
       <SettingsModal />
 
-      {/* Left/right side columns: mission-control telemetry widgets, z-10 */}
-      <LeftColumn />
-      <RightColumn />
+      {/* Left/right side columns: mission-control telemetry widgets, z-10.
+          Stack into full-width bands in portrait orientation (DESIGN.md addendum). */}
+      <LeftColumn isPortrait={isPortrait} />
+      <RightColumn isPortrait={isPortrait} />
 
       {/* Right center: event detail slide-in */}
       <HudEventPanel />

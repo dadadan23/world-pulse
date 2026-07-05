@@ -3,6 +3,7 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Ticker } from './Ticker';
 import { useAppStore } from '../../store/useAppStore';
+import { useSettingsStore, DEFAULT_SEVERITY_THRESHOLD } from '../../store/useSettingsStore';
 import type { Event, NewsEvent } from '@shared/types';
 
 function mockEvent(id: string, overrides?: Partial<Event>): Event {
@@ -48,6 +49,10 @@ describe('Ticker', () => {
       events: [],
       selectedEvent: null,
       serverStatus: null,
+    });
+    useSettingsStore.setState({
+      mutedEventTypes: [],
+      severityThreshold: DEFAULT_SEVERITY_THRESHOLD,
     });
   });
 
@@ -123,5 +128,25 @@ describe('Ticker', () => {
 
     expect(screen.getAllByText('9.0 CRIT').length).toBeGreaterThanOrEqual(1);
     expect(screen.queryByText('2.0 CRIT')).not.toBeInTheDocument();
+  });
+
+  it('excludes headlines whose type is muted in settings', () => {
+    useAppStore.setState({
+      events: [mockEvent('quake-1'), mockNewsEvent('news-1', 'global')],
+    });
+    useSettingsStore.setState({ mutedEventTypes: ['news'] });
+
+    render(<Ticker />);
+    expect(screen.queryByText('Headline news-1')).not.toBeInTheDocument();
+  });
+
+  it('respects a configurable severity threshold for pinning and the pulse badge', () => {
+    useAppStore.setState({
+      events: [mockNewsEvent('mid', 'global', { severity: 5 })],
+    });
+    useSettingsStore.setState({ severityThreshold: 4 });
+
+    render(<Ticker />);
+    expect(screen.getAllByText('5.0 CRIT').length).toBeGreaterThanOrEqual(1);
   });
 });
