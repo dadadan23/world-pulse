@@ -7,6 +7,35 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added
+
+- **Oblivion design system reference documents** (`PRODUCT.md`, `DESIGN.md`) (PR #225)
+
+  Added two root-level reference files that give AI agents and contributors a shared
+  vocabulary for the World Pulse product and the Oblivion visual design system.
+
+  `PRODUCT.md` -- product register, user profile, brand personality (cinematic /
+  precise / ambient), anti-references (glassmorphism, gradient abuse, consumer-app
+  chrome), design principles, color token table, and typography rules.
+
+  `DESIGN.md` -- full Oblivion CSS custom property token tables (backgrounds, text,
+  accent, semantic, glow), canonical severity color mapping shared between UI badges
+  and Three.js globe markers, motion timing/easing tokens with `prefers-reduced-motion`
+  commitment, component specs (`ob-panel` corner ticks, `ob-scanline`, Globe r3f layer
+  stack, HUD z-index table, severity badge), and anti-pattern list.
+
+  Also added `.gitignore` block for ephemeral Impeccable working files (screenshots,
+  session state, per-dev local config, live-mode previews).
+
+- **Backend hardening** (PR #225)
+
+  Added `helmet` HTTP security headers middleware to all API responses.
+  Added in-process rate limiter on `/api/weather` (10 req/IP/min) to protect the
+  upstream API key on 24/7 deployments.
+  `sweepStaleEvents()` now also evicts expired weather-cache and rate-limiter bucket
+  entries to prevent unbounded memory growth.
+  Graceful shutdown now handles both `SIGTERM` and `SIGINT` (ctrl-c in dev mode).
+
 ## [0.2.0] - 2026-06-28
 
 ### Added

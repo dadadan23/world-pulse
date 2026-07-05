@@ -30,39 +30,6 @@ export function selectFeaturedEvent(events: Event[]): Event | null {
 }
 
 /**
- * Order events for the ticker display.
- * Sort: severity desc > recency desc > type diversity (no two adjacent same-type).
- */
-export function prioritizeTickerEvents(events: Event[]): Event[] {
-  if (events.length <= 1) return [...events];
-
-  // First, sort by severity desc then recency desc
-  const sorted = [...events].sort((a, b) => {
-    const sevDiff = (b.severity ?? 0) - (a.severity ?? 0);
-    if (sevDiff !== 0) return sevDiff;
-    return b.timestamp - a.timestamp;
-  });
-
-  // Then apply type-diversity pass: avoid consecutive same-type events
-  const result: Event[] = [sorted[0]];
-  const remaining = sorted.slice(1);
-
-  while (remaining.length > 0) {
-    const lastType = result[result.length - 1].type;
-    const diverseIdx = remaining.findIndex((e) => e.type !== lastType);
-
-    if (diverseIdx >= 0) {
-      result.push(remaining.splice(diverseIdx, 1)[0]);
-    } else {
-      // No diverse option available, take the next in priority order
-      result.push(remaining.shift()!);
-    }
-  }
-
-  return result;
-}
-
-/**
  * Rotate to the next highest-priority event, skipping the current featured event.
  * Intended for use by the auto-rotation timer (see FEATURED_ROTATION_MS).
  *
