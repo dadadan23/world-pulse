@@ -1,0 +1,25 @@
+# World Pulse - Environment Variables
+# Copy this to .env.local and fill in your API keys
+
+# OpenWeather API (required for weather data)
+# Get free key at: https://openweathermap.org/api
+OPENWEATHER_API_KEY=
+
+# NewsAPI (required for news data)
+# Get free key at: https://newsapi.org/
+NEWSAPI_KEY=
+
+# Spotify (optional, for music recommendations)
+# Get credentials at: https://developer.spotify.com/
+SPOTIFY_CLIENT_ID=
+SPOTIFY_CLIENT_SECRET=
+
+# Application Settings
+NODE_ENV=development
+PORT=3000
+
+# Database
+DB_PATH=./data/world-pulse.db
+
+# Logging
+LOG_LEVEL=info
