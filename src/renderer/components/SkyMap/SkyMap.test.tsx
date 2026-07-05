@@ -4,6 +4,10 @@ import { Canvas } from '@react-three/fiber';
 import { SkyMap } from './SkyMap';
 import { StarField } from './StarField';
 import { HorizonRing } from './HorizonRing';
+import { BrightStars } from './BrightStars';
+import { ConstellationLines } from './ConstellationLines';
+import { CoordinateGrid } from './CoordinateGrid';
+import { EclipticLine } from './EclipticLine';
 
 describe('SkyMap', () => {
   it('should render without crashing', () => {
@@ -58,6 +62,83 @@ describe('HorizonRing', () => {
     const { container } = render(
       <Canvas>
         <HorizonRing observerLat={51.5} />
+      </Canvas>
+    );
+    expect(container).toBeTruthy();
+  });
+});
+
+describe('BrightStars', () => {
+  const props = { observerLat: 40, observerLon: 0, observerTime: new Date('2024-06-21T00:00:00Z') };
+
+  it('renders without errors', () => {
+    const { container } = render(
+      <Canvas>
+        <BrightStars {...props} />
+      </Canvas>
+    );
+    expect(container).toBeTruthy();
+  });
+
+  it('renders with southern-hemisphere observer', () => {
+    const { container } = render(
+      <Canvas>
+        <BrightStars observerLat={-33} observerLon={151} observerTime={props.observerTime} />
+      </Canvas>
+    );
+    expect(container).toBeTruthy();
+  });
+});
+
+describe('ConstellationLines', () => {
+  const props = { observerLat: 40, observerLon: 0, observerTime: new Date('2024-06-21T00:00:00Z') };
+
+  it('renders without errors', () => {
+    const { container } = render(
+      <Canvas>
+        <ConstellationLines {...props} />
+      </Canvas>
+    );
+    expect(container).toBeTruthy();
+  });
+
+  it('renders with a different observer position', () => {
+    const { container } = render(
+      <Canvas>
+        <ConstellationLines observerLat={-10} observerLon={40} observerTime={props.observerTime} />
+      </Canvas>
+    );
+    expect(container).toBeTruthy();
+  });
+});
+
+describe('CoordinateGrid', () => {
+  it('renders the altitude circles and azimuth lines without errors', () => {
+    const { container } = render(
+      <Canvas>
+        <CoordinateGrid />
+      </Canvas>
+    );
+    expect(container).toBeTruthy();
+  });
+});
+
+describe('EclipticLine', () => {
+  const props = { observerLat: 40, observerLon: 0, observerTime: new Date('2024-06-21T00:00:00Z') };
+
+  it('renders without errors', () => {
+    const { container } = render(
+      <Canvas>
+        <EclipticLine {...props} />
+      </Canvas>
+    );
+    expect(container).toBeTruthy();
+  });
+
+  it('renders when observer is at high latitude (ecliptic may be mostly below horizon)', () => {
+    const { container } = render(
+      <Canvas>
+        <EclipticLine observerLat={89} observerLon={0} observerTime={props.observerTime} />
       </Canvas>
     );
     expect(container).toBeTruthy();

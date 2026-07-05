@@ -1,4 +1,3 @@
-/* eslint-disable react/no-unknown-property */
 import { useMemo } from 'react';
 import { altAzToVector3 } from './altAzToVector3';
 import { createTextTexture } from '../Globe/textTexture';

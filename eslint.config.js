@@ -62,6 +62,8 @@ export default [
             'roughness',
             'normalMap',
             'normalScale',
+            'sizeAttenuation',
+            'depthTest',
           ],
         },
       ],

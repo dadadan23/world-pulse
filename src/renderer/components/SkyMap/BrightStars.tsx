@@ -1,4 +1,3 @@
-/* eslint-disable react/no-unknown-property */
 import { useMemo } from 'react';
 import { raDecToAltAz } from './celestialMath';
 import { altAzToVector3 } from './altAzToVector3';
