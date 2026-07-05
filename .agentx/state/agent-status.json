@@ -17,10 +17,10 @@
   "engineer": {
     "role": "engineer",
     "status": "complete",
-    "issue": "210,211,213,214,215",
-    "branch": "claude/next-stories-d8icc9",
+    "issue": "230,231,235,239,240",
+    "branch": "claude/next-batch-stories-c2qvx4",
     "startedAt": "2026-06-30T21:01:34Z",
-    "completedAt": "2026-06-30T21:11:32Z",
+    "completedAt": "2026-07-04T23:46:08Z",
     "artifacts": []
   },
   "reviewer": {
