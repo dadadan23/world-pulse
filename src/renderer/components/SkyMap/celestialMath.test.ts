@@ -10,7 +10,7 @@ describe('gmstHours', () => {
     expect(gmst).toBeCloseTo(18.697, 1);
   });
 
-  it('stays in range 0–24', () => {
+  it('stays in range 0-24', () => {
     const dates = [
       new Date('2024-06-15T00:00:00Z'),
       new Date('2024-12-25T18:00:00Z'),
