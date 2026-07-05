@@ -1,5 +1,6 @@
 import { useSocket } from './hooks/useSocket';
 import { useCollectorHealthPolling } from './hooks/useCollectorHealthPolling';
+import { useTickerSpeedSync } from './hooks/useTickerSpeedSync';
 import { useAppStore } from './store/useAppStore';
 import { Dashboard } from './components/Dashboard/Dashboard';
 import { LoadingScreen } from './components/LoadingScreen/LoadingScreen';
@@ -10,6 +11,7 @@ function App() {
   // Initialize socket connection and periodic health polling
   useSocket();
   useCollectorHealthPolling();
+  useTickerSpeedSync();
 
   const { isInitialized, connectionStatus, hasEverConnected } = useAppStore();
 

@@ -1,12 +1,10 @@
 import { Fragment } from 'react';
 import { useAppStore } from '../../../store/useAppStore';
+import { useSettingsStore } from '../../../store/useSettingsStore';
 import { formatRelativeTime } from '../../../utils/time';
 import { getEventIndicator } from '../../../utils/eventIndicators';
 import { isSelectedEvent } from '../../../utils/isSelectedEvent';
-import {
-  sortBySeverityThenRecency,
-  DEFAULT_HIGH_SEVERITY_THRESHOLD,
-} from '../../../utils/severityOrder';
+import { sortBySeverityThenRecency } from '../../../utils/severityOrder';
 import { SeverityPulseBadge } from '../../SeverityPulseBadge/SeverityPulseBadge';
 import type { Event } from '@shared/types';
 
@@ -29,8 +27,9 @@ interface VerticalEventTickerProps {
 export function VerticalEventTicker({ headerLabel, events }: VerticalEventTickerProps) {
   const selectedEvent = useAppStore((state) => state.selectedEvent);
   const setSelectedEvent = useAppStore((state) => state.setSelectedEvent);
+  const severityThreshold = useSettingsStore((state) => state.severityThreshold);
 
-  const rows = sortBySeverityThenRecency(events).slice(0, MAX_ROWS);
+  const rows = sortBySeverityThenRecency(events, severityThreshold).slice(0, MAX_ROWS);
 
   // Only loop the scroll animation (and duplicate rows) once there's enough
   // content to actually scroll through - otherwise a couple of rows just glitch in place.
@@ -48,7 +47,7 @@ export function VerticalEventTicker({ headerLabel, events }: VerticalEventTicker
             {displayRows.map((event, index) => {
               const indicator = getEventIndicator(event.type, event.severity);
               const isSelected = isSelectedEvent(event, selectedEvent);
-              const isHighSeverity = (event.severity ?? 0) >= DEFAULT_HIGH_SEVERITY_THRESHOLD;
+              const isHighSeverity = (event.severity ?? 0) >= severityThreshold;
               return (
                 <Fragment key={`${event.id}-${index}`}>
                   <button

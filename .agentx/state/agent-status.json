@@ -16,11 +16,11 @@
   },
   "engineer": {
     "role": "engineer",
-    "status": "complete",
-    "issue": "230,231,235,239,240",
-    "branch": "claude/next-batch-stories-c2qvx4",
-    "startedAt": "2026-06-30T21:01:34Z",
-    "completedAt": "2026-07-04T23:46:08Z",
+    "status": "active",
+    "issue": "232,233,236,237,238,241,242",
+    "branch": "claude/next-stories-72lncb",
+    "startedAt": "2026-07-05T00:00:00Z",
+    "completedAt": null,
     "artifacts": []
   },
   "reviewer": {
