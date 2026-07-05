@@ -3,6 +3,7 @@ import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
 import * as THREE from 'three';
 import { useAppStore } from '../../store/useAppStore';
+import { useVisibleEvents } from '../../hooks/useVisibleEvents';
 import { createEarthTextures } from './textureRenderer';
 import { latLonToVector3 } from './projection';
 import { ne110mCoastlineSource } from './geoJsonCoastlineSource';
@@ -671,7 +672,7 @@ function deduplicateNearbyEvents(events: Event[], featuredId: string | undefined
 
 /** All event markers as a group */
 function EventMarkers({ reducedMotion }: { reducedMotion: boolean }) {
-  const events = useAppStore((state) => state.events);
+  const events = useVisibleEvents();
   const featuredEvent = useAppStore((state) => state.featuredEvent);
   const setFeaturedEvent = useAppStore((state) => state.setFeaturedEvent);
   const setSelectedEvent = useAppStore((state) => state.setSelectedEvent);

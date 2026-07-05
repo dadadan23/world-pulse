@@ -1,14 +1,27 @@
 import { useEffect } from 'react';
 import { useAppStore } from '../../store/useAppStore';
+import { useSettingsStore } from '../../store/useSettingsStore';
+import { EVENT_TYPE_LABELS } from '../../utils/eventTypeLabels';
+import { TICKER_SPEED_OPTIONS } from '../../utils/tickerSpeed';
+import { SEVERITY_LEVELS } from '@shared/types';
 
 /**
  * Slide-in settings modal (Modals z-50+ layer per DESIGN.md's HUD Layout table).
- * UI shell only -- functional controls (mute toggles, ticker speed, location
- * override) are wired in by their own stories.
+ * Location override (#234) is deferred to a separate architect-reviewed pass
+ * since it touches src/server/** and src/shared/types.ts.
  */
 export function SettingsModal() {
   const settingsOpen = useAppStore((state) => state.settingsOpen);
   const setSettingsOpen = useAppStore((state) => state.setSettingsOpen);
+
+  const mutedEventTypes = useSettingsStore((state) => state.mutedEventTypes);
+  const toggleEventTypeMuted = useSettingsStore((state) => state.toggleEventTypeMuted);
+  const tickerSpeed = useSettingsStore((state) => state.tickerSpeed);
+  const setTickerSpeed = useSettingsStore((state) => state.setTickerSpeed);
+  const severityThreshold = useSettingsStore((state) => state.severityThreshold);
+  const setSeverityThreshold = useSettingsStore((state) => state.setSeverityThreshold);
+  const audioChimeEnabled = useSettingsStore((state) => state.audioChimeEnabled);
+  const setAudioChimeEnabled = useSettingsStore((state) => state.setAudioChimeEnabled);
 
   useEffect(() => {
     if (!settingsOpen) return;
@@ -56,7 +69,94 @@ export function SettingsModal() {
           </button>
         </div>
 
-        <div className="flex-1 min-h-0 overflow-y-auto" />
+        <div className="flex-1 min-h-0 overflow-y-auto flex flex-col gap-5">
+          <section>
+            <span className="ob-label text-ob-text-dim tracking-ultrawide">EVENT TYPES</span>
+            <div className="flex flex-col gap-1.5 mt-2">
+              {EVENT_TYPE_LABELS.map(({ type, label }) => {
+                const isMuted = mutedEventTypes.includes(type);
+                return (
+                  <button
+                    key={type}
+                    type="button"
+                    onClick={() => toggleEventTypeMuted(type)}
+                    aria-pressed={!isMuted}
+                    className={`w-full flex items-center justify-between px-3 py-1.5 border transition-colors duration-150 cursor-pointer ${
+                      isMuted
+                        ? 'border-ob-border text-ob-text-dim'
+                        : 'border-ob-cyan/40 text-ob-text'
+                    }`}
+                  >
+                    <span className="ob-label">{label}</span>
+                    <span className={`ob-label ${isMuted ? 'text-ob-text-dim' : 'text-ob-cyan'}`}>
+                      {isMuted ? 'MUTED' : 'ON'}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </section>
+
+          <section>
+            <span className="ob-label text-ob-text-dim tracking-ultrawide">TICKER SPEED</span>
+            <div className="flex gap-2 mt-2">
+              {TICKER_SPEED_OPTIONS.map((speed) => (
+                <button
+                  key={speed}
+                  type="button"
+                  onClick={() => setTickerSpeed(speed)}
+                  aria-pressed={tickerSpeed === speed}
+                  className={`flex-1 ob-label py-1.5 border transition-colors duration-150 cursor-pointer ${
+                    tickerSpeed === speed
+                      ? 'border-ob-cyan/40 text-ob-cyan'
+                      : 'border-ob-border text-ob-text-dim'
+                  }`}
+                >
+                  {speed.toUpperCase()}
+                </button>
+              ))}
+            </div>
+          </section>
+
+          <section>
+            <span className="ob-label text-ob-text-dim tracking-ultrawide">SEVERITY ALERTS</span>
+            <div className="flex flex-col gap-3 mt-2">
+              <label className="flex flex-col gap-1.5">
+                <span className="ob-label text-ob-text-dim">
+                  THRESHOLD: {severityThreshold.toFixed(1)}
+                </span>
+                <input
+                  type="range"
+                  min={SEVERITY_LEVELS.info}
+                  max={SEVERITY_LEVELS.critical}
+                  step={0.5}
+                  value={severityThreshold}
+                  onChange={(e) => setSeverityThreshold(Number(e.target.value))}
+                  aria-label="Severity threshold"
+                  className="w-full accent-ob-cyan"
+                />
+              </label>
+
+              <button
+                type="button"
+                onClick={() => setAudioChimeEnabled(!audioChimeEnabled)}
+                aria-pressed={audioChimeEnabled}
+                className={`w-full flex items-center justify-between px-3 py-1.5 border transition-colors duration-150 cursor-pointer ${
+                  audioChimeEnabled
+                    ? 'border-ob-cyan/40 text-ob-text'
+                    : 'border-ob-border text-ob-text-dim'
+                }`}
+              >
+                <span className="ob-label">AUDIO CHIME</span>
+                <span
+                  className={`ob-label ${audioChimeEnabled ? 'text-ob-cyan' : 'text-ob-text-dim'}`}
+                >
+                  {audioChimeEnabled ? 'ON' : 'OFF'}
+                </span>
+              </button>
+            </div>
+          </section>
+        </div>
       </div>
     </div>
   );

@@ -1,24 +1,25 @@
 import { Fragment } from 'react';
 import { useAppStore } from '../../store/useAppStore';
+import { useSettingsStore } from '../../store/useSettingsStore';
+import { useVisibleEvents } from '../../hooks/useVisibleEvents';
 import { formatRelativeTime } from '../../utils/time';
 import { getEventIndicator } from '../../utils/eventIndicators';
 import { isSelectedEvent } from '../../utils/isSelectedEvent';
-import {
-  sortBySeverityThenRecency,
-  DEFAULT_HIGH_SEVERITY_THRESHOLD,
-} from '../../utils/severityOrder';
+import { sortBySeverityThenRecency } from '../../utils/severityOrder';
 import { SeverityPulseBadge } from '../SeverityPulseBadge/SeverityPulseBadge';
 import type { Event, NewsEvent } from '@shared/types';
 
 const MAX_HEADLINES = 10;
 
 export function Ticker() {
-  const events = useAppStore((state) => state.events);
+  const events = useVisibleEvents();
   const selectedEvent = useAppStore((state) => state.selectedEvent);
   const setSelectedEvent = useAppStore((state) => state.setSelectedEvent);
+  const severityThreshold = useSettingsStore((state) => state.severityThreshold);
 
-  const newsEvents = sortBySeverityThenRecency(
-    events.filter((e): e is NewsEvent => e.type === 'news')
+  const tickerEvents = sortBySeverityThenRecency(
+    events.filter((e): e is NewsEvent => e.type === 'news'),
+    severityThreshold
   ).slice(0, MAX_HEADLINES);
 
   const usingFallback = newsEvents.length === 0;
@@ -45,9 +46,8 @@ export function Ticker() {
                 {[...tickerEvents, ...tickerEvents].map((event, index) => {
                   const indicator = getEventIndicator(event.type, event.severity);
                   const isSelected = isSelectedEvent(event, selectedEvent);
-                  const isHighSeverity = (event.severity ?? 0) >= DEFAULT_HIGH_SEVERITY_THRESHOLD;
-                  const isNews = event.type === 'news';
-                  const isLocal = isNews && (event as NewsEvent).data.scope === 'local';
+                  const isLocal = event.data.scope === 'local';
+                  const isHighSeverity = (event.severity ?? 0) >= severityThreshold;
                   return (
                     <Fragment key={`${event.id}-${index}`}>
                       <button

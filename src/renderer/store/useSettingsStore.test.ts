@@ -1,16 +1,37 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { useSettingsStore } from './useSettingsStore';
+import { useSettingsStore, DEFAULT_SEVERITY_THRESHOLD } from './useSettingsStore';
 
 describe('useSettingsStore', () => {
   beforeEach(() => {
     localStorage.clear();
-    useSettingsStore.setState({ mutedEventTypes: [], tickerSpeed: 'normal' });
+    useSettingsStore.setState({
+      mutedEventTypes: [],
+      tickerSpeed: 'normal',
+      severityThreshold: DEFAULT_SEVERITY_THRESHOLD,
+      audioChimeEnabled: false,
+    });
   });
 
   it('defaults to all event types un-muted and normal ticker speed', () => {
     const state = useSettingsStore.getState();
     expect(state.mutedEventTypes).toEqual([]);
     expect(state.tickerSpeed).toBe('normal');
+  });
+
+  it('defaults severity threshold to the "high" level and audio chime to off', () => {
+    const state = useSettingsStore.getState();
+    expect(state.severityThreshold).toBe(DEFAULT_SEVERITY_THRESHOLD);
+    expect(state.audioChimeEnabled).toBe(false);
+  });
+
+  it('sets severity threshold', () => {
+    useSettingsStore.getState().setSeverityThreshold(5);
+    expect(useSettingsStore.getState().severityThreshold).toBe(5);
+  });
+
+  it('sets audio chime enabled', () => {
+    useSettingsStore.getState().setAudioChimeEnabled(true);
+    expect(useSettingsStore.getState().audioChimeEnabled).toBe(true);
   });
 
   it('mutes an event type', () => {
