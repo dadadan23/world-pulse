@@ -12,18 +12,21 @@ const DOT_CLASSES: Record<CollectorHealthStatus, string> = {
   healthy: 'bg-ob-success ob-glow-success',
   degraded: 'bg-ob-amber',
   disabled: 'bg-ob-danger',
+  unconfigured: 'bg-ob-amber opacity-50',
 };
 
 const BADGE_STATE: Record<CollectorHealthStatus, 'nominal' | 'warning' | 'critical'> = {
   healthy: 'nominal',
   degraded: 'warning',
   disabled: 'critical',
+  unconfigured: 'warning',
 };
 
 const STATUS_LABELS: Record<CollectorHealthStatus, string> = {
   healthy: 'LIVE',
   degraded: 'DEGRADED',
   disabled: 'DISABLED',
+  unconfigured: 'KEY MISSING',
 };
 
 export function CollectorHealthBadge({ name, status, errorCount, isStale }: Props) {

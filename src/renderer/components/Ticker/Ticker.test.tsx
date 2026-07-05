@@ -51,12 +51,20 @@ describe('Ticker', () => {
     });
   });
 
-  it('should show no active events message when no events', () => {
+  it('should show awaiting message when no events at all', () => {
     render(<Ticker />);
-    expect(screen.getByText('NO ACTIVE EVENTS')).toBeInTheDocument();
+    expect(screen.getByText('AWAITING DATA...')).toBeInTheDocument();
   });
 
-  it('should render only news events, excluding other event types', () => {
+  it('should fall back to all events when no news events exist', () => {
+    useAppStore.setState({
+      events: [mockEvent('1')],
+    });
+    render(<Ticker />);
+    expect(screen.getAllByText('Event 1').length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('should render only news events when news events exist', () => {
     useAppStore.setState({
       events: [mockEvent('1'), mockNewsEvent('news-1', 'global')],
     });

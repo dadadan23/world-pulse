@@ -6,7 +6,13 @@ import { Server } from 'socket.io';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
-import type { Event, CollectorHealth, CollectorHealthStatus, WeatherEvent } from '@shared/types';
+import type {
+  Event,
+  CollectorHealth,
+  CollectorHealthStatus,
+  CollectorManifest,
+  WeatherEvent,
+} from '@shared/types';
 import type { BaseCollector } from './collectors/base';
 import { fetchWeatherData } from './collectors/weatherClient';
 
@@ -59,6 +65,7 @@ export function createApp(options?: { corsOrigin?: string }) {
   /** Sweep interval in milliseconds (default: 60 seconds) */
   const SWEEP_INTERVAL_MS = 60 * 1000;
   let collectors: BaseCollector[] = [];
+  let skippedManifests: CollectorManifest[] = [];
   let sweepTimer: ReturnType<typeof setInterval> | null = null;
 
   /** Short-lived cache for on-demand weather lookups, keyed by rounded coordinates. */
@@ -119,6 +126,17 @@ export function createApp(options?: { corsOrigin?: string }) {
   // Status endpoint for frontend initialization
   app.get('/api/status', (_req, res) => {
     const collectorHealth = collectors.map(toCollectorHealth);
+    const unconfigured: CollectorHealth[] = skippedManifests.map((m) => ({
+      name: m.displayName,
+      status: 'unconfigured',
+      lastFetchAt: null,
+      errorCount: 0,
+      isEnabled: false,
+      qualityTier: m.qualityTier,
+      intervalMs: 0,
+      isStale: false,
+    }));
+    const allHealth = [...collectorHealth, ...unconfigured];
     const healthyCount = collectorHealth.filter((c) => c.status === 'healthy').length;
     const primaryCollectors = collectorHealth.filter((c) => c.qualityTier === 'primary');
     const primaryAllHealthy =
@@ -128,8 +146,8 @@ export function createApp(options?: { corsOrigin?: string }) {
     res.json({
       status: overallStatus,
       timestamp: new Date().toISOString(),
-      collectors: collectorHealth,
-      collectorsTotal: collectorHealth.length,
+      collectors: allHealth,
+      collectorsTotal: allHealth.length,
       collectorsHealthy: healthyCount,
       eventCount: eventCache.length,
     });
@@ -246,8 +264,9 @@ export function createApp(options?: { corsOrigin?: string }) {
     getEventCache() {
       return eventCache;
     },
-    setCollectors(c: BaseCollector[]) {
+    setCollectors(c: BaseCollector[], skipped: CollectorManifest[] = []) {
       collectors = c;
+      skippedManifests = skipped;
     },
     startSweep() {
       if (!sweepTimer) {
