@@ -95,4 +95,33 @@ describe('Ticker', () => {
 
     expect(useAppStore.getState().selectedEvent?.id).toBe('news-1');
   });
+
+  it('pins a high-severity headline ahead of more recent routine headlines', () => {
+    const now = Date.now();
+    const older = mockNewsEvent('high-sev', 'global', { timestamp: now - 60_000, severity: 9 });
+    const newer1 = mockNewsEvent('routine-1', 'global', { timestamp: now, severity: 2 });
+    const newer2 = mockNewsEvent('routine-2', 'global', { timestamp: now - 1000, severity: 1 });
+
+    useAppStore.setState({ events: [newer1, newer2, older] });
+    render(<Ticker />);
+
+    const titles = screen
+      .getAllByText(/^Headline /)
+      .slice(0, 3)
+      .map((el) => el.textContent);
+    expect(titles).toEqual(['Headline high-sev', 'Headline routine-1', 'Headline routine-2']);
+  });
+
+  it('shows a pulsing severity badge only for high-severity headlines', () => {
+    useAppStore.setState({
+      events: [
+        mockNewsEvent('high', 'global', { severity: 9 }),
+        mockNewsEvent('routine', 'global', { severity: 2 }),
+      ],
+    });
+    render(<Ticker />);
+
+    expect(screen.getAllByText('9.0 CRIT').length).toBeGreaterThanOrEqual(1);
+    expect(screen.queryByText('2.0 CRIT')).not.toBeInTheDocument();
+  });
 });

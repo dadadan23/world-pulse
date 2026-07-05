@@ -3,13 +3,19 @@ import { useAppStore } from '../../../store/useAppStore';
 import { formatRelativeTime } from '../../../utils/time';
 import { getEventIndicator } from '../../../utils/eventIndicators';
 import { isSelectedEvent } from '../../../utils/isSelectedEvent';
+import {
+  sortBySeverityThenRecency,
+  DEFAULT_HIGH_SEVERITY_THRESHOLD,
+} from '../../../utils/severityOrder';
+import { SeverityPulseBadge } from '../../SeverityPulseBadge/SeverityPulseBadge';
 import type { Event } from '@shared/types';
 
 const MAX_ROWS = 5;
 
 interface VerticalEventTickerProps {
   headerLabel: string;
-  /** Already filtered to the relevant event types and sorted by recency (most recent first). */
+  /** Already filtered to the relevant event types; recency order is a hint only --
+   *  high-severity events are re-pinned to the top regardless of the input order. */
   events: Event[];
 }
 
@@ -17,12 +23,14 @@ interface VerticalEventTickerProps {
  * Shared scrolling vertical feed used by GeologicTicker and NightSkyTicker: fixed ~5-row
  * viewport that loops via the `.animate-scroll-vertical` primitive once there's enough
  * content to actually scroll, click-to-select, and the consistent active-selection highlight.
+ * Rows are ordered severity-first (high-severity events pinned ahead of routine ones),
+ * then by recency within each group.
  */
 export function VerticalEventTicker({ headerLabel, events }: VerticalEventTickerProps) {
   const selectedEvent = useAppStore((state) => state.selectedEvent);
   const setSelectedEvent = useAppStore((state) => state.setSelectedEvent);
 
-  const rows = events.slice(0, MAX_ROWS);
+  const rows = sortBySeverityThenRecency(events).slice(0, MAX_ROWS);
 
   // Only loop the scroll animation (and duplicate rows) once there's enough
   // content to actually scroll through - otherwise a couple of rows just glitch in place.
@@ -40,6 +48,7 @@ export function VerticalEventTicker({ headerLabel, events }: VerticalEventTicker
             {displayRows.map((event, index) => {
               const indicator = getEventIndicator(event.type, event.severity);
               const isSelected = isSelectedEvent(event, selectedEvent);
+              const isHighSeverity = (event.severity ?? 0) >= DEFAULT_HIGH_SEVERITY_THRESHOLD;
               return (
                 <Fragment key={`${event.id}-${index}`}>
                   <button
@@ -55,6 +64,7 @@ export function VerticalEventTicker({ headerLabel, events }: VerticalEventTicker
                     <span className={`${indicator.color} text-[12px] shrink-0`} aria-hidden>
                       {indicator.symbol}
                     </span>
+                    {isHighSeverity && <SeverityPulseBadge severity={event.severity ?? 0} />}
                     <span className="ob-label truncate flex-1 min-w-0">{event.title}</span>
                     <span className="ob-label text-ob-text-dim tabular-nums shrink-0">
                       {formatRelativeTime(event.timestamp)}

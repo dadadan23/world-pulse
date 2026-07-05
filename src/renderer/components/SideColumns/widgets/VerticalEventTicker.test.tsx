@@ -74,4 +74,34 @@ describe('VerticalEventTicker', () => {
     const row = screen.getAllByText('Selected Row')[0].closest('button');
     expect(row?.className).toContain('bg-ob-cyan/10');
   });
+
+  it('pins a high-severity row ahead of more recent routine rows', () => {
+    const now = Date.now();
+    const older = mockEvent('high', {
+      title: 'High Severity',
+      timestamp: now - 60_000,
+      severity: 8,
+    });
+    const newer1 = mockEvent('r1', { title: 'Routine Newest', timestamp: now, severity: 1 });
+    const newer2 = mockEvent('r2', { title: 'Routine Newer', timestamp: now - 1000, severity: 2 });
+
+    render(<VerticalEventTicker headerLabel="◆ TEST FEED" events={[newer1, newer2, older]} />);
+
+    const rowTitles = screen
+      .getAllByText(/Routine|High Severity/)
+      .slice(0, 3)
+      .map((el) => el.textContent);
+    expect(rowTitles).toEqual(['High Severity', 'Routine Newest', 'Routine Newer']);
+  });
+
+  it('shows a pulsing severity badge only for high-severity rows', () => {
+    const events = [
+      mockEvent('high', { title: 'High Row', severity: 9 }),
+      mockEvent('routine', { title: 'Routine Row', severity: 2 }),
+    ];
+    render(<VerticalEventTicker headerLabel="◆ TEST FEED" events={events} />);
+
+    expect(screen.getByText('9.0 CRIT')).toBeInTheDocument();
+    expect(screen.queryByText('2.0 CRIT')).not.toBeInTheDocument();
+  });
 });
