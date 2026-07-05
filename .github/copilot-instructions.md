@@ -91,6 +91,8 @@ This ensures cross-platform compatibility and prevents encoding issues in termin
 
 **Exception - astronomical Bayer designations:** Star catalog data (e.g. `src/renderer/components/SkyMap/brightStarCatalog.ts`) **MAY** use Greek letters in `name` fields for standard Bayer designations (e.g. `alpha Cen`, `beta Cen` written as `α Cen`, `β Cen`), since this is the conventional astronomical notation and the source is display-only star data, not code, scripting, or CI/CD-facing text. This exception is scoped to star/constellation name fields only - identifiers, code, and comments in the same files still MUST remain ASCII-only.
 
+**Exception - scientific/geographic notation:** Code comments, docstrings, and user-facing display strings **MAY** use the degree symbol (`°`), Greek letters standing for angles or physical constants (e.g. `ε` for obliquity, `π` for pi), and the plus-minus sign (`±`) when describing angular measurements, coordinates, or astronomical/geometric quantities (e.g. `40°N`, `mean obliquity ε = 23.4393°`, `ring is vertical (π/2)`). This is conventional scientific notation, not a substitute for a required ASCII equivalent (unlike arrows, checkmarks, or box-drawing characters, which have no other correct representation in code). Identifiers, control flow, and non-scientific text **MUST** remain ASCII-only.
+
 ---
 
 ## Directive Language (RFC 2119)
