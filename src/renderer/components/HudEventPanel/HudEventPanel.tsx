@@ -158,6 +158,7 @@ export function HudEventPanel() {
     <div
       className="fixed top-1/2 right-5 z-20 w-[310px] ob-hud-panel ob-transition-fade"
       style={{
+        position: 'fixed', // ob-hud-panel sets position:relative which wins over Tailwind's .fixed class in the cascade
         transform: visible
           ? 'translateY(-50%) translateX(0)'
           : 'translateY(-50%) translateX(340px)',

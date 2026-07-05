@@ -98,15 +98,9 @@ export class VolcanoCollector extends BaseCollector {
 
   private transform(notice: USGSVolcanoNotice): VolcanoEvent {
     const colorCode = notice.currentColorCode.toLowerCase() as
-      | 'green'
-      | 'yellow'
-      | 'orange'
-      | 'red';
+      'green' | 'yellow' | 'orange' | 'red';
     const alertLevel = notice.currentAlertLevel.toLowerCase() as
-      | 'normal'
-      | 'advisory'
-      | 'watch'
-      | 'warning';
+      'normal' | 'advisory' | 'watch' | 'warning';
     const severity = this.getSeverity(colorCode);
 
     return {

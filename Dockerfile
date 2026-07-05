@@ -3,7 +3,7 @@
 # ---------------------------------------------------------------------------
 # deps: install once, shared by the build stages.
 # ---------------------------------------------------------------------------
-FROM node:22-alpine AS deps
+FROM node:24-alpine AS deps
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
@@ -32,7 +32,7 @@ RUN npm run build:server
 # runtime: production image. Express serves the API, Socket.io, and the
 # built frontend from a single process/port.
 # ---------------------------------------------------------------------------
-FROM node:22-alpine AS runtime
+FROM node:24-alpine AS runtime
 ENV NODE_ENV=production
 WORKDIR /app
 
