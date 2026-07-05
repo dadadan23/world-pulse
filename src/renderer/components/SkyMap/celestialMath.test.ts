@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { gmstHours, lstHours, raDecToAltAz, eclipticToEquatorial } from './celestialMath';
 
-// Reference epoch: 2000-01-01 12:00 UTC (J2000.0) — GMST ≈ 18.697 hours
+// Reference epoch: 2000-01-01 12:00 UTC (J2000.0) - GMST ~ 18.697 hours
 const J2000 = new Date('2000-01-01T12:00:00Z');
 
 describe('gmstHours', () => {
