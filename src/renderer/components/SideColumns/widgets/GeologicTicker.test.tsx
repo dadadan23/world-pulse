@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { GeologicTicker } from './GeologicTicker';
 import { useAppStore } from '../../../store/useAppStore';
+import { useSettingsStore } from '../../../store/useSettingsStore';
 import type { Event } from '@shared/types';
 
 function mockEvent(id: string, overrides?: Partial<Event>): Event {
@@ -21,6 +22,7 @@ function mockEvent(id: string, overrides?: Partial<Event>): Event {
 describe('GeologicTicker', () => {
   beforeEach(() => {
     useAppStore.setState({ events: [], selectedEvent: null });
+    useSettingsStore.setState({ mutedEventTypes: [] });
   });
 
   it('shows the NO ACTIVE EVENTS empty state and the GEOLOGIC PULSE header when there are no geologic events', () => {
@@ -43,5 +45,19 @@ describe('GeologicTicker', () => {
     expect(screen.queryByText('Sunny')).not.toBeInTheDocument();
     const titles = screen.getAllByText(/Old Quake|Volcano Alert/).map((el) => el.textContent);
     expect(titles[0]).toBe('Volcano Alert');
+  });
+
+  it('excludes earthquake events when earthquake is muted in settings', () => {
+    useAppStore.setState({
+      events: [
+        mockEvent('quake-1', { type: 'earthquake', title: 'Muted Quake' }),
+        mockEvent('volcano-1', { type: 'volcano', title: 'Visible Volcano' }),
+      ],
+    });
+    useSettingsStore.setState({ mutedEventTypes: ['earthquake'] });
+
+    render(<GeologicTicker />);
+    expect(screen.queryByText('Muted Quake')).not.toBeInTheDocument();
+    expect(screen.getByText('Visible Volcano')).toBeInTheDocument();
   });
 });

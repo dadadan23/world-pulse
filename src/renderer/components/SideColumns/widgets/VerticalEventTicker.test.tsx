@@ -3,6 +3,7 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { VerticalEventTicker } from './VerticalEventTicker';
 import { useAppStore } from '../../../store/useAppStore';
+import { useSettingsStore, DEFAULT_SEVERITY_THRESHOLD } from '../../../store/useSettingsStore';
 import type { Event } from '@shared/types';
 
 function mockEvent(id: string, overrides?: Partial<Event>): Event {
@@ -21,6 +22,7 @@ function mockEvent(id: string, overrides?: Partial<Event>): Event {
 describe('VerticalEventTicker', () => {
   beforeEach(() => {
     useAppStore.setState({ selectedEvent: null });
+    useSettingsStore.setState({ severityThreshold: DEFAULT_SEVERITY_THRESHOLD });
   });
 
   it('shows the NO ACTIVE EVENTS empty state and header label when there are no events', () => {
@@ -103,5 +105,13 @@ describe('VerticalEventTicker', () => {
 
     expect(screen.getByText('9.0 CRIT')).toBeInTheDocument();
     expect(screen.queryByText('2.0 CRIT')).not.toBeInTheDocument();
+  });
+
+  it('respects a lowered configurable severity threshold for the pulse badge', () => {
+    useSettingsStore.setState({ severityThreshold: 4 });
+    const events = [mockEvent('mid', { title: 'Mid Row', severity: 5 })];
+
+    render(<VerticalEventTicker headerLabel="◆ TEST FEED" events={events} />);
+    expect(screen.getByText('5.0 CRIT')).toBeInTheDocument();
   });
 });
