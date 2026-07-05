@@ -103,6 +103,10 @@ export function SkyMap({ observerLat = 40, observerLon = 0 }: SkyMapProps) {
             <div className="w-2 h-2 rounded-full bg-ob-amber" />
             <span className="ob-label text-ob-text-dim">PLANETS</span>
           </div>
+          <div className="flex items-center gap-1.5">
+            <div className="w-2 h-2 rounded-full bg-ob-cyan" />
+            <span className="ob-label text-ob-text-dim">ASTEROIDS</span>
+          </div>
           <span className="ml-auto ob-label text-ob-text-dim tabular-nums">
             {celestialEvents.length} OBJECTS
           </span>

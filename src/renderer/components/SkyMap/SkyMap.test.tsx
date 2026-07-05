@@ -35,6 +35,15 @@ describe('SkyMap', () => {
     const { container } = render(<SkyMap observerLat={51.5} observerLon={-0.1} />);
     expect(container).toBeTruthy();
   });
+
+  it('should display a legend entry for every rendered layer, including asteroids', () => {
+    const { getByText } = render(<SkyMap />);
+    expect(getByText('STARS')).toBeTruthy();
+    expect(getByText('CONSTELLATIONS')).toBeTruthy();
+    expect(getByText('ECLIPTIC')).toBeTruthy();
+    expect(getByText('PLANETS')).toBeTruthy();
+    expect(getByText('ASTEROIDS')).toBeTruthy();
+  });
 });
 
 describe('StarField', () => {
