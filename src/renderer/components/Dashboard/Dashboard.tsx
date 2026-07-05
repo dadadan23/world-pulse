@@ -4,6 +4,7 @@ import { HudStatusPanel } from '../HudStatusPanel/HudStatusPanel';
 import { HudCollectorPanel } from '../HudCollectorPanel/HudCollectorPanel';
 import { HudEventPanel } from '../HudEventPanel/HudEventPanel';
 import { LeftColumn, RightColumn } from '../SideColumns';
+import { SettingsModal, SettingsTrigger } from '../SettingsModal';
 import { SkyMapModal } from '../SkyMapModal/SkyMapModal';
 import { SourceDirectoryModal } from '../SourceDirectoryModal/SourceDirectoryModal';
 import { Ticker } from '../Ticker/Ticker';
@@ -38,6 +39,10 @@ export function Dashboard() {
 
       {/* Top-right: collector badges + sky map toggle */}
       <HudCollectorPanel />
+
+      {/* Settings trigger icon + slide-in modal (Modals z-50+ layer) */}
+      <SettingsTrigger />
+      <SettingsModal />
 
       {/* Left/right side columns: mission-control telemetry widgets, z-10 */}
       <LeftColumn />

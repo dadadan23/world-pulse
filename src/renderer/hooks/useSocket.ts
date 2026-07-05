@@ -1,9 +1,8 @@
 import { useEffect, useRef } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { useAppStore } from '../store/useAppStore';
+import { SERVER_URL } from '../config';
 import type { Event } from '@shared/types';
-
-const SERVER_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:3000';
 
 /** Dormant retry interval after Socket.io exhausts its reconnection attempts */
 const DORMANT_RETRY_MS = 30_000;

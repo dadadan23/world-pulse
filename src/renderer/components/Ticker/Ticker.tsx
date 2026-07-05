@@ -1,14 +1,25 @@
 import { Fragment } from 'react';
 import { useAppStore } from '../../store/useAppStore';
-import { prioritizeTickerEvents } from '../../store/eventPrioritizer';
 import { formatRelativeTime } from '../../utils/time';
 import { getEventIndicator } from '../../utils/eventIndicators';
+import { isSelectedEvent } from '../../utils/isSelectedEvent';
+import {
+  sortBySeverityThenRecency,
+  DEFAULT_HIGH_SEVERITY_THRESHOLD,
+} from '../../utils/severityOrder';
+import { SeverityPulseBadge } from '../SeverityPulseBadge/SeverityPulseBadge';
+import type { NewsEvent } from '@shared/types';
+
+const MAX_HEADLINES = 10;
 
 export function Ticker() {
-  const { events } = useAppStore();
+  const events = useAppStore((state) => state.events);
+  const selectedEvent = useAppStore((state) => state.selectedEvent);
+  const setSelectedEvent = useAppStore((state) => state.setSelectedEvent);
 
-  // Prioritize by severity, recency, and type diversity
-  const tickerEvents = prioritizeTickerEvents(events).slice(0, 10);
+  const tickerEvents = sortBySeverityThenRecency(
+    events.filter((e): e is NewsEvent => e.type === 'news')
+  ).slice(0, MAX_HEADLINES);
 
   return (
     <div
@@ -28,11 +39,24 @@ export function Ticker() {
               <>
                 {[...tickerEvents, ...tickerEvents].map((event, index) => {
                   const indicator = getEventIndicator(event.type, event.severity);
+                  const isSelected = isSelectedEvent(event, selectedEvent);
+                  const isLocal = event.data.scope === 'local';
+                  const isHighSeverity = (event.severity ?? 0) >= DEFAULT_HIGH_SEVERITY_THRESHOLD;
                   return (
                     <Fragment key={`${event.id}-${index}`}>
-                      <div className="inline-flex items-center gap-2.5 px-6 border-r border-ob-border h-[42px]">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedEvent(event)}
+                        className={`inline-flex items-center gap-2.5 px-6 border-r border-ob-border h-[42px] cursor-pointer transition-colors duration-150 hover:bg-ob-cyan/5 ${
+                          isSelected ? 'bg-ob-cyan/10' : ''
+                        }`}
+                      >
                         <span className={`${indicator.color} text-[12px]`} aria-hidden>
                           {indicator.symbol}
+                        </span>
+                        {isHighSeverity && <SeverityPulseBadge severity={event.severity ?? 0} />}
+                        <span className={`ob-label ${isLocal ? 'text-ob-amber' : 'text-ob-cyan'}`}>
+                          {isLocal ? '[NEAR YOU]' : '[GLOBAL]'}
                         </span>
                         <span className="text-ob-text text-[11px] truncate max-w-[36ch]">
                           {event.title}
@@ -40,7 +64,7 @@ export function Ticker() {
                         <span className="ob-label text-ob-text-dim tabular-nums">
                           {formatRelativeTime(event.timestamp)}
                         </span>
-                      </div>
+                      </button>
                     </Fragment>
                   );
                 })}
