@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { WeatherEvent } from '@shared/types';
-
-const SERVER_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:3000';
+import { SERVER_URL } from '../config';
 
 export type WeatherUnavailableReason = 'not_configured' | 'fetch_failed' | 'invalid_coordinates';
 

@@ -1,4 +1,3 @@
-/* eslint-disable react/no-unknown-property */
 /* eslint-disable react-hooks/purity -- decorative star positions are generated once via useMemo([]) */
 
 import { useMemo } from 'react';

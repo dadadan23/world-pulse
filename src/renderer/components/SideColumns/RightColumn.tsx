@@ -1,3 +1,4 @@
+import { NightSkyTicker } from './widgets/NightSkyTicker';
 import { ISSWidget } from './widgets/ISSWidget';
 import { AuroraWidget } from './widgets/AuroraWidget';
 import { AsteroidWidget } from './widgets/AsteroidWidget';
@@ -11,6 +12,7 @@ export function RightColumn() {
       style={{ maxHeight: 'calc(100vh - 460px - 70px)' }}
     >
       <div className="flex flex-col gap-3">
+        <NightSkyTicker />
         <ISSWidget />
         <AuroraWidget />
         <AsteroidWidget />

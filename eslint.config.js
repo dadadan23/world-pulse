@@ -62,6 +62,9 @@ export default [
             'roughness',
             'normalMap',
             'normalScale',
+            // Three.js material props used in react-three-fiber JSX
+            'depthTest',
+            'sizeAttenuation',
           ],
         },
       ],
