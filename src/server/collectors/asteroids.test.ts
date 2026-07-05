@@ -81,4 +81,190 @@ describe('AsteroidCollector', () => {
   it('validate returns false for null', () => {
     expect(collector.validate(null)).toBe(false);
   });
+
+  it('throws when the response fails validation', async () => {
+    mockAxiosGet.mockResolvedValueOnce({ data: { element_count: 'not-a-number' } });
+    await expect(collector.fetch()).rejects.toThrow('Invalid response from NASA NeoWs');
+  });
+
+  it('sorts multiple asteroids by ascending miss distance', async () => {
+    const multiResponse = {
+      data: {
+        element_count: 2,
+        near_earth_objects: {
+          '2026-06-27': [
+            {
+              ...validResponse.data.near_earth_objects['2026-06-27'][0],
+              id: 'far',
+              name: '(2026 FAR)',
+              close_approach_data: [
+                {
+                  ...validResponse.data.near_earth_objects['2026-06-27'][0].close_approach_data[0],
+                  miss_distance: { kilometers: '900000', lunar: '2.3' },
+                },
+              ],
+            },
+          ],
+          '2026-06-28': [
+            {
+              ...validResponse.data.near_earth_objects['2026-06-27'][0],
+              id: 'near',
+              name: '(2026 NEAR)',
+              close_approach_data: [
+                {
+                  ...validResponse.data.near_earth_objects['2026-06-27'][0].close_approach_data[0],
+                  miss_distance: { kilometers: '100000', lunar: '0.3' },
+                },
+              ],
+            },
+          ],
+        },
+      },
+    };
+    mockAxiosGet.mockResolvedValueOnce(multiResponse);
+    const events = await collector.fetch();
+    expect(events.map((e) => e.title)).toEqual(['Asteroid 2026 NEAR', 'Asteroid 2026 FAR']);
+  });
+
+  it('assigns mid-range severity for a 1-5 lunar distance approach', async () => {
+    const midRangeResponse = {
+      data: {
+        element_count: 1,
+        near_earth_objects: {
+          '2026-06-27': [
+            {
+              ...validResponse.data.near_earth_objects['2026-06-27'][0],
+              close_approach_data: [
+                {
+                  ...validResponse.data.near_earth_objects['2026-06-27'][0].close_approach_data[0],
+                  miss_distance: { kilometers: '1200000', lunar: '3.1' },
+                },
+              ],
+            },
+          ],
+        },
+      },
+    };
+    mockAxiosGet.mockResolvedValueOnce(midRangeResponse);
+    const events = await collector.fetch();
+    expect(events[0].severity).toBeGreaterThan(0);
+  });
+
+  it('assigns max severity for a close, large, hazardous asteroid', async () => {
+    const hazardousResponse = {
+      data: {
+        element_count: 1,
+        near_earth_objects: {
+          '2026-06-27': [
+            {
+              ...validResponse.data.near_earth_objects['2026-06-27'][0],
+              is_potentially_hazardous_asteroid: true,
+              estimated_diameter: {
+                meters: { estimated_diameter_min: 800, estimated_diameter_max: 1500 },
+              },
+              close_approach_data: [
+                {
+                  ...validResponse.data.near_earth_objects['2026-06-27'][0].close_approach_data[0],
+                  miss_distance: { kilometers: '50000', lunar: '0.13' },
+                },
+              ],
+            },
+          ],
+        },
+      },
+    };
+    mockAxiosGet.mockResolvedValueOnce(hazardousResponse);
+    const events = await collector.fetch();
+    expect(events[0].severity).toBe(10);
+  });
+
+  it('assigns low severity for a 5-10 lunar distance approach', async () => {
+    const midFarResponse = {
+      data: {
+        element_count: 1,
+        near_earth_objects: {
+          '2026-06-27': [
+            {
+              ...validResponse.data.near_earth_objects['2026-06-27'][0],
+              close_approach_data: [
+                {
+                  ...validResponse.data.near_earth_objects['2026-06-27'][0].close_approach_data[0],
+                  miss_distance: { kilometers: '3000000', lunar: '7.8' },
+                },
+              ],
+            },
+          ],
+        },
+      },
+    };
+    mockAxiosGet.mockResolvedValueOnce(midFarResponse);
+    const events = await collector.fetch();
+    expect(events[0].severity).toBeGreaterThan(0);
+  });
+
+  it('assigns mid-tier severity for a 500-1000m diameter asteroid', async () => {
+    const midDiameterResponse = {
+      data: {
+        element_count: 1,
+        near_earth_objects: {
+          '2026-06-27': [
+            {
+              ...validResponse.data.near_earth_objects['2026-06-27'][0],
+              estimated_diameter: {
+                meters: { estimated_diameter_min: 400, estimated_diameter_max: 700 },
+              },
+            },
+          ],
+        },
+      },
+    };
+    mockAxiosGet.mockResolvedValueOnce(midDiameterResponse);
+    const events = await collector.fetch();
+    expect(events[0].severity).toBeGreaterThan(0);
+  });
+
+  it('skips a NEO with no close-approach data', async () => {
+    const noApproachResponse = {
+      data: {
+        element_count: 1,
+        near_earth_objects: {
+          '2026-06-27': [
+            {
+              ...validResponse.data.near_earth_objects['2026-06-27'][0],
+              close_approach_data: [],
+            },
+          ],
+        },
+      },
+    };
+    mockAxiosGet.mockResolvedValueOnce(noApproachResponse);
+    await expect(collector.fetch()).resolves.toEqual([]);
+  });
+
+  it('assigns zero severity for a distant, small, non-hazardous asteroid', async () => {
+    const farResponse = {
+      data: {
+        element_count: 1,
+        near_earth_objects: {
+          '2026-06-27': [
+            {
+              ...validResponse.data.near_earth_objects['2026-06-27'][0],
+              estimated_diameter: {
+                meters: { estimated_diameter_min: 5, estimated_diameter_max: 20 },
+              },
+              close_approach_data: [
+                {
+                  ...validResponse.data.near_earth_objects['2026-06-27'][0].close_approach_data[0],
+                  miss_distance: { kilometers: '10000000', lunar: '26' },
+                },
+              ],
+            },
+          ],
+        },
+      },
+    };
+    mockAxiosGet.mockResolvedValueOnce(farResponse);
+    const events = await collector.fetch();
+    expect(events[0].severity).toBe(0);
+  });
 });

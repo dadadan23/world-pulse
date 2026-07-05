@@ -32,11 +32,7 @@ export interface CollectorMeta {
  * Exported from shared types so frontend and backend use identical values.
  */
 export type ConnectionStatus =
-  | 'connecting'
-  | 'connected'
-  | 'disconnected'
-  | 'error'
-  | 'dormant-reconnecting';
+  'connecting' | 'connected' | 'disconnected' | 'error' | 'dormant-reconnecting';
 
 /**
  * Named severity levels for events, ordered from highest to lowest.
@@ -334,8 +330,7 @@ export function validateManifest(manifest: unknown): ManifestValidationResult {
 // ---------------------------------------------------------------------------
 
 export type EventValidationResult =
-  | { valid: true; event: Event }
-  | { valid: false; reason: string };
+  { valid: true; event: Event } | { valid: false; reason: string };
 
 /**
  * Validate that an unknown value conforms to the Event contract.
@@ -412,8 +407,7 @@ export interface VisualizationManifest {
 }
 
 export type VisualizationManifestValidationResult =
-  | { valid: true }
-  | { valid: false; errors: string[] };
+  { valid: true } | { valid: false; errors: string[] };
 
 /**
  * Validate a visualization plugin manifest.
