@@ -17,14 +17,14 @@ export function Ticker() {
   const setSelectedEvent = useAppStore((state) => state.setSelectedEvent);
   const severityThreshold = useSettingsStore((state) => state.severityThreshold);
 
-  const tickerEvents = sortBySeverityThenRecency(
+  const newsEvents = sortBySeverityThenRecency(
     events.filter((e): e is NewsEvent => e.type === 'news'),
     severityThreshold
   ).slice(0, MAX_HEADLINES);
 
   const usingFallback = newsEvents.length === 0;
   const tickerEvents: Event[] = usingFallback
-    ? sortBySeverityThenRecency(events).slice(0, MAX_HEADLINES)
+    ? sortBySeverityThenRecency(events, severityThreshold).slice(0, MAX_HEADLINES)
     : newsEvents;
 
   return (
@@ -46,8 +46,9 @@ export function Ticker() {
                 {[...tickerEvents, ...tickerEvents].map((event, index) => {
                   const indicator = getEventIndicator(event.type, event.severity);
                   const isSelected = isSelectedEvent(event, selectedEvent);
-                  const isLocal = event.data.scope === 'local';
                   const isHighSeverity = (event.severity ?? 0) >= severityThreshold;
+                  const isNews = event.type === 'news';
+                  const isLocal = isNews && (event as NewsEvent).data.scope === 'local';
                   return (
                     <Fragment key={`${event.id}-${index}`}>
                       <button

@@ -105,7 +105,9 @@ describe('Dashboard', () => {
       // Both LeftColumn and RightColumn switch to the portrait band layout
       expect(container.querySelectorAll('.overflow-x-auto')).toHaveLength(2);
       // Both columns still render every widget, just re-flowed -- see LeftColumn/RightColumn tests
-      expect(screen.getAllByText('NO ACTIVE EVENTS').length).toBe(3);
+      // GeologicTicker + NightSkyTicker show "NO ACTIVE EVENTS"; bottom Ticker shows "AWAITING DATA..."
+      expect(screen.getAllByText('NO ACTIVE EVENTS').length).toBe(2);
+      expect(screen.getByText('AWAITING DATA...')).toBeInTheDocument();
     });
   });
 });
