@@ -178,7 +178,7 @@ httpServer.listen(PORT, () => {
     addEvents(events);
   });
 
-  setCollectors(collectors);
+  setCollectors(collectors, registry.getSkippedManifests());
 
   // Wire disable notifications
   for (const c of collectors) {

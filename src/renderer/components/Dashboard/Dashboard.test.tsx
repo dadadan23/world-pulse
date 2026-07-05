@@ -62,10 +62,12 @@ describe('Dashboard', () => {
     expect(screen.getByText('DATA SOURCES')).toBeInTheDocument();
   });
 
-  it('renders the Ticker and side-column tickers with empty state message when no events', () => {
+  it('renders the Ticker and side-column tickers with empty state messages when no events', () => {
     render(<Dashboard />);
-    // Bottom Ticker, GeologicTicker, and NightSkyTicker all show this empty state
-    expect(screen.getAllByText('NO ACTIVE EVENTS').length).toBe(3);
+    // GeologicTicker and NightSkyTicker show "NO ACTIVE EVENTS"
+    expect(screen.getAllByText('NO ACTIVE EVENTS').length).toBe(2);
+    // Bottom Ticker shows "AWAITING DATA..." when no events of any type exist
+    expect(screen.getByText('AWAITING DATA...')).toBeInTheDocument();
   });
 
   it('does not render SkyMapModal when skyMapOpen is false', () => {
@@ -103,7 +105,9 @@ describe('Dashboard', () => {
       // Both LeftColumn and RightColumn switch to the portrait band layout
       expect(container.querySelectorAll('.overflow-x-auto')).toHaveLength(2);
       // Both columns still render every widget, just re-flowed -- see LeftColumn/RightColumn tests
-      expect(screen.getAllByText('NO ACTIVE EVENTS').length).toBe(3);
+      // GeologicTicker + NightSkyTicker show "NO ACTIVE EVENTS"; bottom Ticker shows "AWAITING DATA..."
+      expect(screen.getAllByText('NO ACTIVE EVENTS').length).toBe(2);
+      expect(screen.getByText('AWAITING DATA...')).toBeInTheDocument();
     });
   });
 });

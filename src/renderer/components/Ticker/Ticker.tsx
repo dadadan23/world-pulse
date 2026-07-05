@@ -7,7 +7,7 @@ import { getEventIndicator } from '../../utils/eventIndicators';
 import { isSelectedEvent } from '../../utils/isSelectedEvent';
 import { sortBySeverityThenRecency } from '../../utils/severityOrder';
 import { SeverityPulseBadge } from '../SeverityPulseBadge/SeverityPulseBadge';
-import type { NewsEvent } from '@shared/types';
+import type { Event, NewsEvent } from '@shared/types';
 
 const MAX_HEADLINES = 10;
 
@@ -17,10 +17,15 @@ export function Ticker() {
   const setSelectedEvent = useAppStore((state) => state.setSelectedEvent);
   const severityThreshold = useSettingsStore((state) => state.severityThreshold);
 
-  const tickerEvents = sortBySeverityThenRecency(
+  const newsEvents = sortBySeverityThenRecency(
     events.filter((e): e is NewsEvent => e.type === 'news'),
     severityThreshold
   ).slice(0, MAX_HEADLINES);
+
+  const usingFallback = newsEvents.length === 0;
+  const tickerEvents: Event[] = usingFallback
+    ? sortBySeverityThenRecency(events, severityThreshold).slice(0, MAX_HEADLINES)
+    : newsEvents;
 
   return (
     <div
@@ -41,8 +46,9 @@ export function Ticker() {
                 {[...tickerEvents, ...tickerEvents].map((event, index) => {
                   const indicator = getEventIndicator(event.type, event.severity);
                   const isSelected = isSelectedEvent(event, selectedEvent);
-                  const isLocal = event.data.scope === 'local';
                   const isHighSeverity = (event.severity ?? 0) >= severityThreshold;
+                  const isNews = event.type === 'news';
+                  const isLocal = isNews && (event as NewsEvent).data.scope === 'local';
                   return (
                     <Fragment key={`${event.id}-${index}`}>
                       <button
@@ -56,9 +62,13 @@ export function Ticker() {
                           {indicator.symbol}
                         </span>
                         {isHighSeverity && <SeverityPulseBadge severity={event.severity ?? 0} />}
-                        <span className={`ob-label ${isLocal ? 'text-ob-amber' : 'text-ob-cyan'}`}>
-                          {isLocal ? '[NEAR YOU]' : '[GLOBAL]'}
-                        </span>
+                        {isNews && (
+                          <span
+                            className={`ob-label ${isLocal ? 'text-ob-amber' : 'text-ob-cyan'}`}
+                          >
+                            {isLocal ? '[NEAR YOU]' : '[GLOBAL]'}
+                          </span>
+                        )}
                         <span className="text-ob-text text-[11px] truncate max-w-[36ch]">
                           {event.title}
                         </span>
@@ -71,7 +81,7 @@ export function Ticker() {
                 })}
               </>
             ) : (
-              <span className="ob-label text-ob-cyan px-6">NO ACTIVE EVENTS</span>
+              <span className="ob-label text-ob-cyan px-6">AWAITING DATA...</span>
             )}
           </div>
         </div>

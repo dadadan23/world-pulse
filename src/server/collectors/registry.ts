@@ -18,6 +18,7 @@ interface CollectorRegistration {
 export class CollectorRegistry {
   private registrations: CollectorRegistration[] = [];
   private active: BaseCollector[] = [];
+  private skipped: CollectorManifest[] = [];
 
   /**
    * Register a collector module.
@@ -56,6 +57,7 @@ export class CollectorRegistry {
           console.warn(
             `[Registry] Skipping "${manifest.id}": missing required env vars: ${missing.join(', ')}`
           );
+          this.skipped.push(manifest);
           continue;
         }
       }
@@ -109,5 +111,10 @@ export class CollectorRegistry {
   /** Returns a snapshot of the currently active collector instances. */
   getCollectors(): BaseCollector[] {
     return [...this.active];
+  }
+
+  /** Returns manifests for collectors skipped due to missing required env vars. */
+  getSkippedManifests(): CollectorManifest[] {
+    return [...this.skipped];
   }
 }

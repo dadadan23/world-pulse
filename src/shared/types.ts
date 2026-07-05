@@ -224,7 +224,7 @@ export interface DataCollector {
 /**
  * Collector health status for API responses
  */
-export type CollectorHealthStatus = 'healthy' | 'degraded' | 'disabled';
+export type CollectorHealthStatus = 'healthy' | 'degraded' | 'disabled' | 'unconfigured';
 
 /**
  * Quality tier for data collectors.

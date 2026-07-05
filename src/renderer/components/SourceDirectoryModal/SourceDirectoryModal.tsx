@@ -13,6 +13,7 @@ const BADGE_STATE: Record<
   healthy: 'nominal',
   degraded: 'warning',
   disabled: 'critical',
+  unconfigured: 'warning',
   unknown: 'info',
 };
 
@@ -20,6 +21,7 @@ const STATUS_LABELS: Record<SourceDirectoryEntry['status'], string> = {
   healthy: 'LIVE',
   degraded: 'DEGRADED',
   disabled: 'DISABLED',
+  unconfigured: 'KEY MISSING',
   unknown: 'UNKNOWN',
 };
 
