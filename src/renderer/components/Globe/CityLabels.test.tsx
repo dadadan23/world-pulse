@@ -14,6 +14,33 @@ describe('CityLabels', () => {
     expect(container).toBeTruthy();
   });
 
+  it('should render tier 2 cities when zoomed in (camera distance < 3.5)', () => {
+    const { container } = render(
+      <Canvas>
+        <CityLabels cameraDistance={2.0} featuredEventLocation={null} />
+      </Canvas>
+    );
+    expect(container).toBeTruthy();
+  });
+
+  it('should render tier 3 cities near a featured event', () => {
+    const { container } = render(
+      <Canvas>
+        <CityLabels cameraDistance={5} featuredEventLocation={{ lat: 40.71, lon: -74.01 }} />
+      </Canvas>
+    );
+    expect(container).toBeTruthy();
+  });
+
+  it('should not show tier 3 cities far from a featured event', () => {
+    const { container } = render(
+      <Canvas>
+        <CityLabels cameraDistance={5} featuredEventLocation={{ lat: 89, lon: 179 }} />
+      </Canvas>
+    );
+    expect(container).toBeTruthy();
+  });
+
   it('should show tier 1 cities when not zoomed', () => {
     // Tier 1 cities should be visible at default camera distance (2.4)
     const tier1Cities = getCitiesByTier(1);

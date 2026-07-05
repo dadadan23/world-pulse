@@ -16,10 +16,12 @@
   },
   "engineer": {
     "role": "engineer",
-    "status": "complete",
-    "issue": "39,161",
-    "branch": "claude/story-39-dedicated-display-perf",
-    "startedAt": "2026-06-27T16:47:16Z"
+    "status": "active",
+    "issue": "232,233,236,237,238,241,242",
+    "branch": "claude/next-stories-72lncb",
+    "startedAt": "2026-07-05T00:00:00Z",
+    "completedAt": null,
+    "artifacts": []
   },
   "reviewer": {
     "status": "idle",

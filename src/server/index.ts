@@ -9,6 +9,7 @@ import { VolcanoCollector } from './collectors/volcanoes';
 import { PlanetCollector } from './collectors/planets';
 import { WeatherCollector } from './collectors/weather';
 import { HistoricalCollector } from './collectors/historical';
+import { NewsCollector } from './collectors/news';
 import type { CollectorManifest } from '@shared/types';
 
 // Load environment variables — .env.local (gitignored, local dev) takes precedence over .env
@@ -38,6 +39,7 @@ const manifests: {
     | typeof PlanetCollector
     | typeof WeatherCollector
     | typeof HistoricalCollector
+    | typeof NewsCollector
   >;
 }[] = [
   {
@@ -143,6 +145,20 @@ const manifests: {
     },
     factory: () => new HistoricalCollector(),
   },
+  {
+    manifest: {
+      id: 'news',
+      version: '1.0.0',
+      displayName: 'Global Headlines',
+      capabilities: ['news'],
+      qualityTier: 'primary',
+      enabledByDefault: true,
+      description: 'Global top headline news from NewsAPI.',
+      sourceUrl: 'https://newsapi.org/',
+      requiredEnvVars: ['NEWSAPI_KEY'],
+    },
+    factory: () => new NewsCollector(),
+  },
 ];
 
 for (const { manifest, factory } of manifests) {
@@ -162,7 +178,7 @@ httpServer.listen(PORT, () => {
     addEvents(events);
   });
 
-  setCollectors(collectors);
+  setCollectors(collectors, registry.getSkippedManifests());
 
   // Wire disable notifications
   for (const c of collectors) {
@@ -184,14 +200,17 @@ httpServer.listen(PORT, () => {
 });
 
 // Graceful shutdown
-process.on('SIGTERM', () => {
-  console.warn('[Server] SIGTERM received, shutting down gracefully');
+function shutdown(signal: string) {
+  console.warn(`[Server] ${signal} received, shutting down gracefully`);
   registry.stop();
   httpServer.close(() => {
     console.warn('[Server] HTTP server closed');
     process.exit(0);
   });
-});
+}
+
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));
 
 process.on('uncaughtException', (error) => {
   console.error('[Server] Uncaught exception:', error);

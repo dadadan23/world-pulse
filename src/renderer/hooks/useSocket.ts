@@ -1,9 +1,10 @@
 import { useEffect, useRef } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { useAppStore } from '../store/useAppStore';
+import { useSettingsStore } from '../store/useSettingsStore';
+import { armChimeOnFirstInteraction, playChime, shouldPlayChime } from '../utils/chime';
+import { SERVER_URL } from '../config';
 import type { Event } from '@shared/types';
-
-const SERVER_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:3000';
 
 /** Dormant retry interval after Socket.io exhausts its reconnection attempts */
 const DORMANT_RETRY_MS = 30_000;
@@ -20,6 +21,9 @@ export function useSocket() {
     useAppStore();
 
   useEffect(() => {
+    // Arm the opt-in audio chime as soon as the user first interacts with the page
+    armChimeOnFirstInteraction();
+
     // Fetch initial server status
     const checkServerStatus = async () => {
       try {
@@ -101,6 +105,14 @@ export function useSocket() {
     socket.on('events:new', (data: EventsPayload) => {
       console.warn(`[Socket] Received ${data.events.length} new events`);
       addEvents(data.events);
+
+      const { audioChimeEnabled, severityThreshold, mutedEventTypes } = useSettingsStore.getState();
+      if (
+        audioChimeEnabled &&
+        shouldPlayChime(data.events, { mutedEventTypes, severityThreshold })
+      ) {
+        playChime();
+      }
     });
 
     // Cleanup on unmount

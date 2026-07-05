@@ -33,7 +33,7 @@ jobs:
   # ── 1. Extract all issue numbers from closing keywords ──────────────────
   extract-issues:
     name: Extract linked issues
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     outputs:
       issue_numbers: ${{ steps.extract.outputs.issue_numbers }}
       has_issues: ${{ steps.extract.outputs.has_issues }}
@@ -98,7 +98,7 @@ jobs:
     if: |
       needs.extract-issues.outputs.has_issues == 'true' &&
       (github.event.action == 'opened' || github.event.action == 'reopened')
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     steps:
       - name: Ensure status:in-progress label exists
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
@@ -214,7 +214,7 @@ jobs:
       needs.extract-issues.outputs.has_issues == 'true' &&
       github.event.action == 'closed' &&
       github.event.pull_request.merged == true
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     steps:
       - name: Update Projects v2 status to Done
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
@@ -294,7 +294,7 @@ jobs:
       needs.extract-issues.outputs.has_issues == 'true' &&
       github.event.action == 'closed' &&
       github.event.pull_request.merged == false
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     steps:
       - name: Revert Projects v2 status to Ready
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0

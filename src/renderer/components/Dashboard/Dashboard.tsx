@@ -1,9 +1,11 @@
 import { useGeolocation } from '../../hooks/useGeolocation';
+import { useOrientation } from '../../hooks/useOrientation';
 import { Globe } from '../Globe/Globe';
 import { HudStatusPanel } from '../HudStatusPanel/HudStatusPanel';
 import { HudCollectorPanel } from '../HudCollectorPanel/HudCollectorPanel';
 import { HudEventPanel } from '../HudEventPanel/HudEventPanel';
 import { LeftColumn, RightColumn } from '../SideColumns';
+import { SettingsModal, SettingsTrigger } from '../SettingsModal';
 import { SkyMapModal } from '../SkyMapModal/SkyMapModal';
 import { SourceDirectoryModal } from '../SourceDirectoryModal/SourceDirectoryModal';
 import { Ticker } from '../Ticker/Ticker';
@@ -17,6 +19,7 @@ import { PrimaryDegradedBanner } from '../PrimaryDegradedBanner/PrimaryDegradedB
 export function Dashboard() {
   // Request geolocation once on mount; result stored in Zustand
   useGeolocation();
+  const isPortrait = useOrientation();
 
   return (
     <div className="relative w-screen h-screen overflow-hidden bg-ob-bg-primary">
@@ -39,9 +42,14 @@ export function Dashboard() {
       {/* Top-right: collector badges + sky map toggle */}
       <HudCollectorPanel />
 
-      {/* Left/right side columns: mission-control telemetry widgets, z-10 */}
-      <LeftColumn />
-      <RightColumn />
+      {/* Settings trigger icon + slide-in modal (Modals z-50+ layer) */}
+      <SettingsTrigger />
+      <SettingsModal />
+
+      {/* Left/right side columns: mission-control telemetry widgets, z-10.
+          Stack into full-width bands in portrait orientation (DESIGN.md addendum). */}
+      <LeftColumn isPortrait={isPortrait} />
+      <RightColumn isPortrait={isPortrait} />
 
       {/* Right center: event detail slide-in */}
       <HudEventPanel />

@@ -1,12 +1,20 @@
 import express from 'express';
 import cors from 'cors';
+import helmet from 'helmet';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
-import type { Event, CollectorHealth, CollectorHealthStatus } from '@shared/types';
+import type {
+  Event,
+  CollectorHealth,
+  CollectorHealthStatus,
+  CollectorManifest,
+  WeatherEvent,
+} from '@shared/types';
 import type { BaseCollector } from './collectors/base';
+import { fetchWeatherData } from './collectors/weatherClient';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 /** Built frontend assets, produced by `vite build` (see vite.config.ts outDir). */
@@ -41,10 +49,11 @@ function toCollectorHealth(collector: BaseCollector): CollectorHealth {
 
 export function createApp(options?: { corsOrigin?: string }) {
   const app = express();
+  const corsOrigin = options?.corsOrigin ?? 'http://localhost:5173';
   const httpServer = createServer(app);
   const io = new Server(httpServer, {
     cors: {
-      origin: options?.corsOrigin || 'http://localhost:5173',
+      origin: corsOrigin,
       methods: ['GET', 'POST'],
     },
   });
@@ -56,21 +65,41 @@ export function createApp(options?: { corsOrigin?: string }) {
   /** Sweep interval in milliseconds (default: 60 seconds) */
   const SWEEP_INTERVAL_MS = 60 * 1000;
   let collectors: BaseCollector[] = [];
+  let skippedManifests: CollectorManifest[] = [];
   let sweepTimer: ReturnType<typeof setInterval> | null = null;
 
-  /** Remove events older than EVENT_TTL_MS and notify clients */
+  /** Short-lived cache for on-demand weather lookups, keyed by rounded coordinates. */
+  const weatherCache = new Map<string, { data: WeatherEvent['data']; expiresAt: number }>();
+  const WEATHER_CACHE_TTL_MS = 10 * 60 * 1000;
+
+  /** Simple in-process rate limiter for /api/weather: max 10 requests per IP per minute. */
+  const weatherRateMap = new Map<string, { count: number; resetAt: number }>();
+  const WEATHER_RATE_LIMIT = 10;
+  const WEATHER_RATE_WINDOW_MS = 60 * 1000;
+
+  /** Remove events older than EVENT_TTL_MS, evict expired weather cache entries, notify clients */
   function sweepStaleEvents() {
-    const cutoff = Date.now() - EVENT_TTL_MS;
+    const now = Date.now();
+    const cutoff = now - EVENT_TTL_MS;
     const before = eventCache.length;
     eventCache = eventCache.filter((e) => e.timestamp >= cutoff);
     const expired = before - eventCache.length;
     if (expired > 0) {
-      io.emit('events:expired', { count: expired, timestamp: Date.now() });
+      io.emit('events:expired', { count: expired, timestamp: now });
+    }
+    // Evict expired weather cache entries to prevent unbounded growth on 24/7 deployments
+    for (const [key, entry] of weatherCache) {
+      if (entry.expiresAt <= now) weatherCache.delete(key);
+    }
+    // Evict stale rate-limit buckets
+    for (const [ip, bucket] of weatherRateMap) {
+      if (bucket.resetAt <= now) weatherRateMap.delete(ip);
     }
   }
 
   // Middleware
-  app.use(cors({ origin: options?.corsOrigin || 'http://localhost:5173' }));
+  app.use(helmet());
+  app.use(cors({ origin: corsOrigin }));
   app.use(express.json());
 
   // Health check endpoint
@@ -97,6 +126,17 @@ export function createApp(options?: { corsOrigin?: string }) {
   // Status endpoint for frontend initialization
   app.get('/api/status', (_req, res) => {
     const collectorHealth = collectors.map(toCollectorHealth);
+    const unconfigured: CollectorHealth[] = skippedManifests.map((m) => ({
+      name: m.displayName,
+      status: 'unconfigured',
+      lastFetchAt: null,
+      errorCount: 0,
+      isEnabled: false,
+      qualityTier: m.qualityTier,
+      intervalMs: 0,
+      isStale: false,
+    }));
+    const allHealth = [...collectorHealth, ...unconfigured];
     const healthyCount = collectorHealth.filter((c) => c.status === 'healthy').length;
     const primaryCollectors = collectorHealth.filter((c) => c.qualityTier === 'primary');
     const primaryAllHealthy =
@@ -106,8 +146,8 @@ export function createApp(options?: { corsOrigin?: string }) {
     res.json({
       status: overallStatus,
       timestamp: new Date().toISOString(),
-      collectors: collectorHealth,
-      collectorsTotal: collectorHealth.length,
+      collectors: allHealth,
+      collectorsTotal: allHealth.length,
       collectorsHealthy: healthyCount,
       eventCount: eventCache.length,
     });
@@ -119,6 +159,66 @@ export function createApp(options?: { corsOrigin?: string }) {
       events: eventCache,
       timestamp: new Date().toISOString(),
     });
+  });
+
+  // On-demand weather lookup for a given coordinate (client geolocation or a
+  // selected event's location). Distinct from the WeatherCollector's ambient
+  // broadcast, which always reflects the server's own IP-detected location.
+  app.get('/api/weather', async (req, res) => {
+    // Rate limit: 10 requests per IP per minute to protect the upstream API key
+    const ip = String(req.ip ?? 'unknown');
+    const now = Date.now();
+    const bucket = weatherRateMap.get(ip);
+    if (bucket && bucket.resetAt > now) {
+      if (bucket.count >= WEATHER_RATE_LIMIT) {
+        res.status(429).json({ error: 'rate_limited', message: 'Too many requests' });
+        return;
+      }
+      bucket.count++;
+    } else {
+      weatherRateMap.set(ip, { count: 1, resetAt: now + WEATHER_RATE_WINDOW_MS });
+    }
+
+    const lat = Number(req.query.lat);
+    const lon = Number(req.query.lon);
+    const name = typeof req.query.name === 'string' ? req.query.name : 'Unknown location';
+
+    if (
+      !Number.isFinite(lat) ||
+      !Number.isFinite(lon) ||
+      lat < -90 ||
+      lat > 90 ||
+      lon < -180 ||
+      lon > 180
+    ) {
+      res.status(400).json({ error: 'invalid_coordinates' });
+      return;
+    }
+
+    const apiKey = process.env.OPENWEATHER_API_KEY;
+    if (!apiKey) {
+      res.status(503).json({
+        error: 'not_configured',
+        message: 'OPENWEATHER_API_KEY is not set on the server',
+      });
+      return;
+    }
+
+    const cacheKey = `${lat.toFixed(2)},${lon.toFixed(2)}`;
+    const cached = weatherCache.get(cacheKey);
+    if (cached && cached.expiresAt > Date.now()) {
+      res.json({ data: cached.data, timestamp: new Date().toISOString() });
+      return;
+    }
+
+    try {
+      const { data } = await fetchWeatherData(lat, lon, apiKey, name);
+      weatherCache.set(cacheKey, { data, expiresAt: Date.now() + WEATHER_CACHE_TTL_MS });
+      res.json({ data, timestamp: new Date().toISOString() });
+    } catch (err) {
+      console.error('[API] /api/weather fetch failed:', err);
+      res.status(502).json({ error: 'fetch_failed', message: 'Failed to fetch weather data' });
+    }
   });
 
   // Serve the built frontend (single-container deployment). In dev/test the
@@ -164,8 +264,9 @@ export function createApp(options?: { corsOrigin?: string }) {
     getEventCache() {
       return eventCache;
     },
-    setCollectors(c: BaseCollector[]) {
+    setCollectors(c: BaseCollector[], skipped: CollectorManifest[] = []) {
       collectors = c;
+      skippedManifests = skipped;
     },
     startSweep() {
       if (!sweepTimer) {

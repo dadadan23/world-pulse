@@ -1,9 +1,3 @@
-/* eslint-disable react/no-unknown-property */
-/*
-  react-three-fiber uses Three.js-specific JSX props (e.g., depthTest, sizeAttenuation)
-  which ESLint incorrectly flags as unknown DOM props. Disable the rule for this file.
-*/
-
 import { useMemo } from 'react';
 import { CITIES, type CityData } from './cityData';
 import { latLonToVector3 } from './projection';

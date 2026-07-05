@@ -134,8 +134,9 @@ export interface NewsEvent extends Event {
     headline: string;
     publisher: string;
     url: string;
-    sentiment: number; // -1 to 1 (negative to positive)
+    sentiment?: number; // -1 to 1 (negative to positive); not provided by all sources
     category: string;
+    scope: 'global' | 'local'; // 'global' = top headlines, 'local' = IP-geolocated "near you"
   };
 }
 
@@ -223,7 +224,7 @@ export interface DataCollector {
 /**
  * Collector health status for API responses
  */
-export type CollectorHealthStatus = 'healthy' | 'degraded' | 'disabled';
+export type CollectorHealthStatus = 'healthy' | 'degraded' | 'disabled' | 'unconfigured';
 
 /**
  * Quality tier for data collectors.

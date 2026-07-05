@@ -1,5 +1,10 @@
+import { useEffect, useState } from 'react';
 import { useAppStore } from '../../store/useAppStore';
+import { useWeatherData, type WeatherState } from '../../hooks/useWeatherData';
 import type { WeatherEvent, ForecastDay, PlanetEvent } from '@shared/types';
+
+/** How long to wait for the ambient (IP-based) weather broadcast before giving up. */
+const BROADCAST_TIMEOUT_MS = 20_000;
 
 // Map OpenWeatherMap condition codes to a simple display symbol
 function conditionSymbol(code: number): string {
@@ -57,15 +62,60 @@ function ForecastStrip({ days }: { days: ForecastDay[] }) {
   );
 }
 
-export function WeatherWidget() {
-  const { events } = useAppStore();
+/**
+ * Tracks the legacy ambient weather broadcast (server IP-detected location),
+ * used only when there's no client geolocation or selected-event location to
+ * look up directly. Times out into 'unavailable' instead of spinning forever
+ * when the server never produces a weather event (e.g. missing API key).
+ */
+function useBroadcastWeatherFallback(weatherEvent: WeatherEvent | undefined): WeatherState {
+  const [timedOut, setTimedOut] = useState(false);
 
-  const weatherEvent = events.find((e): e is WeatherEvent => e.type === 'weather');
+  useEffect(() => {
+    if (weatherEvent) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional reset on event arrival, not a render-loop sync
+      setTimedOut(false);
+      return;
+    }
+    const timer = setTimeout(() => setTimedOut(true), BROADCAST_TIMEOUT_MS);
+    return () => clearTimeout(timer);
+  }, [weatherEvent]);
+
+  if (weatherEvent) return { status: 'ready', data: weatherEvent.data };
+  if (timedOut) return { status: 'unavailable', reason: 'fetch_failed' };
+  return { status: 'loading' };
+}
+
+export function WeatherWidget() {
+  const events = useAppStore((state) => state.events);
+  const selectedEvent = useAppStore((state) => state.selectedEvent);
+  const userLat = useAppStore((state) => state.userLat);
+  const userLon = useAppStore((state) => state.userLon);
+  const geolocationStatus = useAppStore((state) => state.geolocationStatus);
+
+  const broadcastWeatherEvent = events.find((e): e is WeatherEvent => e.type === 'weather');
   const moonEvent = events.find(
     (e): e is PlanetEvent => e.type === 'planet' && e.data.planetName === 'Moon'
   );
 
-  if (!weatherEvent) {
+  const eventLocation = selectedEvent?.location ?? null;
+  const hasClientLocation = geolocationStatus === 'granted' && userLat !== null && userLon !== null;
+
+  const activeLat = eventLocation ? eventLocation.lat : hasClientLocation ? userLat : null;
+  const activeLon = eventLocation ? eventLocation.lon : hasClientLocation ? userLon : null;
+  const activeName = eventLocation?.name;
+  const hasActiveLocation = activeLat !== null && activeLon !== null;
+
+  // Prefer an on-demand lookup for the client's own location or whatever event
+  // is selected; only fall back to the server's ambient default broadcast
+  // when neither is available (e.g. geolocation denied, nothing selected).
+  const restWeather = useWeatherData(activeLat, activeLon, activeName);
+  const broadcastWeather = useBroadcastWeatherFallback(broadcastWeatherEvent);
+  const weather = hasActiveLocation ? restWeather : broadcastWeather;
+
+  const isViewingEvent = eventLocation !== null;
+
+  if (weather.status === 'loading' || weather.status === 'idle') {
     return (
       <div className="ob-panel p-3">
         <div className="ob-panel-inner p-2 flex items-center justify-center h-full min-h-[80px]">
@@ -78,7 +128,27 @@ export function WeatherWidget() {
     );
   }
 
-  const d = weatherEvent.data;
+  if (weather.status === 'unavailable') {
+    const message =
+      weather.reason === 'not_configured'
+        ? 'OpenWeatherMap API key not configured'
+        : 'Unable to reach weather service';
+    return (
+      <div className="ob-panel p-3">
+        <div className="ob-panel-inner p-2 flex items-center justify-center h-full min-h-[80px]">
+          <div
+            className="flex flex-col items-center gap-1 text-center"
+            data-testid="weather-unavailable"
+          >
+            <span className="ob-label text-ob-amber">WEATHER UNAVAILABLE</span>
+            <span className="ob-label text-ob-text-dim text-[10px]">{message}</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const d = weather.data;
   const moonPhase = typeof moonEvent?.data.phase === 'number' ? moonEvent.data.phase : null;
 
   return (
@@ -86,7 +156,14 @@ export function WeatherWidget() {
       <div className="ob-panel-inner flex flex-col gap-2">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-ob-border pb-2">
-          <span className="ob-heading text-sm text-ob-text tracking-wide">WEATHER</span>
+          <span className="ob-heading text-sm text-ob-text tracking-wide flex items-center gap-1.5">
+            WEATHER
+            {isViewingEvent && (
+              <span className="ob-label text-ob-amber text-[9px]" data-testid="weather-event-badge">
+                EVENT LOCATION
+              </span>
+            )}
+          </span>
           <span className="ob-label text-ob-text-dim text-[10px] truncate max-w-[120px]">
             {d.locationName}
           </span>
