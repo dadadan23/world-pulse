@@ -1,3 +1,5 @@
+# See docs/RELEASE.md for how auto-update works and the manual recovery
+# path if a published release is broken.
 name: Release
 
 on:
@@ -14,10 +16,16 @@ jobs:
         include:
           - os: macos-latest
             artifact_name: release-macos
-            artifact_path: release/*.dmg
+            artifact_path: |
+              release/*.dmg
+              release/latest-mac.yml
+              release/*.blockmap
           - os: ubuntu-latest
             artifact_name: release-linux
-            artifact_path: release/*.AppImage
+            artifact_path: |
+              release/*.AppImage
+              release/latest-linux.yml
+              release/*.blockmap
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
@@ -59,7 +67,7 @@ jobs:
       - name: Upload release assets
         uses: softprops/action-gh-release@718ea10b132b3b2eba29c1007bb80653f286566b # v3.0.1
         with:
-          draft: true
+          draft: false
           prerelease: false
           fail_on_unmatched_files: false
           files: release-artifacts/**/*

@@ -7,6 +7,7 @@
 import axios from 'axios';
 import type { Event, NewsEvent } from '@shared/types';
 import { BaseCollector } from './base';
+import { getLocationOverride } from '../locationOverride';
 
 export interface NewsAPIArticle {
   source: { id: string | null; name: string };
@@ -30,7 +31,8 @@ interface IPGeoResponse {
 export class NewsCollector extends BaseCollector {
   private readonly apiUrl = 'https://newsapi.org/v2/top-headlines';
   private readonly ipGeoUrl = 'https://ipapi.co/json/';
-  private cachedCountryCode?: string;
+  /** IP-geolocated fallback, used only while no override country code is set. */
+  private ipCachedCountryCode?: string;
 
   constructor() {
     super('Global Headlines', 'news', 15 * 60 * 1000); // 15 minutes
@@ -42,13 +44,11 @@ export class NewsCollector extends BaseCollector {
       throw new Error('NEWSAPI_KEY not configured');
     }
 
-    if (!this.cachedCountryCode) {
-      this.cachedCountryCode = await this.detectCountryCode();
-    }
+    const countryCode = await this.resolveCountryCode();
 
     const results = await Promise.allSettled([
       this.fetchHeadlines(apiKey, 'global'),
-      this.fetchHeadlines(apiKey, 'local', this.cachedCountryCode),
+      this.fetchHeadlines(apiKey, 'local', countryCode),
     ]);
 
     // Only fail the whole poll (and count toward BaseCollector's backoff) when
@@ -94,6 +94,22 @@ export class NewsCollector extends BaseCollector {
     }
 
     return response.data.articles.map((article) => this.transform(article, scope));
+  }
+
+  /**
+   * Uses the settings-panel location override's country code when set (#234),
+   * skipping ipapi.co entirely; otherwise falls back to lazy-cached IP geolocation.
+   */
+  private async resolveCountryCode(): Promise<string> {
+    const override = getLocationOverride();
+    if (override) {
+      return (override.countryCode ?? 'GB').toUpperCase();
+    }
+
+    if (!this.ipCachedCountryCode) {
+      this.ipCachedCountryCode = await this.detectCountryCode();
+    }
+    return this.ipCachedCountryCode;
   }
 
   private async detectCountryCode(): Promise<string> {

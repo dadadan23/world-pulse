@@ -9,6 +9,7 @@ describe('useSettingsStore', () => {
       tickerSpeed: 'normal',
       severityThreshold: DEFAULT_SEVERITY_THRESHOLD,
       audioChimeEnabled: false,
+      locationOverride: null,
     });
   });
 
@@ -62,6 +63,20 @@ describe('useSettingsStore', () => {
   it('sets ticker speed', () => {
     useSettingsStore.getState().setTickerSpeed('fast');
     expect(useSettingsStore.getState().tickerSpeed).toBe('fast');
+  });
+
+  it('defaults locationOverride to null and can set/clear it', () => {
+    expect(useSettingsStore.getState().locationOverride).toBeNull();
+
+    useSettingsStore.getState().setLocationOverride({ lat: 48.86, lon: 2.35, name: 'Paris, FR' });
+    expect(useSettingsStore.getState().locationOverride).toEqual({
+      lat: 48.86,
+      lon: 2.35,
+      name: 'Paris, FR',
+    });
+
+    useSettingsStore.getState().setLocationOverride(null);
+    expect(useSettingsStore.getState().locationOverride).toBeNull();
   });
 
   it('persists state to localStorage and rehydrates on reload', () => {

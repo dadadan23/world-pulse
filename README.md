@@ -119,6 +119,7 @@ npm run build:electron   # Package desktop app
 - [Technical Specification](./SPEC.md) - Architecture, tech stack, roadmap
 - [Contributing Guide](./CONTRIBUTING.md) - Development workflow
 - [Architecture Overview](./ARCHITECTURE.md) - System design
+- [Release Process & Manual Recovery](./docs/RELEASE.md) - How releases publish, how auto-update works, and how to roll back a broken release
 - [docs/](./docs) - ADRs, specs, and prototypes per feature
 
 ---

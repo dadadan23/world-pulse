@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { SettingsModal } from './SettingsModal';
 import { SettingsTrigger } from './SettingsTrigger';
@@ -14,7 +14,13 @@ describe('SettingsModal + SettingsTrigger', () => {
       tickerSpeed: 'normal',
       severityThreshold: DEFAULT_SEVERITY_THRESHOLD,
       audioChimeEnabled: false,
+      locationOverride: null,
     });
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => ({}) }));
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   it('opens the modal when the trigger icon is clicked', async () => {
@@ -103,5 +109,67 @@ describe('SettingsModal + SettingsTrigger', () => {
 
     await user.click(screen.getByRole('button', { name: /audio chime/i }));
     expect(useSettingsStore.getState().audioChimeEnabled).toBe(true);
+  });
+
+  describe('near you location override (#234)', () => {
+    it('rejects an out-of-range latitude with an inline error, without calling the server', async () => {
+      const user = userEvent.setup();
+      useAppStore.setState({ settingsOpen: true });
+      render(<SettingsModal />);
+
+      await user.type(screen.getByLabelText('Latitude'), '999');
+      await user.type(screen.getByLabelText('Longitude'), '10');
+      await user.click(screen.getByRole('button', { name: 'SAVE' }));
+
+      expect(await screen.findByRole('alert')).toHaveTextContent(/latitude/i);
+      expect(global.fetch).not.toHaveBeenCalled();
+      expect(useSettingsStore.getState().locationOverride).toBeNull();
+    });
+
+    it('saves a valid override to the server and reflects it as ACTIVE', async () => {
+      const user = userEvent.setup();
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue({
+          ok: true,
+          json: async () => ({ override: { lat: 40.71, lon: -74.0, name: 'New York, US' } }),
+        })
+      );
+      useAppStore.setState({ settingsOpen: true });
+      render(<SettingsModal />);
+
+      await user.type(screen.getByLabelText('Latitude'), '40.71');
+      await user.type(screen.getByLabelText('Longitude'), '-74.0');
+      await user.type(screen.getByLabelText('Location display name'), 'New York, US');
+      await user.click(screen.getByRole('button', { name: 'SAVE' }));
+
+      await waitFor(() =>
+        expect(useSettingsStore.getState().locationOverride).toEqual({
+          lat: 40.71,
+          lon: -74.0,
+          name: 'New York, US',
+        })
+      );
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringContaining('/api/settings/location'),
+        expect.objectContaining({ method: 'POST' })
+      );
+      expect(screen.getByText(/ACTIVE:/)).toHaveTextContent('New York, US');
+    });
+
+    it('disables CLEAR when no override is set, and clears it via the server when one is', async () => {
+      const user = userEvent.setup();
+      useAppStore.setState({ settingsOpen: true });
+      useSettingsStore.setState({ locationOverride: { lat: 1, lon: 2, name: 'Test' } });
+      render(<SettingsModal />);
+
+      await user.click(screen.getByRole('button', { name: 'CLEAR' }));
+
+      await waitFor(() => expect(useSettingsStore.getState().locationOverride).toBeNull());
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringContaining('/api/settings/location'),
+        expect.objectContaining({ method: 'DELETE' })
+      );
+    });
   });
 });

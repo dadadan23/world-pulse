@@ -6,10 +6,12 @@ import { fork, type ChildProcess } from 'child_process';
 import { is } from '@electron-toolkit/utils';
 import { createRestartController } from './restartController';
 import { waitForServer } from './serverHealthPoller';
+import { createUpdateManager, type UpdateManager } from './updateManager';
 
 let mainWindow: BrowserWindow | null = null;
 let serverProcess: ChildProcess | null = null;
 let isAppQuitting = false;
+let updateManager: UpdateManager | null = null;
 
 const SERVER_PORT = process.env.PORT || 3000;
 
@@ -187,6 +189,17 @@ app.whenReady().then(async () => {
       createWindow();
     }
   });
+
+  // electron-updater expects a real packaged app + published feed; skip it in dev.
+  if (app.isPackaged) {
+    updateManager = createUpdateManager({
+      logPath: path.join(app.getPath('logs'), 'world-pulse-update.log'),
+      onStatusChange: (status) => {
+        mainWindow?.webContents.send('update:status', status);
+      },
+    });
+    updateManager.start();
+  }
 });
 
 app.on('window-all-closed', () => {
@@ -198,4 +211,5 @@ app.on('window-all-closed', () => {
 
 app.on('before-quit', () => {
   stopBackendServer();
+  updateManager?.stop();
 });
