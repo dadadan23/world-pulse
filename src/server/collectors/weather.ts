@@ -7,6 +7,7 @@
 import axios from 'axios';
 import type { Event, WeatherEvent } from '@shared/types';
 import { BaseCollector } from './base';
+import { getLocationOverride } from '../locationOverride';
 import {
   fetchWeatherData,
   validateCurrentResponse,
@@ -22,7 +23,8 @@ interface IPGeoResponse {
 
 export class WeatherCollector extends BaseCollector {
   private readonly ipGeoUrl = 'https://ipapi.co/json/';
-  private cachedLocation: { lat: number; lon: number; name: string } | null = null;
+  /** IP-geolocated fallback, used only while no location override is set. */
+  private ipCachedLocation: { lat: number; lon: number; name: string } | null = null;
 
   constructor() {
     super('Local Weather', 'weather', 15 * 60 * 1000); // 15 minutes
@@ -34,11 +36,7 @@ export class WeatherCollector extends BaseCollector {
       throw new Error('OPENWEATHER_API_KEY not configured');
     }
 
-    if (!this.cachedLocation) {
-      this.cachedLocation = await this.detectLocation();
-    }
-
-    const { lat, lon, name } = this.cachedLocation;
+    const { lat, lon, name } = await this.resolveLocation();
 
     const { data, descriptionText } = await fetchWeatherData(lat, lon, apiKey, name);
 
@@ -59,6 +57,26 @@ export class WeatherCollector extends BaseCollector {
 
   validate(data: unknown): data is OWMCurrentResponse {
     return validateCurrentResponse(data);
+  }
+
+  /**
+   * Uses the settings-panel location override when set (#234); otherwise falls
+   * back to the existing lazy-cached IP geolocation.
+   */
+  private async resolveLocation(): Promise<{ lat: number; lon: number; name: string }> {
+    const override = getLocationOverride();
+    if (override) {
+      return {
+        lat: override.lat,
+        lon: override.lon,
+        name: override.name ?? `${override.lat.toFixed(2)}, ${override.lon.toFixed(2)}`,
+      };
+    }
+
+    if (!this.ipCachedLocation) {
+      this.ipCachedLocation = await this.detectLocation();
+    }
+    return this.ipCachedLocation;
   }
 
   private async detectLocation(): Promise<{ lat: number; lon: number; name: string }> {

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAppStore } from '../../store/useAppStore';
 import { useReverseGeocode } from '../../hooks/useReverseGeocode';
+import { useUpdateStatus } from '../../hooks/useUpdateStatus';
 
 function formatUTC(date: Date): string {
   return date.toLocaleTimeString('en-US', {
@@ -27,6 +28,7 @@ export function HudStatusPanel() {
   const userLon = useAppStore((state) => state.userLon);
   const geolocationStatus = useAppStore((state) => state.geolocationStatus);
   const placeName = useReverseGeocode(userLat, userLon);
+  const updateStatus = useUpdateStatus();
   const [time, setTime] = useState(new Date());
 
   useEffect(() => {
@@ -68,6 +70,20 @@ export function HudStatusPanel() {
           <span className="ob-label text-ob-text-dim">EVENTS</span>
           <span className="ob-label text-ob-cyan font-medium">{events.length}</span>
         </div>
+        {updateStatus !== 'idle' && (
+          <div className="flex justify-between items-center" aria-live="off">
+            <span className="ob-label text-ob-text-dim">UPDATE</span>
+            <span
+              className={`ob-label font-medium ${
+                updateStatus === 'ready' ? 'text-ob-success' : 'text-ob-text-dim'
+              }`}
+            >
+              {updateStatus === 'checking' && 'CHECKING'}
+              {updateStatus === 'downloading' && 'DOWNLOADING'}
+              {updateStatus === 'ready' && 'READY'}
+            </span>
+          </div>
+        )}
         {geolocationStatus !== 'pending' && (
           <div className="flex flex-col gap-0.5">
             <div className="flex justify-between items-center">

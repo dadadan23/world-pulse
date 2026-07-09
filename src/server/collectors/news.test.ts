@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { NewsCollector } from './news';
+import { setLocationOverride } from '../locationOverride';
 import axios from 'axios';
 
 vi.mock('axios');
@@ -61,6 +62,7 @@ describe('NewsCollector', () => {
     collector = new NewsCollector();
     vi.clearAllMocks();
     process.env.NEWSAPI_KEY = 'test-key';
+    setLocationOverride(null);
   });
 
   describe('constructor', () => {
@@ -236,6 +238,50 @@ describe('NewsCollector', () => {
 
       await expect(collector.fetch()).rejects.toBeInstanceOf(Error);
       await expect(collector.fetch()).rejects.toThrow(/global failure|local failure/);
+    });
+  });
+
+  describe('location override (#234)', () => {
+    it('uses the override country code instead of calling ipapi.co', async () => {
+      setLocationOverride({ lat: 48.86, lon: 2.35, name: 'Paris, FR', countryCode: 'fr' });
+      mockHeadlineRoutes({});
+
+      const events = await collector.fetch();
+      const localEvents = events.filter((e) => e.data.scope === 'local');
+
+      expect(localEvents).toHaveLength(1);
+      const geoCalls = mockedGet.mock.calls.filter(([url]) => (url as string).includes('ipapi.co'));
+      expect(geoCalls).toHaveLength(0);
+      const localCall = mockedGet.mock.calls.find(
+        ([, config]) => (config as { params?: Record<string, unknown> })?.params?.country
+      );
+      expect(localCall?.[1]).toMatchObject({ params: { country: 'FR' } });
+    });
+
+    it('falls back to the IP-geolocated country code when the override has no country code', async () => {
+      setLocationOverride({ lat: 48.86, lon: 2.35, name: 'Paris, FR' });
+      mockHeadlineRoutes({ geo: { data: { country_code: 'FR' } } });
+
+      await collector.fetch();
+
+      const geoCalls = mockedGet.mock.calls.filter(([url]) => (url as string).includes('ipapi.co'));
+      expect(geoCalls).toHaveLength(1);
+      const localCall = mockedGet.mock.calls.find(
+        ([, config]) => (config as { params?: Record<string, unknown> })?.params?.country
+      );
+      expect(localCall?.[1]).toMatchObject({ params: { country: 'FR' } });
+    });
+
+    it('resumes IP geolocation once the override is cleared', async () => {
+      setLocationOverride({ lat: 48.86, lon: 2.35, countryCode: 'fr' });
+      mockHeadlineRoutes({});
+      await collector.fetch();
+
+      setLocationOverride(null);
+      await collector.fetch();
+
+      const geoCalls = mockedGet.mock.calls.filter(([url]) => (url as string).includes('ipapi.co'));
+      expect(geoCalls).toHaveLength(1);
     });
   });
 });

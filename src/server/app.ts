@@ -15,6 +15,7 @@ import type {
 } from '@shared/types';
 import type { BaseCollector } from './collectors/base';
 import { fetchWeatherData } from './collectors/weatherClient';
+import { getLocationOverride, setLocationOverride } from './locationOverride';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 /** Built frontend assets, produced by `vite build` (see vite.config.ts outDir). */
@@ -219,6 +220,56 @@ export function createApp(options?: { corsOrigin?: string }) {
       console.error('[API] /api/weather fetch failed:', err);
       res.status(502).json({ error: 'fetch_failed', message: 'Failed to fetch weather data' });
     }
+  });
+
+  // "Near you" location override (#234): WeatherCollector/NewsCollector read
+  // this instead of IP-geolocating (ipapi.co) once it's set.
+  app.post('/api/settings/location', (req, res) => {
+    const body = req.body as Record<string, unknown> | null;
+    if (typeof body !== 'object' || body === null) {
+      res.status(400).json({ error: 'invalid_body' });
+      return;
+    }
+
+    const { lat, lon, name, countryCode } = body;
+
+    if (
+      typeof lat !== 'number' ||
+      !Number.isFinite(lat) ||
+      lat < -90 ||
+      lat > 90 ||
+      typeof lon !== 'number' ||
+      !Number.isFinite(lon) ||
+      lon < -180 ||
+      lon > 180
+    ) {
+      res.status(400).json({ error: 'invalid_coordinates' });
+      return;
+    }
+    if (name !== undefined && typeof name !== 'string') {
+      res.status(400).json({ error: 'invalid_name' });
+      return;
+    }
+    if (
+      countryCode !== undefined &&
+      (typeof countryCode !== 'string' || !/^[A-Za-z]{2}$/.test(countryCode))
+    ) {
+      res.status(400).json({ error: 'invalid_country_code' });
+      return;
+    }
+
+    setLocationOverride({
+      lat,
+      lon,
+      name: typeof name === 'string' && name.trim() !== '' ? name : undefined,
+      countryCode: typeof countryCode === 'string' ? countryCode.toUpperCase() : undefined,
+    });
+    res.json({ override: getLocationOverride() });
+  });
+
+  app.delete('/api/settings/location', (_req, res) => {
+    setLocationOverride(null);
+    res.json({ override: null });
   });
 
   // Serve the built frontend (single-container deployment). In dev/test the

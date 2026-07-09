@@ -8,11 +8,20 @@ export type TickerSpeed = 'slow' | 'normal' | 'fast';
 /** Default severity threshold at/above which ticker rows are pinned + pulsed. */
 export const DEFAULT_SEVERITY_THRESHOLD = SEVERITY_LEVELS.high;
 
+/** "Near you" location override (#234), mirrors src/server/locationOverride.ts. */
+export interface LocationOverride {
+  lat: number;
+  lon: number;
+  name?: string;
+  countryCode?: string;
+}
+
 interface SettingsState {
   mutedEventTypes: EventType[];
   tickerSpeed: TickerSpeed;
   severityThreshold: number;
   audioChimeEnabled: boolean;
+  locationOverride: LocationOverride | null;
 
   muteEventType: (type: EventType) => void;
   unmuteEventType: (type: EventType) => void;
@@ -20,6 +29,7 @@ interface SettingsState {
   setTickerSpeed: (speed: TickerSpeed) => void;
   setSeverityThreshold: (threshold: number) => void;
   setAudioChimeEnabled: (enabled: boolean) => void;
+  setLocationOverride: (override: LocationOverride | null) => void;
 }
 
 export const useSettingsStore = create<SettingsState>()(
@@ -29,6 +39,7 @@ export const useSettingsStore = create<SettingsState>()(
       tickerSpeed: 'normal',
       severityThreshold: DEFAULT_SEVERITY_THRESHOLD,
       audioChimeEnabled: false,
+      locationOverride: null,
 
       muteEventType: (type) => {
         const { mutedEventTypes } = get();
@@ -52,6 +63,7 @@ export const useSettingsStore = create<SettingsState>()(
       setTickerSpeed: (speed) => set({ tickerSpeed: speed }),
       setSeverityThreshold: (threshold) => set({ severityThreshold: threshold }),
       setAudioChimeEnabled: (enabled) => set({ audioChimeEnabled: enabled }),
+      setLocationOverride: (override) => set({ locationOverride: override }),
     }),
     {
       name: 'world-pulse-settings',

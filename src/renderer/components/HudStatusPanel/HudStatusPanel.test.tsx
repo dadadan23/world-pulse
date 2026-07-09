@@ -91,4 +91,23 @@ describe('HudStatusPanel', () => {
     render(<HudStatusPanel />);
     expect(screen.getByText('33.87S 70.65W')).toBeInTheDocument();
   });
+
+  it('hides the UPDATE row outside Electron (no window.electronAPI)', () => {
+    render(<HudStatusPanel />);
+    expect(screen.queryByText('UPDATE')).not.toBeInTheDocument();
+  });
+
+  it('shows a passive READY glyph once the main process reports an update is ready', () => {
+    window.electronAPI = {
+      platform: 'darwin',
+      onUpdateStatus: (callback) => {
+        callback('ready');
+        return () => {};
+      },
+    };
+    render(<HudStatusPanel />);
+    expect(screen.getByText('UPDATE')).toBeInTheDocument();
+    expect(screen.getByText('READY')).toBeInTheDocument();
+    delete window.electronAPI;
+  });
 });

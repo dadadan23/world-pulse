@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { WeatherCollector } from './weather';
+import { setLocationOverride } from '../locationOverride';
 import axios from 'axios';
 
 vi.mock('axios');
@@ -48,6 +49,7 @@ describe('WeatherCollector', () => {
     collector = new WeatherCollector();
     vi.clearAllMocks();
     process.env.OPENWEATHER_API_KEY = 'test-key';
+    setLocationOverride(null);
   });
 
   describe('constructor', () => {
@@ -177,6 +179,57 @@ describe('WeatherCollector', () => {
         .mockResolvedValueOnce(makeForecastResponse());
 
       await expect(collector.fetch()).rejects.toThrow('Invalid response from OpenWeatherMap');
+    });
+  });
+
+  describe('location override (#234)', () => {
+    it('uses the override coordinates instead of calling ipapi.co', async () => {
+      setLocationOverride({ lat: 48.86, lon: 2.35, name: 'Paris, FR' });
+      mockedGet
+        .mockResolvedValueOnce(makeCurrentResponse())
+        .mockResolvedValueOnce(makeForecastResponse());
+
+      const events = await collector.fetch();
+
+      expect(mockedGet).toHaveBeenCalledTimes(2); // current + forecast only, no IP geo lookup
+      expect(mockedGet.mock.calls.every(([url]) => !(url as string).includes('ipapi.co'))).toBe(
+        true
+      );
+      expect(events).toHaveLength(1);
+    });
+
+    it('queries OpenWeatherMap with the override coordinates', async () => {
+      setLocationOverride({ lat: 48.86, lon: 2.35 });
+      mockedGet
+        .mockResolvedValueOnce(makeCurrentResponse())
+        .mockResolvedValueOnce(makeForecastResponse());
+
+      await collector.fetch();
+
+      const currentCall = mockedGet.mock.calls.find(([url]) =>
+        (url as string).includes('/weather')
+      );
+      expect(currentCall?.[1]).toMatchObject({ params: { lat: 48.86, lon: 2.35 } });
+    });
+
+    it('resumes IP geolocation once the override is cleared', async () => {
+      setLocationOverride({ lat: 48.86, lon: 2.35, name: 'Paris, FR' });
+      mockedGet
+        .mockResolvedValueOnce(makeCurrentResponse())
+        .mockResolvedValueOnce(makeForecastResponse());
+      await collector.fetch();
+
+      setLocationOverride(null);
+      mockedGet
+        .mockResolvedValueOnce({
+          data: { latitude: 51.5, longitude: -0.1, city: 'London', country_name: 'UK' },
+        })
+        .mockResolvedValueOnce(makeCurrentResponse())
+        .mockResolvedValueOnce(makeForecastResponse());
+      await collector.fetch();
+
+      const geoCalls = mockedGet.mock.calls.filter(([url]) => (url as string).includes('ipapi.co'));
+      expect(geoCalls).toHaveLength(1);
     });
   });
 });
