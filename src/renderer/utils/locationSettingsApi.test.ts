@@ -32,7 +32,9 @@ describe('locationSettingsApi', () => {
   });
 
   it('sends a DELETE request to clear the override', async () => {
-    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ override: null }) });
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue({ ok: true, json: async () => ({ override: null }) });
     vi.stubGlobal('fetch', fetchMock);
 
     await clearLocationOverride();

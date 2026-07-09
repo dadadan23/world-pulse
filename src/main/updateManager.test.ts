@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import fs from 'fs';
 import type { AppUpdater } from 'electron-updater';
 import {
   createUpdateManager,
@@ -126,5 +127,21 @@ describe('createUpdateManager', () => {
     manager.start();
     vi.advanceTimersByTime(QUIET_HOURS_POLL_MS * 3);
     expect(updater.quitAndInstall).not.toHaveBeenCalled();
+  });
+
+  it('creates the log directory only once across many log lines', () => {
+    const mkdirSpy = vi.spyOn(fs, 'mkdirSync').mockImplementation(() => undefined);
+    vi.spyOn(fs, 'appendFileSync').mockImplementation(() => undefined);
+
+    createUpdateManager({
+      updater: updater as unknown as AppUpdater,
+      logPath: '/tmp/fake/world-pulse-update.log',
+    });
+
+    updater.emit('checking-for-update');
+    updater.emit('update-available', { version: '1.0.0' });
+    updater.emit('update-downloaded', { version: '1.0.0' });
+
+    expect(mkdirSpy).toHaveBeenCalledTimes(1);
   });
 });

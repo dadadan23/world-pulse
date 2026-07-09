@@ -258,18 +258,18 @@ describe('NewsCollector', () => {
       expect(localCall?.[1]).toMatchObject({ params: { country: 'FR' } });
     });
 
-    it('falls back to GB when the override has no country code, without calling ipapi.co', async () => {
+    it('falls back to the IP-geolocated country code when the override has no country code', async () => {
       setLocationOverride({ lat: 48.86, lon: 2.35, name: 'Paris, FR' });
-      mockHeadlineRoutes({});
+      mockHeadlineRoutes({ geo: { data: { country_code: 'FR' } } });
 
       await collector.fetch();
 
       const geoCalls = mockedGet.mock.calls.filter(([url]) => (url as string).includes('ipapi.co'));
-      expect(geoCalls).toHaveLength(0);
+      expect(geoCalls).toHaveLength(1);
       const localCall = mockedGet.mock.calls.find(
         ([, config]) => (config as { params?: Record<string, unknown> })?.params?.country
       );
-      expect(localCall?.[1]).toMatchObject({ params: { country: 'GB' } });
+      expect(localCall?.[1]).toMatchObject({ params: { country: 'FR' } });
     });
 
     it('resumes IP geolocation once the override is cleared', async () => {

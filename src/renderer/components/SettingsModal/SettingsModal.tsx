@@ -12,6 +12,7 @@ import { saveLocationOverride, clearLocationOverride } from '../../utils/locatio
 export function SettingsModal() {
   const settingsOpen = useAppStore((state) => state.settingsOpen);
   const setSettingsOpen = useAppStore((state) => state.setSettingsOpen);
+  const connectionStatus = useAppStore((state) => state.connectionStatus);
 
   const mutedEventTypes = useSettingsStore((state) => state.mutedEventTypes);
   const toggleEventTypeMuted = useSettingsStore((state) => state.toggleEventTypeMuted);
@@ -31,16 +32,21 @@ export function SettingsModal() {
   const [locationError, setLocationError] = useState<string | null>(null);
 
   // The override lives in server memory (not disk) -- re-assert a persisted
-  // override once on load in case the backend restarted since it was saved.
+  // override whenever we connect or reconnect to the backend (e.g. after a
+  // server restart, which would otherwise silently drop it server-side).
   useEffect(() => {
-    if (locationOverride) {
+    if (connectionStatus === 'connected' && locationOverride) {
       saveLocationOverride(locationOverride).catch(() => {});
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- run once on mount only
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- run on connection status changes
+  }, [connectionStatus]);
 
   async function handleSaveLocation(): Promise<void> {
     setLocationError(null);
+    if (latInput.trim() === '' || lonInput.trim() === '') {
+      setLocationError('LATITUDE AND LONGITUDE ARE REQUIRED');
+      return;
+    }
     const lat = Number(latInput);
     const lon = Number(lonInput);
 

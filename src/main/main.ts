@@ -199,6 +199,16 @@ app.whenReady().then(async () => {
       },
     });
     updateManager.start();
+
+    // A newly created window (e.g. re-opened from the macOS dock) only learns
+    // of the current status here -- onStatusChange only fires on transitions.
+    app.on('browser-window-created', (_event, window) => {
+      window.webContents.on('dom-ready', () => {
+        if (updateManager) {
+          window.webContents.send('update:status', updateManager.status);
+        }
+      });
+    });
   }
 });
 

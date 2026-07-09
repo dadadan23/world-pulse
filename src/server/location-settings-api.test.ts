@@ -48,9 +48,7 @@ describe('POST/DELETE /api/settings/location', () => {
 
   it('rejects an out-of-range latitude with 400 and does not persist it', async () => {
     const { app: expressApp } = setup();
-    const res = await request(expressApp)
-      .post('/api/settings/location')
-      .send({ lat: 999, lon: 2 });
+    const res = await request(expressApp).post('/api/settings/location').send({ lat: 999, lon: 2 });
 
     expect(res.status).toBe(400);
     expect(res.body.error).toBe('invalid_coordinates');
@@ -59,9 +57,7 @@ describe('POST/DELETE /api/settings/location', () => {
 
   it('rejects an out-of-range longitude with 400', async () => {
     const { app: expressApp } = setup();
-    const res = await request(expressApp)
-      .post('/api/settings/location')
-      .send({ lat: 1, lon: 999 });
+    const res = await request(expressApp).post('/api/settings/location').send({ lat: 1, lon: 999 });
 
     expect(res.status).toBe(400);
     expect(res.body.error).toBe('invalid_coordinates');

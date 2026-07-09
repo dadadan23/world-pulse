@@ -185,7 +185,9 @@ describe('WeatherCollector', () => {
   describe('location override (#234)', () => {
     it('uses the override coordinates instead of calling ipapi.co', async () => {
       setLocationOverride({ lat: 48.86, lon: 2.35, name: 'Paris, FR' });
-      mockedGet.mockResolvedValueOnce(makeCurrentResponse()).mockResolvedValueOnce(makeForecastResponse());
+      mockedGet
+        .mockResolvedValueOnce(makeCurrentResponse())
+        .mockResolvedValueOnce(makeForecastResponse());
 
       const events = await collector.fetch();
 
@@ -198,17 +200,23 @@ describe('WeatherCollector', () => {
 
     it('queries OpenWeatherMap with the override coordinates', async () => {
       setLocationOverride({ lat: 48.86, lon: 2.35 });
-      mockedGet.mockResolvedValueOnce(makeCurrentResponse()).mockResolvedValueOnce(makeForecastResponse());
+      mockedGet
+        .mockResolvedValueOnce(makeCurrentResponse())
+        .mockResolvedValueOnce(makeForecastResponse());
 
       await collector.fetch();
 
-      const currentCall = mockedGet.mock.calls.find(([url]) => (url as string).includes('/weather'));
+      const currentCall = mockedGet.mock.calls.find(([url]) =>
+        (url as string).includes('/weather')
+      );
       expect(currentCall?.[1]).toMatchObject({ params: { lat: 48.86, lon: 2.35 } });
     });
 
     it('resumes IP geolocation once the override is cleared', async () => {
       setLocationOverride({ lat: 48.86, lon: 2.35, name: 'Paris, FR' });
-      mockedGet.mockResolvedValueOnce(makeCurrentResponse()).mockResolvedValueOnce(makeForecastResponse());
+      mockedGet
+        .mockResolvedValueOnce(makeCurrentResponse())
+        .mockResolvedValueOnce(makeForecastResponse());
       await collector.fetch();
 
       setLocationOverride(null);

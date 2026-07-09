@@ -2,11 +2,7 @@ import { SERVER_URL } from '../config';
 import type { LocationOverride } from '../store/useSettingsStore';
 
 export type LocationSettingsError =
-  | 'invalid_coordinates'
-  | 'invalid_name'
-  | 'invalid_country_code'
-  | 'invalid_body'
-  | 'fetch_failed';
+  'invalid_coordinates' | 'invalid_name' | 'invalid_country_code' | 'invalid_body' | 'fetch_failed';
 
 interface LocationSettingsResponse {
   override: LocationOverride | null;

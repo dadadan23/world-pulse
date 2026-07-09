@@ -112,6 +112,36 @@ describe('SettingsModal + SettingsTrigger', () => {
   });
 
   describe('near you location override (#234)', () => {
+    it('rejects empty latitude/longitude instead of silently saving 0,0', async () => {
+      const user = userEvent.setup();
+      useAppStore.setState({ settingsOpen: true });
+      render(<SettingsModal />);
+
+      // Leave both fields blank and click SAVE directly.
+      await user.click(screen.getByRole('button', { name: 'SAVE' }));
+
+      expect(await screen.findByRole('alert')).toHaveTextContent(/required/i);
+      expect(global.fetch).not.toHaveBeenCalled();
+      expect(useSettingsStore.getState().locationOverride).toBeNull();
+    });
+
+    it('re-asserts a persisted override to the server when the connection (re)connects', async () => {
+      useSettingsStore.setState({ locationOverride: { lat: 1, lon: 2, name: 'Test' } });
+      useAppStore.setState({ settingsOpen: true, connectionStatus: 'connecting' });
+      render(<SettingsModal />);
+
+      expect(global.fetch).not.toHaveBeenCalled();
+
+      useAppStore.setState({ connectionStatus: 'connected' });
+
+      await waitFor(() =>
+        expect(global.fetch).toHaveBeenCalledWith(
+          expect.stringContaining('/api/settings/location'),
+          expect.objectContaining({ method: 'POST' })
+        )
+      );
+    });
+
     it('rejects an out-of-range latitude with an inline error, without calling the server', async () => {
       const user = userEvent.setup();
       useAppStore.setState({ settingsOpen: true });

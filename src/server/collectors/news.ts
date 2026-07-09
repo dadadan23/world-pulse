@@ -97,13 +97,15 @@ export class NewsCollector extends BaseCollector {
   }
 
   /**
-   * Uses the settings-panel location override's country code when set (#234),
-   * skipping ipapi.co entirely; otherwise falls back to lazy-cached IP geolocation.
+   * Uses the settings-panel location override's country code when set (#234).
+   * If the override omits a country code, falls back to lazy-cached IP
+   * geolocation rather than assuming a fixed default -- more accurate than
+   * guessing when the override was only meant to set lat/lon for weather.
    */
   private async resolveCountryCode(): Promise<string> {
     const override = getLocationOverride();
-    if (override) {
-      return (override.countryCode ?? 'GB').toUpperCase();
+    if (override?.countryCode) {
+      return override.countryCode.toUpperCase();
     }
 
     if (!this.ipCachedCountryCode) {

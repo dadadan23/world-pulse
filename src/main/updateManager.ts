@@ -60,12 +60,16 @@ export function createUpdateManager(options: UpdateManagerOptions = {}): UpdateM
   let updateReady = false;
   let checkTimer: ReturnType<typeof setInterval> | null = null;
   let quietHoursTimer: ReturnType<typeof setInterval> | null = null;
+  let logDirReady = false;
 
   function log(message: string): void {
     process.stdout.write(`[Updater] ${message}\n`);
     if (!options.logPath) return;
     try {
-      fs.mkdirSync(path.dirname(options.logPath), { recursive: true });
+      if (!logDirReady) {
+        fs.mkdirSync(path.dirname(options.logPath), { recursive: true });
+        logDirReady = true;
+      }
       fs.appendFileSync(options.logPath, `[${new Date().toISOString()}] ${message}\n`);
     } catch {
       // Never let logging failures affect the update flow.
