@@ -4,26 +4,42 @@
 
 World Pulse is a real-time information radiator that visualizes global events on an interactive 3D globe. It is designed to run 24/7 as an ambient dashboard on dedicated hardware (TV, iPad, monitor). The app streams live data from multiple sources (earthquakes, ISS tracking, aurora, volcanoes, asteroids, planet visibility) and renders them on a Three.js globe with a dark "Oblivion" aesthetic.
 
-**Current status:** v0.2.0 — Phase 1 (backend + MVP globe) is substantially complete; Phase 2 backlog (extensibility platform + historical context, epics #142/#143) is defined but needs refinement before engineering starts.
+**Current status:** v0.2.0+ — Phase 1 (MVP) and Phase 2 (extensibility platform + historical context, epics #142/#143) are both complete and closed, along with three further epics shipped since (#208 headline news ticker, #226/#227/#228/#229 ambient settings / adaptive layout / severity alerting / Electron auto-update). **The issue tracker currently has zero open issues.** There is no defined next phase — see "Backlog Refinement Findings" below.
 
 ---
 
-## Project Status (as of 2026-06-21)
+## Project Status (as of 2026-09-24)
 
 | Area | Status | Notes |
 |---|---|---|
-| CI/CD | Needs attention | Feature work is CI-green, but open Dependabot PRs (#176–#187) are currently failing on the Docker and Copilot Setup Steps workflows. |
-| Globe fidelity | ~95% done | Coastlines, boundaries, markers, atmosphere shipped (#41–44, #56, #57, #62 closed). Only graticule grid overlay remains (#45, P2/cosmetic). |
-| Oblivion design system | Done | Feature #46 and all its stories closed. |
-| Degraded UX | Done | Feature #26 and all its stories closed. |
-| Reliability (original scope) | Done | Feature #23, collector health/lifecycle (#28, #29), and registry/manifest work (#144, #147–149, via PR #170) all closed. |
-| Release readiness | Remaining: #39, #66 | #37 (Electron smoke) and #38 (quality gate checklist) shipped via PR #170. #39 (dedicated-display perf) is now unblocked since #67 closed. #66 (release.yml packaging) still open. |
-| Phase 2 backlog | Needs refinement | Epics #142 (Extensible Platform) and #143 (Historical Context), 26 open stories (#144–167) created 2026-06-02. Thin on Given-When-Then ACs and dependency/sprint mapping compared to the Epic #24 backlog — recommend a refinement pass before starting implementation. |
-| AgentX automation | Bug filed (#191) | `agent-x.yml` re-fires on every label added to an issue, posting duplicate routing comments (6–7x on each of #142–167). |
+| CI/CD | Needs attention | Feature-branch CI is green, but **26 Dependabot PRs are open and unmerged** (#255–#303, oldest from 2026-07-26). Several are major-version bumps (vite 7→8, eslint 9→10, vitest 4→5, electron 42→43) that need manual verification, not auto-merge. This has been a recurring gap — the PR numbers cited in the prior status entry (#176–#187) are long gone, but the underlying backlog is larger now, not smaller. |
+| Globe fidelity | Done | All stories (#41–45, #56, #57, #62) closed, including the graticule overlay (#45) and Natural Earth 110m coastline pipeline. |
+| Oblivion design system | Done | Feature #46 and all stories closed. `DESIGN.md`/`PRODUCT.md` are the canonical, current reference (added via PR #225 by the "Impeccable" tool — see design-language note below). |
+| Degraded UX | Done | Feature #26 and all stories closed. |
+| Reliability (original scope) | Done | Feature #23, collector health/lifecycle, and registry/manifest work all closed. |
+| Release readiness | Done | #39, #66, #37, #38 all closed. |
+| Phase 2 backlog (#142/#143) | Done | Both epics and all 24 child stories (#144–167) closed. |
+| Headline news + tickers (#208) | Done | NewsAPI collector, "near you" headlines, geologic/night-sky vertical tickers (#209–215) closed. |
+| Ambient display settings (#226) | Done | Settings store, panel UI, mute toggles, ticker speed, location override (#230–234) closed. |
+| Adaptive multi-display layout (#227) | Done | Breakpoint spec, portrait layout, orientation handling, cross-viewport validation (#235–238) closed. |
+| Severity-aware alerting (#228) | Done | Ticker ordering, pulse animation, audio chime, mute config (#239–242) closed. |
+| Electron auto-update (#229) | Done | electron-updater wiring, in-app update check, status indicator, recovery docs (#243–246) closed. |
+| AgentX automation | Resolved | Bug #191 (duplicate routing comments) closed. |
+
+## Backlog Refinement Findings (2026-09-24)
+
+A full backlog review (all 121 tracked issues, all open PRs) found:
+
+1. **The backlog is empty.** Every issue in the tracker is closed — there is nothing to triage or refine, and no work is currently mis-statused. The prior "Phase 2 needs refinement" framing above is obsolete; refinement happened and the epics shipped.
+2. **There is no defined next phase.** Neither this file, `BACKLOG.md`, `PRODUCT.md`, nor `SPEC.md` names what comes after the four epics above. Before opening new stories, get direction from the project owner on priorities rather than inventing scope.
+3. **Dependabot debt (26 open PRs, #255–#303)** is the one concrete, actionable gap — see CI/CD row above.
+4. **`.agentx/state/agent-status.json` had a stale entry**: `engineer` was recorded `"active"` on issues 232/233/236/237/238/241/242, all of which are closed. Reset to `idle` as part of this pass — a symptom worth watching is that the `hook complete` step isn't always being run when work finishes.
+5. **`CHANGELOG.md` stops at v0.2.0 / PR #225** and does not reflect the four epics closed since. Left as-is here (reconstructing changelog entries from merged-PR history is release-notes work, not backlog triage) but flagged for whoever owns releases.
+6. **`BACKLOG.md`** was dated 2026-05-03 and described a sprint that finished months ago; rewritten below to match current state.
 
 ## Active Branches
 
-No feature PRs are currently open — only Dependabot dependency-bump PRs. Before starting new work: run `git fetch --all`, check `.agentx/state/agent-status.json` for active agents on the same issue, and confirm the target issue isn't already closed (the tracker has previously lagged behind merged work — see PR #170 closing #37/#38/#147–149).
+No feature PRs are currently open — only Dependabot dependency-bump PRs (26 of them, see above). Before starting new work: run `git fetch --all`, check `.agentx/state/agent-status.json` for active agents on the same issue, and confirm the target issue isn't already closed (the tracker has previously lagged behind merged work).
 
 ## AgentX Knowledge Layer
 
@@ -52,21 +68,12 @@ This is enforced in `.agentx/workflows/story.toml`, `bug.toml`, and `docs.toml` 
 
 ## Critical Path
 
-```
-1. CI green (branch claude/plan-world-pulse-mission-qoZIF merged)
-   ↓
-2. Knowledge Layer loaded (done — .agentx/knowledge/)
-   ↓
-3. Globe GeoJSON epic (#40): Track A (data pipeline) → Track B (render)
-   ↓
-4. Oblivion design system completion (#46, #48–#53, #59)
-   ↓
-5. Degraded UX stories (#58, #63)
-   ↓
-6. Release readiness (#66, smoke tests)
-```
-
-Do not start Globe Track B before Track A GeoJSON output is available.
+The original critical path (CI green → Globe GeoJSON → Oblivion design system →
+Degraded UX → Release readiness) is **complete** — every stage closed, including
+the three later epics (news/tickers, ambient settings + adaptive layout,
+severity alerting + auto-update) that were added after this path was written.
+There is currently no active critical path; see "Backlog Refinement Findings"
+above for what to resolve before defining the next one.
 
 ## Issue Lifecycle (REQUIRED — automated via `.github/workflows/pr-issue-link.yml`)
 
