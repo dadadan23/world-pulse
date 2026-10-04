@@ -16,12 +16,12 @@
   },
   "engineer": {
     "role": "engineer",
-    "status": "active",
-    "issue": "232,233,236,237,238,241,242",
+    "status": "idle",
+    "issue": null,
     "branch": "claude/next-stories-72lncb",
     "startedAt": "2026-07-05T00:00:00Z",
-    "completedAt": null,
-    "artifacts": []
+    "completedAt": "2026-09-24T00:00:00Z",
+    "artifacts": ["issues 232,233,236,237,238,241,242 all closed — stale active flag reset during backlog refinement pass"]
   },
   "reviewer": {
     "status": "idle",
