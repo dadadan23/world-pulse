@@ -7,6 +7,17 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Security
+
+- **Production dependency vulnerabilities fixed** (#416)
+
+  Updated `proxy-addr` to 2.0.8 (critical, IP spoofing via IPv4-mapped IPv6 trust
+  subnet), `axios` to 1.20.0 (high, six advisories) and `socket.io-parser` to 4.2.7
+  (high, zero-attachment memory exhaustion). `npm audit --omit=dev` now reports no
+  vulnerabilities. Also applied in-range updates (react 19.3, express 5.3, helmet 8.3,
+  socket.io 4.8.4, electron 42.11, vitest 4.1.12 and other dev tooling). Major-version
+  bumps are tracked separately in #417.
+
 ### Added
 
 - **Oblivion design system reference documents** (`PRODUCT.md`, `DESIGN.md`) (PR #225)
