@@ -263,20 +263,21 @@ function render(changed, quiet) {
   MODES.forEach((m) => { const on = state.has(m.id); svg.classList.toggle('m-' + m.id, on); chips[m.id].setAttribute('aria-pressed', on); chips[m.id].querySelector('.st').textContent = on ? 'ON' : 'OFF'; });
   stage.classList.toggle('m-phosphor', state.has('phosphor'));
   document.querySelectorAll('.scene[data-scene]').forEach((b) => { const s = SCENES.find((x) => x.id === b.dataset.scene); b.setAttribute('aria-pressed', s.modes.length === state.size && s.modes.every((m) => state.has(m))); });
-  try { localStorage.setItem('wp-modes', JSON.stringify([...state])); } catch (e) { /* ignore */ }
   if (changed && !quiet) feedback(changed);
 }
+// persistence is separate from rendering: only committed user selections are saved (never Showtime scenes or held peeks)
+function persist() { try { localStorage.setItem('wp-modes', JSON.stringify([...state])); } catch (e) { /* ignore */ } }
 let toastT;
 function feedback(id) { const m = MODES.find((x) => x.id === id), on = state.has(id), c = chips[id];
   c.classList.remove('engage'); if (on) { void c.offsetWidth; c.classList.add('engage'); setTimeout(() => c.classList.remove('engage'), 420); }
   if (!reduce) { stage.classList.remove('glitch'); void stage.offsetWidth; stage.classList.add('glitch'); setTimeout(() => stage.classList.remove('glitch'), 80); }
   toast.textContent = (on ? 'ENGAGED // ' : 'STANDBY // ') + m.name.toUpperCase(); toast.classList.toggle('off', !on); toast.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => toast.classList.remove('show'), 1300); blip(on); }
 function setMode(id, on, quiet) { const had = state.has(id); if (on === had) return; on ? state.add(id) : state.delete(id); render(id, quiet); }
-function applyScene(s, quiet) { state = new Set(s.modes); render(null, true); if (!quiet) { toast.textContent = 'SCENE // ' + s.name.toUpperCase(); toast.classList.remove('off'); toast.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => toast.classList.remove('show'), 1300); blip(true); } }
+function applyScene(s, quiet, commit) { state = new Set(s.modes); render(null, true); if (commit) persist(); if (!quiet) { toast.textContent = 'SCENE // ' + s.name.toUpperCase(); toast.classList.remove('off'); toast.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => toast.classList.remove('show'), 1300); blip(true); } }
 
 // scenes + controls
 const scenesEl = document.getElementById('scenes');
-SCENES.forEach((s) => { const b = document.createElement('button'); b.className = 'scene'; b.dataset.scene = s.id; b.setAttribute('aria-pressed', 'false'); b.innerHTML = `${s.name}<kbd>${s.key}</kbd>`; b.onclick = () => { stopShow(); applyScene(s); wake(); }; scenesEl.appendChild(b); });
+SCENES.forEach((s) => { const b = document.createElement('button'); b.className = 'scene'; b.dataset.scene = s.id; b.setAttribute('aria-pressed', 'false'); b.innerHTML = `${s.name}<kbd>${s.key}</kbd>`; b.onclick = () => { stopShow(); applyScene(s, false, true); wake(); }; scenesEl.appendChild(b); });
 const showBtn = document.getElementById('show'), sndBtn = document.getElementById('snd'), prog = document.getElementById('prog');
 let showT = null, si = 0; const CYCLE = 8000;
 function startShow() { prog.style.setProperty('--cycle', CYCLE / 1000 + 's'); prog.classList.add('run'); showBtn.setAttribute('aria-pressed', 'true'); const step = () => { applyScene(SCENES[si++ % SCENES.length]); }; step(); showT = setInterval(step, CYCLE); }
@@ -289,13 +290,22 @@ sndBtn.onclick = () => { setSfx(!sfx); wake(); };
 // toggle / peek input: tap toggles, hold (>350ms) peeks and reverts on release
 const HOLD = 350; const press = {};
 function down(id) { if (press[id]) return; press[id] = { peek: false, t: setTimeout(() => { const p = press[id]; if (p && !state.has(id)) { p.peek = true; chips[id].classList.add('peek'); setMode(id, true); } }, HOLD) }; wake(); }
-function up(id) { const p = press[id]; if (!p) return; clearTimeout(p.t); delete press[id]; chips[id].classList.remove('peek'); if (p.peek) setMode(id, false); else { stopShow(); setMode(id, !state.has(id)); } }
+// ends a press; returns true if it was a peek (already reverted)
+function holdEnd(id) { const p = press[id]; if (!p) return false; clearTimeout(p.t); delete press[id]; chips[id].classList.remove('peek'); if (p.peek) { setMode(id, false); return true; } return false; }
+function toggleCommit(id) { stopShow(); setMode(id, !state.has(id)); persist(); }
+// hotkeys and chip keyboard activation: tap toggles, hold peeks
+function up(id) { if (!press[id]) return; if (!holdEnd(id)) toggleCommit(id); }
+const suppressClick = {};
 MODES.forEach((m) => { const b = chips[m.id];
-  b.addEventListener('pointerdown', (e) => { e.preventDefault(); b.focus({ preventScroll: true }); down(m.id); }); b.addEventListener('pointerup', () => up(m.id)); b.addEventListener('pointerleave', () => { if (press[m.id]) up(m.id); });
+  // pointer: hold previews; the committed toggle comes from 'click', so assistive tech that dispatches a bare click also works
+  b.addEventListener('pointerdown', () => { delete suppressClick[m.id]; down(m.id); });
+  b.addEventListener('pointerup', () => { if (holdEnd(m.id)) suppressClick[m.id] = true; });
+  b.addEventListener('pointerleave', () => holdEnd(m.id)); b.addEventListener('pointercancel', () => holdEnd(m.id));
+  b.addEventListener('click', (e) => { if (e.detail === 0 && press[m.id]) return; if (suppressClick[m.id]) { delete suppressClick[m.id]; return; } toggleCommit(m.id); });
   b.addEventListener('keydown', (e) => { if ((e.key === 'Enter' || e.key === ' ') ) { e.preventDefault(); e.stopPropagation(); if (!e.repeat) down(m.id); } });
   b.addEventListener('keyup', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); up(m.id); } }); });
 addEventListener('keydown', (e) => { if (e.metaKey || e.ctrlKey || e.altKey || e.repeat) return; wake(); const k = e.key; const m = MODES.find((x) => x.key === k);
-  if (m) { e.preventDefault(); down(m.id); return; } const s = SCENES.find((x) => x.key.toLowerCase() === k.toLowerCase()); if (s) { stopShow(); applyScene(s); return; }
+  if (m) { e.preventDefault(); down(m.id); return; } const s = SCENES.find((x) => x.key.toLowerCase() === k.toLowerCase()); if (s) { stopShow(); applyScene(s, false, true); return; }
   if (k === ' ' && document.activeElement === document.body) { e.preventDefault(); autoSaved = null; toggleShow(); } if (k.toLowerCase() === 'm') setSfx(!sfx); });
 addEventListener('keyup', (e) => { const m = MODES.find((x) => x.key === e.key); if (m) up(m.id); });
 
@@ -312,6 +322,10 @@ function userTouched() { if (showT && autoSaved) { stopShow(); state = autoSaved
 ['pointerdown', 'pointermove', 'keydown', 'touchstart', 'wheel'].forEach((ev) => addEventListener(ev, userTouched, { capture: true, passive: true }));
 document.addEventListener('visibilitychange', () => { if (document.hidden) clearTimeout(autoT); else armAuto(); });
 armAuto();
+// reduced motion: SMIL ignores CSS, so pause the SVG timeline on a still frame (and follow preference changes)
+const rmq = matchMedia('(prefers-reduced-motion: reduce)');
+function syncMotion() { if (rmq.matches) { svg.setCurrentTime(1.2); svg.pauseAnimations(); } else svg.unpauseAnimations(); }
+syncMotion(); rmq.addEventListener('change', syncMotion);
 window.__wp = { state: () => [...state], applyScene, SCENES };
 </script>
 </body>

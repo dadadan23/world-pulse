@@ -31,13 +31,12 @@
   .val { font-family: inherit; font-size: 11px; fill: #c8e6f0; }
   .big { font-family: inherit; font-size: 22px; fill: #c8e6f0; font-weight: 300; }
   .note { font-family: inherit; font-size: 9px; fill: #ffb020; letter-spacing: 0.05em; }
-  @media (prefers-reduced-motion: reduce) { svg animate, svg animateTransform { display: none; } }
 </style>
 </head>
 <body>
 <header>
   <h1>World Pulse // Next-phase concepts</h1>
-  <p class="lede">Wireframe-grade mockups for discussion. Geometry is the project's Natural Earth 110m coastline in an orthographic projection; <b>all values, locations and events are illustrative placeholders</b>, not live data. Colors, type and timing follow DESIGN.md. Animation is SMIL and is disabled under reduced-motion.</p>
+  <p class="lede">Wireframe-grade mockups for discussion. Geometry is the project's Natural Earth 110m coastline in an orthographic projection; <b>all values, locations and events are illustrative placeholders</b>, not live data. Colors, type and timing follow DESIGN.md. Animation is SMIL; under reduced-motion it pauses on a still frame.</p>
 </header>
 <main><div class="grid" id="grid"></div></main>
 <script>
@@ -237,6 +236,10 @@ frame('f', 'EPIC 3 / FEATURES 3.1 + 3.2', 'Wildfire and space-weather layers',
     el(svg, 'text', { x: W - 224, y: 122, class: 'val', style: 'fill:#ffb020' }, 'KP 5  G1 STORM');
     el(svg, 'text', { x: W - 224, y: 148, class: 'lbl' }, 'SOLAR WIND 520 KM/S'); el(svg, 'polyline', { points: Array.from({ length: 24 }, (_, i) => `${W - 224 + i * 8},${170 - (Math.sin(i / 3) * 6 + i * 0.6)}`).join(' '), fill: 'none', stroke: '#00d4ff' });
     el(svg, 'text', { x: W - 224, y: 200, class: 'lbl' }, 'BZ -8 NT  SOUTHWARD'); el(svg, 'text', { x: W - 224, y: 222, class: 'lbl' }, 'X-RAY M2.1  (FLARE CLASS)'); });
+// reduced motion: SMIL ignores CSS, so pause each SVG timeline on a still frame (and follow preference changes)
+const rmq = matchMedia('(prefers-reduced-motion: reduce)');
+const syncMotion = () => document.querySelectorAll('svg').forEach((s) => { if (rmq.matches) { s.setCurrentTime(1.2); s.pauseAnimations(); } else s.unpauseAnimations(); });
+syncMotion(); rmq.addEventListener('change', syncMotion);
 </script>
 </body>
 </html>
