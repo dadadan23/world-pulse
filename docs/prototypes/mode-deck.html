@@ -97,7 +97,7 @@
 <body>
 <div class="wrap">
   <h1>World Pulse // Mode Deck prototype</h1>
-  <p class="lede">Interactive. Click or press <b>1&ndash;8</b> to toggle a mode. <b>Hold</b> a key or chip to peek (it reverts on release). <b>Q W E R</b> switch scenes. <b>Space</b> starts Showtime auto-cycle. <b>M</b> toggles sound (off by default). Stop touching it for six seconds and the deck collapses to a quiet LED strip. All data is illustrative.</p>
+  <p class="lede">Interactive. Click or press <b>1&ndash;8</b> to toggle a mode. <b>Hold</b> a key or chip to peek (it reverts on release). <b>Q W E R</b> switch scenes. <b>Space</b> starts Showtime auto-cycle, and Showtime also starts by itself after 30 seconds without any interaction (add <code>?idle=5</code> to the URL to try it sooner); any input stops it and restores what you had on. <b>M</b> toggles sound (off by default). Stop touching it for six seconds and the deck collapses to a quiet LED strip. All data is illustrative.</p>
   <div class="frame">
     <div class="stage" id="stage">
       <svg class="map" id="map" viewBox="0 0 960 560" role="img" aria-label="Illustrative globe with switchable display modes"></svg>
@@ -282,7 +282,7 @@ let showT = null, si = 0; const CYCLE = 8000;
 function startShow() { prog.style.setProperty('--cycle', CYCLE / 1000 + 's'); prog.classList.add('run'); showBtn.setAttribute('aria-pressed', 'true'); const step = () => { applyScene(SCENES[si++ % SCENES.length]); }; step(); showT = setInterval(step, CYCLE); }
 function stopShow() { if (showT) { clearInterval(showT); showT = null; } prog.classList.remove('run'); showBtn.setAttribute('aria-pressed', 'false'); }
 const toggleShow = () => (showT ? stopShow() : startShow());
-showBtn.onclick = () => { toggleShow(); wake(); };
+showBtn.onclick = () => { autoSaved = null; toggleShow(); wake(); };
 const setSfx = (v) => { sfx = v; sndBtn.setAttribute('aria-pressed', v); try { localStorage.setItem('wp-sfx', v ? '1' : '0'); } catch (e) { /* ignore */ } if (v) blip(true); };
 sndBtn.onclick = () => { setSfx(!sfx); wake(); };
 
@@ -296,13 +296,22 @@ MODES.forEach((m) => { const b = chips[m.id];
   b.addEventListener('keyup', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); up(m.id); } }); });
 addEventListener('keydown', (e) => { if (e.metaKey || e.ctrlKey || e.altKey || e.repeat) return; wake(); const k = e.key; const m = MODES.find((x) => x.key === k);
   if (m) { e.preventDefault(); down(m.id); return; } const s = SCENES.find((x) => x.key.toLowerCase() === k.toLowerCase()); if (s) { stopShow(); applyScene(s); return; }
-  if (k === ' ' && document.activeElement === document.body) { e.preventDefault(); toggleShow(); } if (k.toLowerCase() === 'm') setSfx(!sfx); });
+  if (k === ' ' && document.activeElement === document.body) { e.preventDefault(); autoSaved = null; toggleShow(); } if (k.toLowerCase() === 'm') setSfx(!sfx); });
 addEventListener('keyup', (e) => { const m = MODES.find((x) => x.key === e.key); if (m) up(m.id); });
 
 // idle collapse
 let idleT; function wake() { deck.classList.remove('idle'); clearTimeout(idleT); idleT = setTimeout(() => deck.classList.add('idle'), 6000); }
 ['pointermove', 'pointerdown', 'focusin', 'touchstart'].forEach((ev) => deck.addEventListener(ev, wake)); stage.addEventListener('pointermove', wake);
 sndBtn.setAttribute('aria-pressed', sfx); render(null, true); wake();
+// auto-Showtime: starts after 30 s with no user interaction; any input stops it and restores the prior modes
+const AUTO_MS = (+new URLSearchParams(location.search).get('idle') || 30) * 1000;
+let autoT, autoSaved = null;
+function autoStart() { if (showT) return; autoSaved = new Set(state); startShow(); toast.textContent = 'SHOWTIME // AUTO'; toast.classList.remove('off'); toast.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => toast.classList.remove('show'), 1300); }
+function armAuto() { clearTimeout(autoT); autoT = setTimeout(autoStart, AUTO_MS); }
+function userTouched() { if (showT && autoSaved) { stopShow(); state = autoSaved; autoSaved = null; render(null, true); } armAuto(); }
+['pointerdown', 'pointermove', 'keydown', 'touchstart', 'wheel'].forEach((ev) => addEventListener(ev, userTouched, { capture: true, passive: true }));
+document.addEventListener('visibilitychange', () => { if (document.hidden) clearTimeout(autoT); else armAuto(); });
+armAuto();
 window.__wp = { state: () => [...state], applyScene, SCENES };
 </script>
 </body>
