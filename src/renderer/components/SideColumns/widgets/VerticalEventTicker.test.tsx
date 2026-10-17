@@ -32,7 +32,11 @@ describe('VerticalEventTicker', () => {
   });
 
   it('caps the displayed rows at 5 even when given more events', () => {
-    const events = Array.from({ length: 8 }, (_, i) => mockEvent(`${i}`, { title: `Row ${i}` }));
+    // Explicit descending timestamps: the ticker shows the newest 5, so this makes Rows 0-4
+    // deterministic instead of depending on Date.now() ticking between mockEvent() calls.
+    const events = Array.from({ length: 8 }, (_, i) =>
+      mockEvent(`${i}`, { title: `Row ${i}`, timestamp: 1_000_000 - i })
+    );
     render(<VerticalEventTicker headerLabel="◆ TEST FEED" events={events} />);
 
     expect(screen.queryByText('Row 5')).not.toBeInTheDocument();
