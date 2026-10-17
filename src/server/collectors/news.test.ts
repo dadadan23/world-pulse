@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { NewsCollector } from './news';
 import { setLocationOverride } from '../locationOverride';
-import axios from 'axios';
+import axios, { type AxiosRequestConfig } from 'axios';
 
 vi.mock('axios');
 const mockedGet = vi.mocked(axios.get);
@@ -40,7 +40,7 @@ function mockHeadlineRoutes(opts: {
   global?: ReturnType<typeof makeResponse>;
   local?: ReturnType<typeof makeResponse>;
 }) {
-  mockedGet.mockImplementation((url: string, config?: { params?: Record<string, unknown> }) => {
+  mockedGet.mockImplementation((url: string, config?: AxiosRequestConfig) => {
     if (url.includes('ipapi.co')) {
       if (typeof opts.geo === 'function') return (opts.geo as () => never)();
       return Promise.resolve(opts.geo ?? GEO_RESPONSE);
@@ -230,7 +230,7 @@ describe('NewsCollector', () => {
     });
 
     it('wraps a non-Error rejection reason in an Error when both fetches fail', async () => {
-      mockedGet.mockImplementation((url: string, config?: { params?: Record<string, unknown> }) => {
+      mockedGet.mockImplementation((url: string, config?: AxiosRequestConfig) => {
         if (url.includes('ipapi.co')) return Promise.resolve(GEO_RESPONSE);
         // Simulate a rejection with a non-Error value (e.g. a raw string thrown by a mock/library).
         return Promise.reject(config?.params?.country ? 'local failure' : 'global failure');
