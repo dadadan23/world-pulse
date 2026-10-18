@@ -2,15 +2,15 @@
 
 ## Status
 
-| Field        | Value                                                                                                                            |
-| ------------ | -------------------------------------------------------------------------------------------------------------------------------- |
-| Issue        | #384 (parent feature #356, epic #348)                                                                                            |
-| Type         | type:story (spike)                                                                                                               |
-| Agent        | Architect                                                                                                                        |
-| Status       | In Review, revision 2 (review fixes applied; owner decisions of 2026-10-18 recorded; SPEC-384 section 9 items 1 to 6 still open) |
-| Branch       | `claude/384-frame-budget-spike` (commits 58f9d4a, b2a91b6; revision 2 in df2a424)                                                |
-| Started      | 2026-10-18                                                                                                                       |
-| Last Updated | 2026-10-18                                                                                                                       |
+| Field        | Value                                                                                                                                        |
+| ------------ | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| Issue        | #384 (parent feature #356, epic #348)                                                                                                        |
+| Type         | type:story (spike)                                                                                                                           |
+| Agent        | Architect                                                                                                                                    |
+| Status       | In Review, revision 3 (PR #438 review threads addressed; owner decisions of 2026-10-18 recorded; SPEC-384 section 9 items 1 to 6 still open) |
+| Branch       | `claude/384-frame-budget-spike` (commits 58f9d4a, b2a91b6; revision 2 in df2a424)                                                            |
+| Started      | 2026-10-18                                                                                                                                   |
+| Last Updated | 2026-10-18                                                                                                                                   |
 
 ### Phase Checklist
 
@@ -54,7 +54,7 @@
 
 ### Key numbers (provenance in SPEC-384 section 4)
 
-- Exact: 265 draw calls per frame at 50 markers (77 at 0 markers), of which 196 are markers and 58 are labels (re-measured in session 2; the session 1 figure of about 202 was inflated by a probe counting bug). 42,552 triangles. 58.2 MiB of textures. JS heap about 15 MiB. vendor-three chunk 324 kB gzip, main chunk 136 kB gzip.
+- Exact: 265 draw calls per frame at 50 markers (77 at 0 markers), of which 196 are markers and 58 are labels (re-measured in session 2; the session 1 figure of about 202 was inflated by a probe counting bug). Markers: 50 mounted (client cap `MAX_MARKERS = 50`) = 50 spheres + 50 x 2 ring passes + 23 x 2 pulse-ring passes (corrected in session 3; counted in the page on a build of `12bec81`, whose `src/` equals `7dbd9d5`). 42,552 triangles. 58.2 MiB of textures. JS heap about 15 MiB. vendor-three chunk 324 kB gzip, main chunk 136 kB gzip.
 - Relative (SwiftShader, 1080p): DPR 2 is 2.2x slower and 4K is 2.4x slower. Ablation shares: earth ~31%, atmosphere ~17%, wireframe ~17%, markers ~13%, labels ~6%.
 - CPU (container, 640x360): rAF callback mean goes from 1.7 ms to 5.8 ms when 50 markers are added.
 - Startup (container): first draw at about 7 s. About 6.1 s is synchronous shader link wait (SwiftShader-specific) and about 1.1 s is heightmap generation.
@@ -80,7 +80,7 @@ Real GPUs, Raspberry Pi, iPad Safari, Electron builds, GPU timer queries, power 
 Applied `docs/reviews/REVIEW-384.md`. No `src/` or `.github/` changes.
 
 - **B1:** kept the 96 MiB Full and 64 MiB Floor/Lite caps. #357 night texture is now 2048x1024 or smaller in Full (+10.7 MiB, 68.9 MiB total) and none or 1024x512 or smaller in Lite (+2.7 MiB, 60.9 MiB total). Arithmetic added to SPEC-384 section 5; section 9 item 4 now says +2.7 to +10.7 MiB.
-- **B2 / O1:** `probe.js` now accumulates per-tag counts inside completed frame records only. Re-measured (Chromium 141 SwiftShader, 1080p DPR 1, 50 markers): markers 196, labels 58, sum of all tags 265 exactly (0 markers: 77, sum 77). 196 = 52 events x 1 sphere + 52 x 2 ring passes + 20 pulse rings x 2 passes. `cityData.ts` defines 58 cities (the review said 60); 58 label textures and 58 city-light points match it.
+- **B2 / O1:** `probe.js` now accumulates per-tag counts inside completed frame records only. Re-measured (Chromium 141 SwiftShader, 1080p DPR 1, 50 markers): markers 196, labels 58, sum of all tags 265 exactly (0 markers: 77, sum 77). (The breakdown originally written here, 52 events and 20 pulse rings, was wrong; see session 3: 50 markers and 23 pulse rings.) `cityData.ts` defines 58 cities (the review said 60); 58 label textures and 58 city-light points match it.
 - **S1:** mock server binds `127.0.0.1` by default; `--host` (or `PERF_MOCK_HOST`) for the LAN case, documented in the README.
 - **S2:** probe reports `framesOver33ms`, `framesOver50ms`, `framesOver66ms`, `pctFramesOver66ms`. SPEC-384 section 3 maps each budget column to a probe field; section 7.1 columns match.
 - **S3 to S5:** AC 1 describes a test-only tier override, AC 2 says Lite 80 needs instancing, AC 5 includes the 5-minute step-up rule, AC 8 and sections 9 and 10 now require rows that meet the p95 budget and say what happens if the Pi 5 fails.
@@ -94,3 +94,22 @@ Applied `docs/reviews/REVIEW-384.md`. No `src/` or `.github/` changes.
 ### Hand-off
 
 - NEXT: reviewer re-review of #384, then PR (`Closes #384`) when the owner asks for one.
+
+## Session 3 - Architect, PR review follow-up (2026-10-18)
+
+PR #438 review threads (Copilot). Each claim was checked against the code before changing anything. No `src/` or `.github/` changes. Measured on a `vite build` of `12bec81` (`src/` identical to `7dbd9d5`).
+
+| Thread                                                        | Verdict                                                                                                                                                          | Fix                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| ------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1. [P1] `probe.js` counts rAF ticks, not app render frames    | Valid for capped or on-demand rendering. Today `<Canvas>` uses r3f's default `frameloop="always"`, so ticks and renders coincide and no published number changes | A tick counts as a rendered frame only if at least one draw (including `setSkip`-suppressed draws) was issued since the previous tick. Frame timing and per-frame counts use rendered frames; new `renderedFrames`, `rafTicks`, `rafFpsMean`, `rafIntervalMsP50/P95` (`frames` renamed to `renderedFrames`). README, SPEC-384 sections 3, 4.1, 7 and 7.1 updated. Checked with a simulated 30 fps app cap: 65 rendered frames vs 130 rAF ticks, 265 draws per rendered frame |
+| 2. [P2] SPEC-384 section 4.4 marker derivation                | Valid. `MAX_MARKERS = 50` caps the selection; the mock's 52 events lose `perf-10` and `perf-41` (severity 0.1 and 0) to the cap, none to the 5-degree rule       | Re-derived and counted in the page: 50 spheres + 50 x 2 ring passes + 23 x 2 pulse-ring passes = 196. Headline numbers (196, 265, 254, 20.2k marker triangles) unchanged. Fixed in SPEC-384 sections 4.1, 4.2, 4.3 ablation row, 4.4, AC 3, and session 1 and 2 key numbers here; measured revision recorded in section 4.1                                                                                                                                                  |
+| 3. [P2] governor step-up cannot happen at 60 Hz or from L5    | Valid. 70% of 20 ms is 14 ms, below the 16.7 ms vsync interval; the L5 cap pins intervals at 33.3 ms                                                             | Step-up now uses render-work headroom (`W` at most 50% of the next level's target interval for 60 s) plus a 20 s trial that reverts on a miss, with a 5 to 60 min back-off. Interval budget is never below 1.2 x the measured refresh interval; L5 budget is 50 ms. SPEC-384 section 6.2 (signals table, diagram, worked cases, what #435 needs), AC 5 and the risks row updated                                                                                             |
+| 4. [P2] `cpu-profile.mjs` setup outside cleanup               | Valid                                                                                                                                                            | Preview, mock and browser start inside the `try`; `finally` stops whatever started. Tested with `--chrome /nonexistent/chrome` and with port 3000 occupied: exit 1, ports 3000 and 4173 free afterwards, no vite or mock processes left                                                                                                                                                                                                                                      |
+| 5. [P2] `cpu-profile.mjs --startup` per-frame rates           | Valid. Samples span navigation plus ~5 s, frames only the last ~1 s                                                                                              | Startup mode prints total ms per bucket and function over the profiler's own elapsed time; steady mode divides by the profiler's elapsed time instead of `--seconds`. README documents it                                                                                                                                                                                                                                                                                    |
+| 6. [P2] `globe-baseline.mjs` preview survives a failed launch | Valid                                                                                                                                                            | Preview and browser start inside the `try`. Tested with `--chrome /nonexistent/chrome`: exit 1, port 4173 free afterwards                                                                                                                                                                                                                                                                                                                                                    |
+
+Verification: `prettier --check` on `scripts/perf/`, SPEC-384 and this log passed; `node --check` passed on all four scripts; `node scripts/perf/globe-baseline.mjs --quick` completed in 242 s. Per-element draw calls sum to the total in every scenario (265, 77 at 0 markers, 0 for clear only), and rendered frames equal rAF ticks in every scenario, as expected with `frameloop="always"`. fps values from the single quick rep are not comparable with the section 4.3 medians and were not copied into the spec.
+
+### Hand-off
+
+- NEXT: reviewer re-review of #384 (PR #438). The owner updates story #435 from the new AC 5 text.

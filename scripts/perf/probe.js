@@ -20,6 +20,14 @@
  *                      summary.drawCallsPerFrame. summary also carries the
  *                      unmasked WebGL renderer string, frames over 33/50/66 ms,
  *                      and shader program counts.
+ *
+ * Frames: a browser rAF tick is an application RENDERED FRAME only if the app
+ * issued at least one draw call (including draws suppressed by setSkip) since
+ * the previous tick. frame* / fpsMean / per-frame counts use rendered frames,
+ * so a 30 fps cap on a 60 Hz display reads as 30 fps and ~33 ms. Browser
+ * cadence is reported separately (rafTicks, rafFpsMean, rafIntervalMs*).
+ * With on-demand rendering (r3f frameloop 'demand') the rendered-frame
+ * interval includes idle gaps; read rafCallbackMs* there instead.
  *   setAttribution(on) when on, bracket every draw call with gl.finish() and
  *                      accumulate the blocking time per tag (perTag.gpuMsPerFrame).
  *                      This serialises the pipeline, so absolute fps drops.
@@ -40,6 +48,8 @@
     sampling: false,
     skip: {},
     frameIntervals: [],
+    rafIntervals: [],
+    lastRenderedTs: null,
     callbackMs: [],
     perFrame: [],
     cur: null,
@@ -93,7 +103,16 @@
   }
 
   function frameRecord() {
-    return { calls: 0, tris: 0, lineVerts: 0, points: 0, tagCalls: {}, tagPrims: {}, tagGpuMs: {} };
+    return {
+      issued: 0, // every draw the app attempted, including skipped ones
+      calls: 0,
+      tris: 0,
+      lineVerts: 0,
+      points: 0,
+      tagCalls: {},
+      tagPrims: {},
+      tagGpuMs: {},
+    };
   }
 
   // Only counts while a frame record is open (state.cur), so draws issued
@@ -138,6 +157,7 @@
         var count = arguments[countIdx];
         var tag = state.currentTag;
         if (tag === 'basic') tag = refineBasic(mode, count);
+        if (state.sampling && state.cur) state.cur.issued++;
         if (state.skip[tag]) return undefined;
         account(tag, mode, count, instIdx !== undefined ? arguments[instIdx] : 1);
         if (state.sampling && state.attribution && state.cur) {
@@ -199,12 +219,22 @@
     });
   };
 
-  // ---- Frame interval loop (independent of the app) ----
+  // ---- Tick loop (independent of the app) ----
+  // Each tick closes the record of draws issued since the previous tick. Only
+  // records with at least one issued draw count as rendered frames.
   function tick(ts) {
     if (!state.sampling) return;
     if (state.lastTs !== null) {
-      state.frameIntervals.push(ts - state.lastTs);
-      if (state.cur) state.perFrame.push(state.cur);
+      state.rafIntervals.push(ts - state.lastTs);
+      if (state.cur && state.cur.issued > 0) {
+        state.perFrame.push(state.cur);
+        if (state.lastRenderedTs !== null) state.frameIntervals.push(ts - state.lastRenderedTs);
+        state.lastRenderedTs = ts;
+      }
+    } else {
+      // The sampling start tick is the reference for the first rendered frame,
+      // so with a render on every tick the intervals equal the rAF intervals.
+      state.lastRenderedTs = ts;
     }
     state.cur = frameRecord();
     state.lastTs = ts;
@@ -244,6 +274,8 @@
   window.__wpPerf = {
     start: function () {
       state.frameIntervals = [];
+      state.rafIntervals = [];
+      state.lastRenderedTs = null;
       state.callbackMs = [];
       state.perFrame = [];
       state.programsUsed = typeof WeakSet === 'function' ? new WeakSet() : null;
@@ -258,6 +290,7 @@
       state.sampling = false;
       var dur = (now() - state.startedAt) / 1000;
       var fi = state.frameIntervals;
+      var ri = state.rafIntervals;
       state.cur = null;
       var frames = state.perFrame.length || 1;
       var calls = {};
@@ -285,8 +318,17 @@
       return {
         summary: {
           seconds: Math.round(dur * 10) / 10,
-          frames: fi.length,
-          fpsMean: fi.length ? Math.round((fi.length / dur) * 10) / 10 : null,
+          // Application render frames (ticks with >= 1 issued draw call).
+          renderedFrames: state.perFrame.length,
+          fpsMean: state.perFrame.length
+            ? Math.round((state.perFrame.length / dur) * 10) / 10
+            : null,
+          // Browser rAF cadence, whether or not the app rendered on the tick.
+          rafTicks: ri.length,
+          rafFpsMean: ri.length ? Math.round((ri.length / dur) * 10) / 10 : null,
+          rafIntervalMsP50: pct(ri, 50),
+          rafIntervalMsP95: pct(ri, 95),
+          // Intervals between consecutive rendered frames.
           frameMsP50: pct(fi, 50),
           frameMsP95: pct(fi, 95),
           frameMsP99: pct(fi, 99),

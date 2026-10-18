@@ -4,12 +4,12 @@ Measurement tooling for the display-target and frame-budget spike. Results and
 budgets live in [`docs/specs/SPEC-384.md`](../../docs/specs/SPEC-384.md). Nothing
 here is imported by `src/`.
 
-| File                 | What it does                                                                                                                                                                                                                                     |
-| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `probe.js`           | Dependency-free in-page probe. Counts draw calls, triangles and texture allocations per frame by patching `WebGL2RenderingContext`, and measures frame intervals with its own `requestAnimationFrame` loop. Can skip a scene element (ablation). |
-| `mock-server.mjs`    | Deterministic backend (`/health`, `/api/status`, Socket.io `events:initial`) with N seeded synthetic events plus one ISS and one aurora event. No API keys, no network. Binds `127.0.0.1` unless `--host` is given.                              |
-| `globe-baseline.mjs` | Starts `vite preview` and the mock server, runs throughput scenarios (or `--ablation`) in Playwright Chromium, prints markdown tables.                                                                                                           |
-| `cpu-profile.mjs`    | CDP sampling profile of the render loop at a tiny viewport (JS cost per frame), or of page load with `--startup`.                                                                                                                                |
+| File                 | What it does                                                                                                                                                                                                                                                                                               |
+| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `probe.js`           | Dependency-free in-page probe. Counts draw calls, triangles and texture allocations per frame by patching `WebGL2RenderingContext`, and measures frame intervals with its own `requestAnimationFrame` loop (rendered frames and browser ticks separately, see below). Can skip a scene element (ablation). |
+| `mock-server.mjs`    | Deterministic backend (`/health`, `/api/status`, Socket.io `events:initial`) with N seeded synthetic events plus one ISS and one aurora event. No API keys, no network. Binds `127.0.0.1` unless `--host` is given.                                                                                        |
+| `globe-baseline.mjs` | Starts `vite preview` and the mock server, runs throughput scenarios (or `--ablation`) in Playwright Chromium, prints markdown tables.                                                                                                                                                                     |
+| `cpu-profile.mjs`    | CDP sampling profile of the render loop at a tiny viewport (JS cost per frame), or of page load with `--startup` (totals over the profiled time only, no per-frame or per-second rates).                                                                                                                   |
 
 ## Container / CI use (software GL, relative numbers only)
 
@@ -60,10 +60,25 @@ Run on each candidate device (see SPEC-384 section 2). Takes about 10 minutes pe
    CPU and GPU load if available (`htop` and `vcgencmd measure_temp` on Pi; Activity Monitor on
    macOS; Task Manager GPU tab on Windows).
 8. Record results in the on-device table in SPEC-384 section 7.1. Summary fields to copy:
-   `renderer`, `devicePixelRatio`, `fpsMean`, `frameMsP95`, `pctFramesOver66ms`, `framesOver50ms`,
+   `renderer`, `devicePixelRatio`, `fpsMean`, `rafFpsMean`, `frameMsP95`, `pctFramesOver66ms`, `framesOver50ms`,
    `rafCallbackMsP95`, plus temperature after 10 minutes and whether p95 meets the section 3
    budget for the tier. `framesOver33ms` is informative only (at 30 fps nearly every frame is
    about 33.3 ms). `programsCreated` is only complete when the probe is injected before load.
+
+Rendered frames vs browser ticks: a `requestAnimationFrame` tick counts as an application rendered
+frame only if the app issued at least one draw call (including draws hidden by `setSkip`) since the
+previous tick. `renderedFrames`, `fpsMean`, `frameMs*`, `framesOver*` and all per-frame draw-call and
+triangle counts use rendered frames; `rafTicks`, `rafFpsMean` and `rafIntervalMs*` report the browser
+cadence. With r3f's default `frameloop="always"` (today) they are equal. With a frame cap (SPEC-384 L5)
+on a 60 Hz display, expect about 30 rendered fps against about 60 rAF fps. With on-demand rendering,
+the rendered-frame interval includes idle gaps, so use `rafCallbackMs*` for render cost instead.
+
+`cpu-profile.mjs --startup` profiles from before navigation to the end of a 1 s probe window, so it
+prints total milliseconds per bucket and function over the profiler's own elapsed time. It does not
+print per-frame or per-second rates, because the probe counts only the last ~1 s of frames and
+`--seconds` does not control the startup capture. Both runners stop every process they started
+(vite preview, mock server, browser) if any setup step fails, for example a taken port or a bad
+`--chrome` path.
 
 Notes: the probe patches WebGL only after it is pasted, so draw-call counts start from the next
 frame, which is fine. The renderer string is read from the app's own context on the first

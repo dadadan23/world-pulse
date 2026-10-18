@@ -160,11 +160,6 @@ async function runScenario(browser, s) {
   return { scenario: s.name, renderer: gl, ...r };
 }
 
-const preview = await startProc(
-  'npx',
-  ['vite', 'preview', '--port', '4173', '--strictPort'],
-  /4173/
-);
 const launchArgs = flag('gpu')
   ? ['--ignore-gpu-blocklist', '--enable-gpu-rasterization']
   : [
@@ -174,14 +169,18 @@ const launchArgs = flag('gpu')
       '--disable-gpu-vsync',
       '--disable-frame-rate-limit',
     ];
-const browser = await chromium.launch({
-  executablePath: CHROME,
-  headless: !flag('headed'),
-  args: launchArgs,
-});
-
+// Setup runs inside the try so that a failed browser launch (for example a bad
+// --chrome path) still stops vite preview.
 const results = [];
+let preview;
+let browser;
 try {
+  preview = await startProc('npx', ['vite', 'preview', '--port', '4173', '--strictPort'], /4173/);
+  browser = await chromium.launch({
+    executablePath: CHROME,
+    headless: !flag('headed'),
+    args: launchArgs,
+  });
   // Group scenarios by marker count so the mock server restarts only when needed.
   for (const markers of [...new Set(SCENARIOS.map((s) => s.markers))]) {
     await withMock(markers, async () => {
@@ -193,7 +192,8 @@ try {
           r.rep = rep;
           results.push(r);
           console.warn(
-            `${s.name.padEnd(40)} rep${rep} fps=${r.summary.fpsMean} p50=${r.summary.frameMsP50}ms ` +
+            `${s.name.padEnd(40)} rep${rep} fps=${r.summary.fpsMean} (raf ${r.summary.rafFpsMean}) ` +
+              `p50=${r.summary.frameMsP50}ms ` +
               `raf=${r.summary.rafCallbackMsP50}ms calls=${r.summary.drawCallsPerFrame}`
           );
         }
@@ -201,8 +201,8 @@ try {
     });
   }
 } finally {
-  await browser.close();
-  stopProc(preview);
+  if (browser) await browser.close().catch(() => {});
+  if (preview) stopProc(preview);
 }
 
 if (OUT) writeFileSync(OUT, JSON.stringify(results, null, 2));

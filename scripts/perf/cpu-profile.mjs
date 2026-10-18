@@ -2,7 +2,10 @@
 //
 // Prereqs: npx vite build. Starts vite preview (:4173) + mock server (:3000).
 // Usage:   node scripts/perf/cpu-profile.mjs [--chrome path] [--markers 50] [--seconds 10]
-//          [--startup]   profile page load instead (navigation -> canvas + 4 s)
+//          [--startup]   profile page load instead (navigation -> canvas + 4 s + 1 s).
+//                        Startup output is totals (ms) over the profiler's own
+//                        elapsed time; no per-frame or per-second rates, because
+//                        the probe only counts frames in the final ~1 s.
 //
 // Renders at a deliberately tiny viewport (640x360, dpr 1) so software GL fill
 // cost is minimised and the main thread is not stalled on the GPU process.
@@ -59,22 +62,22 @@ function stopProc(p) {
   }
 }
 
-const preview = await startProc(
-  'npx',
-  ['vite', 'preview', '--port', '4173', '--strictPort'],
-  /4173/
-);
-const mock = await startProc(
-  process.execPath,
-  [path.join(here, 'mock-server.mjs'), '--markers', MARKERS],
-  /listening/
-);
-const browser = await chromium.launch({
-  executablePath: CHROME,
-  args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'],
-});
-
+// Setup runs inside the try so that a failed step (port taken, bad --chrome
+// path) still stops every process that was already started.
+let preview;
+let mock;
+let browser;
 try {
+  preview = await startProc('npx', ['vite', 'preview', '--port', '4173', '--strictPort'], /4173/);
+  mock = await startProc(
+    process.execPath,
+    [path.join(here, 'mock-server.mjs'), '--markers', MARKERS],
+    /listening/
+  );
+  browser = await chromium.launch({
+    executablePath: CHROME,
+    args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'],
+  });
   const ctx = await browser.newContext({ viewport: { width: 640, height: 360 } });
   const page = await ctx.newPage();
   await page.addInitScript({ content: probeSrc });
@@ -131,20 +134,39 @@ try {
     if (b !== 'idle') fns[key] = (fns[key] || 0) + c * dt;
   }
   const total = Object.values(buckets).reduce((a, b) => a + b, 0);
-  const frames = probe.summary.frames || 1;
-  console.warn(`\nCPU profile, ${SECONDS}s @ 640x360, ${MARKERS} markers, ${frames} frames`);
-  console.warn('| Bucket | ms per second | ms per frame | share of wall |');
-  console.warn('|---|---|---|---|');
-  for (const [b, ms] of Object.entries(buckets).sort((a, c) => c[1] - a[1])) {
-    console.warn(
-      `| ${b} | ${(ms / SECONDS).toFixed(1)} | ${(ms / frames).toFixed(2)} | ${((ms / total) * 100).toFixed(1)}% |`
-    );
-  }
-  console.warn('\nTop self-time functions (non-idle):');
-  Object.entries(fns)
+  const elapsedS = (profile.endTime - profile.startTime) / 1e6; // profiler's own window
+  const sorted = Object.entries(buckets).sort((a, c) => c[1] - a[1]);
+  const share = (ms) => `${((ms / total) * 100).toFixed(1)}%`;
+  const top = Object.entries(fns)
     .sort((a, c) => c[1] - a[1])
-    .slice(0, 12)
-    .forEach(([k, ms]) => console.warn(`  ${(ms / frames).toFixed(3)} ms/frame  ${k}`));
+    .slice(0, 12);
+  if (STARTUP) {
+    // Samples cover navigation to the end of the probe window; the probe only
+    // counted frames in the last ~1 s, so per-frame rates would be inflated.
+    console.warn(
+      `\nStartup CPU profile, ${elapsedS.toFixed(2)} s profiled @ 640x360, ${MARKERS} markers`
+    );
+    console.warn('| Bucket | total ms | share of wall |');
+    console.warn('|---|---|---|');
+    for (const [b, ms] of sorted) console.warn(`| ${b} | ${ms.toFixed(0)} | ${share(ms)} |`);
+    console.warn('\nTop self-time functions (non-idle):');
+    top.forEach(([k, ms]) => console.warn(`  ${ms.toFixed(1)} ms total  ${k}`));
+  } else {
+    const frames = probe.summary.renderedFrames || 1;
+    console.warn(
+      `\nCPU profile, ${elapsedS.toFixed(2)} s profiled @ 640x360, ${MARKERS} markers, ` +
+        `${frames} rendered frames`
+    );
+    console.warn('| Bucket | ms per second | ms per frame | share of wall |');
+    console.warn('|---|---|---|---|');
+    for (const [b, ms] of sorted) {
+      console.warn(
+        `| ${b} | ${(ms / elapsedS).toFixed(1)} | ${(ms / frames).toFixed(2)} | ${share(ms)} |`
+      );
+    }
+    console.warn('\nTop self-time functions (non-idle):');
+    top.forEach(([k, ms]) => console.warn(`  ${(ms / frames).toFixed(3)} ms/frame  ${k}`));
+  }
   console.warn('\nProbe summary:', JSON.stringify(probe.summary));
   console.warn('Startup long tasks (ms):', JSON.stringify(startup));
   console.warn(
@@ -156,7 +178,7 @@ try {
   );
   await ctx.close();
 } finally {
-  await browser.close();
-  stopProc(mock);
-  stopProc(preview);
+  if (browser) await browser.close().catch(() => {});
+  if (mock) stopProc(mock);
+  if (preview) stopProc(preview);
 }
