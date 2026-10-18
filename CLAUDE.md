@@ -4,42 +4,41 @@
 
 World Pulse is a real-time information radiator that visualizes global events on an interactive 3D globe. It is designed to run 24/7 as an ambient dashboard on dedicated hardware (TV, iPad, monitor). The app streams live data from multiple sources (earthquakes, ISS tracking, aurora, volcanoes, asteroids, planet visibility) and renders them on a Three.js globe with a dark "Oblivion" aesthetic.
 
-**Current status:** v0.2.0+ — Phase 1 (MVP) and Phase 2 (extensibility platform + historical context, epics #142/#143) are both complete and closed, along with three further epics shipped since (#208 headline news ticker, #226/#227/#228/#229 ambient settings / adaptive layout / severity alerting / Electron auto-update). **The issue tracker currently has zero open issues.** There is no defined next phase — see "Backlog Refinement Findings" below.
+**Current status:** v0.2.0+ — Phase 1 (MVP), Phase 2 (epics #142/#143) and four later epics (#208 headline news ticker; #226/#227/#228/#229 ambient settings, adaptive layout, severity alerting, Electron auto-update) are shipped and closed. **A new "next phase" is planned and open: 4 epics (#347–#350), 19 features and 46 stories — 70 open issues as of 2026-10-18** (see "Next Phase" below).
 
 ---
 
-## Project Status (as of 2026-09-24)
+## Project Status (as of 2026-10-18)
 
 | Area | Status | Notes |
 |---|---|---|
-| CI/CD | Needs attention | Feature-branch CI is green, but **26 Dependabot PRs are open and unmerged** (#255–#303, oldest from 2026-07-26). Several are major-version bumps (vite 7→8, eslint 9→10, vitest 4→5, electron 42→43) that need manual verification, not auto-merge. This has been a recurring gap — the PR numbers cited in the prior status entry (#176–#187) are long gone, but the underlying backlog is larger now, not smaller. |
-| Globe fidelity | Done | All stories (#41–45, #56, #57, #62) closed, including the graticule overlay (#45) and Natural Earth 110m coastline pipeline. |
-| Oblivion design system | Done | Feature #46 and all stories closed. `DESIGN.md`/`PRODUCT.md` are the canonical, current reference (added via PR #225 by the "Impeccable" tool — see design-language note below). |
-| Degraded UX | Done | Feature #26 and all stories closed. |
-| Reliability (original scope) | Done | Feature #23, collector health/lifecycle, and registry/manifest work all closed. |
-| Release readiness | Done | #39, #66, #37, #38 all closed. |
-| Phase 2 backlog (#142/#143) | Done | Both epics and all 24 child stories (#144–167) closed. |
-| Headline news + tickers (#208) | Done | NewsAPI collector, "near you" headlines, geologic/night-sky vertical tickers (#209–215) closed. |
-| Ambient display settings (#226) | Done | Settings store, panel UI, mute toggles, ticker speed, location override (#230–234) closed. |
-| Adaptive multi-display layout (#227) | Done | Breakpoint spec, portrait layout, orientation handling, cross-viewport validation (#235–238) closed. |
-| Severity-aware alerting (#228) | Done | Ticker ordering, pulse animation, audio chime, mute config (#239–242) closed. |
-| Electron auto-update (#229) | Done | electron-updater wiring, in-app update check, status indicator, recovery docs (#243–246) closed. |
-| AgentX automation | Resolved | Bug #191 (duplicate routing comments) closed. |
+| Phase 1, Phase 2, news/tickers, ambient settings, adaptive layout, severity alerting, Electron auto-update | Done | Epics #142/#143, #208, #226–#229 and all child stories closed. `DESIGN.md`/`PRODUCT.md` are the canonical design references. |
+| Next phase (#347–#350) | **Not started** | 0 of 70 issues closed, none assigned, no open feature PRs. See "Next Phase". |
+| Dependency upgrades (#417) | Mostly done | Merged: vitest 5 (#423), dotenv 18 (#426), three 0.186 (#430). **Open Dependabot PRs: 3** — #333 vite 8 (blocked: needs electron-vite 6; `manualChunks` fails under rolldown), #335 electron 44 (needs desktop smoke test), #336 TypeScript 7 (blocked: typescript-eslint peer range). Not yet PR'd: eslint 10, @vitejs/plugin-react 6, @testing-library/jest-dom 7. Use npm 11 for lockfiles. |
+| CI/CD | Green on main | Last main commits are dependency/build fixes (#421, #423, #426, #428 Express 5 SPA fallback, #430). |
+| AgentX state | Idle | `.agentx/state/agent-status.json` shows all agents idle. Always run `hook complete` when finishing work. |
+| `CHANGELOG.md` | Stale | Stops at v0.2.0 / PR #225; does not cover any epic shipped since. |
 
-## Backlog Refinement Findings (2026-09-24)
+## Next Phase (epics opened 2026-10-17; proposal: `docs/proposals/NEXT-PHASE-EPICS.md`)
 
-A full backlog review (all 121 tracked issues, all open PRs) found:
+| Epic | Pri | Features | Summary |
+|---|---|---|---|
+| #347 Mode Deck | P1 | #351–#355 | Mode registry + persisted state, Mode Deck chips/hotkeys/remote nav, engage feedback, Peek, Scenes/Showtime. Every new effect registers as a mode. |
+| #348 Living Globe | P2 | #356–#362 | Perf/a11y guardrails, live solar terminator, callouts, pulse rings, sweep/ping, calm/alert modes, phosphor + burn-in drift. |
+| #349 Context at a Glance | P2 | #363–#366 | Rolling-median baselines, now-vs-normal gauges, data-lineage footer, ISS pass prediction (spike first). |
+| #350 New Data Layers wave 1 | P2 | #367–#369 | NASA FIRMS wildfires, NOAA SWPC space weather, GDACS/EONET disaster alerts (spike first). |
 
-1. **The backlog is empty.** Every issue in the tracker is closed — there is nothing to triage or refine, and no work is currently mis-statused. The prior "Phase 2 needs refinement" framing above is obsolete; refinement happened and the epics shipped.
-2. **There is no defined next phase.** Neither this file, `BACKLOG.md`, `PRODUCT.md`, nor `SPEC.md` names what comes after the four epics above. Before opening new stories, get direction from the project owner on priorities rather than inventing scope.
-3. **Dependabot debt (26 open PRs, #255–#303)** is the one concrete, actionable gap — see CI/CD row above.
-4. **`.agentx/state/agent-status.json` had a stale entry**: `engineer` was recorded `"active"` on issues 232/233/236/237/238/241/242, all of which are closed. Reset to `idle` as part of this pass — a symptom worth watching is that the `hook complete` step isn't always being run when work finishes.
-5. **`CHANGELOG.md` stops at v0.2.0 / PR #225** and does not reflect the four epics closed since. Left as-is here (reconstructing changelog entries from merged-PR history is release-notes work, not backlog triage) but flagged for whoever owns releases.
-6. **`BACKLOG.md`** was dated 2026-05-03 and described a sprint that finished months ago; rewritten below to match current state.
+**Suggested sequence** (derived from epic text and titles; story-level blocked-by links were not verified):
+1. Foundation (P1): #384 frame-budget spike, #385 reduced-motion utility, #370 → #371 mode registry/persistence.
+2. In parallel: Deck UX #372 → #373 → #374; lineage #405 → #406; sun #386 → #387; start baseline server job #400–#402 early so history accumulates.
+3. P2 layers: fires #409–#411, space weather #412–#414, gauges #403–#404, callouts/rings #389–#392, alert state machine/drill #395–#397, remaining deck stories.
+4. P3 after spikes: sweep #393–#394, phosphor #398–#399, sound #377, ISS #407/#408, GDACS #415/#369.
+
+**Open concerns:** stories touching `src/shared/**` or `src/server/**` need architect review (#370, #371, #400, #401, #405, #409, #412 are likely candidates) but no ADR tasks exist; #395–#397 may overlap shipped alerting (#228); several P1 stories sit under P2 epics; no cross-viewport/E2E validation story, no release/CHANGELOG story, and no config/security story for the FIRMS `MAP_KEY` and new external hosts. The prototypes the epics cite (`docs/prototypes/mode-deck.html`, `next-phase-concepts.html`) are not on `main`.
 
 ## Active Branches
 
-No feature PRs are currently open — only Dependabot dependency-bump PRs (26 of them, see above). Before starting new work: run `git fetch --all`, check `.agentx/state/agent-status.json` for active agents on the same issue, and confirm the target issue isn't already closed (the tracker has previously lagged behind merged work).
+No feature PRs are open besides the Dependabot PRs above (#333, #335, #336). Before starting new work: run `git fetch --all`, check `.agentx/state/agent-status.json` for active agents on the same issue, and confirm the target issue is still open — the tracker and this file have both lagged behind reality before.
 
 ## AgentX Knowledge Layer
 
@@ -68,12 +67,7 @@ This is enforced in `.agentx/workflows/story.toml`, `bug.toml`, and `docs.toml` 
 
 ## Critical Path
 
-The original critical path (CI green → Globe GeoJSON → Oblivion design system →
-Degraded UX → Release readiness) is **complete** — every stage closed, including
-the three later epics (news/tickers, ambient settings + adaptive layout,
-severity alerting + auto-update) that were added after this path was written.
-There is currently no active critical path; see "Backlog Refinement Findings"
-above for what to resolve before defining the next one.
+The original critical path (CI green → Globe GeoJSON → Oblivion design system → Degraded UX → Release readiness) is complete. The active path for the next phase is: frame-budget spike (#384) → mode registry (#370/#371) → Mode Deck UI and mode-producing features. See "Next Phase".
 
 ## Issue Lifecycle (REQUIRED — automated via `.github/workflows/pr-issue-link.yml`)
 
