@@ -4,7 +4,10 @@
 // seeded set of synthetic events on connect, so that every measurement run
 // renders the same scene. No collectors, no network, no API keys.
 //
-// Usage: node scripts/perf/mock-server.mjs [--port 3000] [--markers 50]
+// Usage: node scripts/perf/mock-server.mjs [--port 3000] [--markers 50] [--host 127.0.0.1]
+//   --host H      interface to bind. Defaults to 127.0.0.1 (loopback only). For an
+//                 on-device run where the device fetches from another machine, pass
+//                 the LAN address (or 0.0.0.0) on a trusted network only.
 //   --markers N   number of located events to emit (plus 1 ISS + 1 aurora event)
 //                 Events are spread on a golden-angle spiral so the client-side
 //                 5-degree proximity dedup does not collapse them.
@@ -18,6 +21,7 @@ function arg(name, fallback) {
 
 const PORT = Number(arg('port', process.env.PORT ?? 3000));
 const MARKERS = Number(arg('markers', process.env.MARKERS ?? 50));
+const HOST = arg('host', process.env.PERF_MOCK_HOST ?? '127.0.0.1');
 
 // Small seeded PRNG (mulberry32) so severities are identical between runs.
 function rng(seed) {
@@ -102,6 +106,8 @@ io.on('connection', (socket) => {
   socket.emit('events:initial', { events, timestamp: Date.now() });
 });
 
-server.listen(PORT, () => {
-  console.warn(`[perf-mock] listening on :${PORT} with ${MARKERS} located events (+ISS, +aurora)`);
+server.listen(PORT, HOST, () => {
+  console.warn(
+    `[perf-mock] listening on ${HOST}:${PORT} with ${MARKERS} located events (+ISS, +aurora)`
+  );
 });

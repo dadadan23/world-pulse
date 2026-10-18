@@ -14,8 +14,8 @@
     "status": "complete",
     "issue": "384",
     "branch": "claude/384-frame-budget-spike",
-    "startedAt": "2026-10-18T03:25:20Z",
-    "completedAt": "2026-10-18T04:25:13Z",
+    "startedAt": "2026-10-18T20:07:11Z",
+    "completedAt": "2026-10-18T20:15:23Z",
     "artifacts": []
   },
   "engineer": {
@@ -30,9 +30,13 @@
     ]
   },
   "reviewer": {
-    "status": "idle",
-    "issue": null,
-    "lastActivity": null
+    "role": "reviewer",
+    "status": "complete",
+    "issue": "384",
+    "branch": "claude/384-frame-budget-spike",
+    "startedAt": "2026-10-18T19:52:47Z",
+    "completedAt": "2026-10-18T20:06:26Z",
+    "artifacts": []
   },
   "devops-engineer": {
     "status": "idle",
