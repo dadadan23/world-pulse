@@ -1,8 +1,12 @@
 {
   "product-manager": {
-    "status": "idle",
-    "issue": null,
-    "lastActivity": null
+    "role": "product-manager",
+    "status": "complete",
+    "issue": "384",
+    "branch": "claude/384-frame-budget-spike",
+    "startedAt": "2026-10-18T20:17:15Z",
+    "completedAt": "2026-10-18T20:21:06Z",
+    "artifacts": []
   },
   "ux-designer": {
     "status": "idle",
@@ -34,8 +38,8 @@
     "status": "complete",
     "issue": "384",
     "branch": "claude/384-frame-budget-spike",
-    "startedAt": "2026-10-18T19:52:47Z",
-    "completedAt": "2026-10-18T20:06:26Z",
+    "startedAt": "2026-10-18T20:17:15Z",
+    "completedAt": "2026-10-18T20:22:53Z",
     "artifacts": []
   },
   "devops-engineer": {

@@ -8,7 +8,7 @@
 | Type         | type:story (spike)                                                                                                               |
 | Agent        | Architect                                                                                                                        |
 | Status       | In Review, revision 2 (review fixes applied; owner decisions of 2026-10-18 recorded; SPEC-384 section 9 items 1 to 6 still open) |
-| Branch       | `claude/384-frame-budget-spike` (commits 58f9d4a, b2a91b6; revision 2 uncommitted)                                               |
+| Branch       | `claude/384-frame-budget-spike` (commits 58f9d4a, b2a91b6; revision 2 in df2a424)                                                |
 | Started      | 2026-10-18                                                                                                                       |
 | Last Updated | 2026-10-18                                                                                                                       |
 
