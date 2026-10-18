@@ -65,3 +65,10 @@ Real GPUs, Raspberry Pi, iPad Safari, TV browsers, Electron builds, GPU timer qu
 
 - NEXT: product-manager or owner decision on tiers (SPEC-384 section 9), then reviewer for the spec and scripts.
 - Proposed follow-up stories under #356 (not created): DPR cap and quality profile store; instanced markers and rings; label sprite atlas and hidden-label culling; frame-time governor; non-gating perf probe in CI (high-risk surface: `.github/workflows/**`).
+
+### Owner decisions (2026-10-18)
+
+- Floor: Raspberry Pi 5 (a better-fitting device may replace it); iPad 9th gen moved to best effort; broad backwards compatibility not required.
+- Smart-TV browsers out as render hosts.
+- Acceptance criterion 8 gate accepted.
+- Still open: SPEC-384 section 9, items 1-6 (30 fps at Floor, reduced-motion rotation, lite earth material, night-lights texture, profile setting UI, CI perf check).

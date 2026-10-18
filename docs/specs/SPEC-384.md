@@ -14,7 +14,7 @@
 
 | Question                         | Answer                                                                                                                                                                                                                                                                                                                      |
 | -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Lowest supported display         | **Proposed:** Raspberry Pi 5 driving a 1080p TV, and iPad 9th gen (A13). Built-in smart-TV browsers are not a supported render host. Needs owner confirmation.                                                                                                                                                              |
+| Lowest supported display         | **Decided (owner, 2026-10-18):** Raspberry Pi 5 driving a 1080p TV. A different floor device may replace it if it needs fewer tradeoffs. Broad backwards compatibility is not required. Built-in smart-TV browsers are not a supported render host.                                                                         |
 | Frame budget                     | Floor tier: 30 fps (33.3 ms), p95 50 ms or less. Recommended and Showpiece tiers: 60 fps (16.7 ms), p95 20 ms or less.                                                                                                                                                                                                      |
 | What the current globe costs     | 265 draw calls, 42.6k triangles, 58.2 MiB of textures at 50 markers (exact). The marker system is **76% of draw calls** and adds about **4 ms/frame of main-thread JS** on the container CPU. Fill cost is led by the earth sphere, then the atmosphere shells and the wireframe overlay. Device pixel ratio is not capped. |
 | Effects that need a lite path    | Phosphor bloom, sweep and ping, pulse-ring expansion, and fire-marker animation and count. Terminator, callout and alert dim stay cheap if built as specified, so they need no lite variant (section 6).                                                                                                                    |
@@ -22,16 +22,16 @@
 
 ---
 
-## 2. Target hardware tiers (assumptions, owner to confirm)
+## 2. Target hardware tiers (Floor choice decided 2026-10-18; device capabilities still unverified)
 
 None of these devices was available to the spike. Device capabilities listed come from public specs and **have not been verified here**.
 
-| Tier                        | Reference devices (assumed)                                                                                               | Runtime                                       | Resolution and DPR cap                                                               | Default profile       |
-| --------------------------- | ------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------- | ------------------------------------------------------------------------------------ | --------------------- |
-| **Floor** (minimum)         | Raspberry Pi 5 (4 GB or more, VideoCore VII, WebGL2 through Mesa) on a 1080p TV; iPad 9th gen (A13, 3 GB) on a wall mount | Chromium kiosk or Electron arm64; iPad Safari | 1920x1080, DPR cap **1.0** (iPad: 1.0, raise to 1.5 only if on-device test passes)   | Lite                  |
-| **Recommended**             | Mini PC or laptop with Intel Iris Xe-class iGPU or Apple M1; iPad Air/Pro (M1)                                            | Electron (primary), desktop Chrome/Safari     | 1080p to 1440p, DPR cap **1.5**                                                      | Full (bloom half-res) |
-| **Showpiece**               | 4K TV or monitor driven by Apple M1 Pro or newer, or a discrete GPU (GTX 1660-class or better)                            | Electron                                      | 3840x2160, DPR cap **1.0** at 4K (do not let OS scaling 2x push render size past 4K) | Full                  |
-| **Unsupported render host** | Smart-TV built-in browsers (Tizen, webOS, Android TV WebView), Raspberry Pi 4 and older, iPads before A12                 | Best effort only                              | Lite forced                                                                          | Lite                  |
+| Tier                        | Reference devices (assumed)                                                                                                                           | Runtime                                   | Resolution and DPR cap                                                               | Default profile       |
+| --------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------- | ------------------------------------------------------------------------------------ | --------------------- |
+| **Floor** (minimum)         | Raspberry Pi 5 (4 GB or more, VideoCore VII, WebGL2 through Mesa) on a 1080p TV                                                                       | Chromium kiosk or Electron arm64          | 1920x1080, DPR cap **1.0**                                                           | Lite                  |
+| **Recommended**             | Mini PC or laptop with Intel Iris Xe-class iGPU or Apple M1; iPad Air/Pro (M1)                                                                        | Electron (primary), desktop Chrome/Safari | 1080p to 1440p, DPR cap **1.5**                                                      | Full (bloom half-res) |
+| **Showpiece**               | 4K TV or monitor driven by Apple M1 Pro or newer, or a discrete GPU (GTX 1660-class or better)                                                        | Electron                                  | 3840x2160, DPR cap **1.0** at 4K (do not let OS scaling 2x push render size past 4K) | Full                  |
+| **Unsupported render host** | Smart-TV built-in browsers (Tizen, webOS, Android TV WebView), Raspberry Pi 4 and older, iPad 9th gen and older (best effort, not a floor commitment) | Best effort only                          | Lite forced                                                                          | Lite                  |
 
 "Unsupported" doesn't mean blocked. It means nobody commits to a budget for those devices. A TV is still supported as a **display**, driven over HDMI by a Floor-or-better device.
 
@@ -249,16 +249,22 @@ Each one is testable with the tooling in `scripts/perf/` or with unit tests.
 
 ---
 
-## 9. Open questions for the owner
+## 9. Owner decisions and open questions
 
-1. **Which Floor device do you actually deploy?** Pi 5, Pi 4, iPad 9th gen, or something else? This decides whether Floor is 30 fps or Lite-only.
-2. **Are built-in smart-TV browsers out of scope as render hosts?** Proposed: yes.
-3. **Is 30 fps acceptable at Floor** for an ambient display? Rotation is 0.06 rad/s, so 30 fps is visually smooth, and it lowers power and heat.
-4. **Should reduced motion also stop auto-rotation** and allow on-demand rendering (near-zero idle GPU)? `PRODUCT.md` only lists sweep and glow.
-5. **Lite earth material.** Is a visibly simpler earth (no normal map, cheaper shading) acceptable at L5? It is the largest measured fill cost.
-6. **Night-lights texture source and size for #357.** This affects memory (+10.7 to +42.7 MiB) and licensing.
-7. **Should the performance profile (Auto, Full, Lite) appear in the settings panel?** That needs UX (#226 pattern).
-8. **Is a perf regression check in CI wanted?** It would touch `.github/workflows/**`, which is high-risk surface needing architect review. Proposed: start as a non-gating job that posts probe counts.
+**Decided 2026-10-18 (owner):**
+
+- **Floor device:** Raspberry Pi 5 on a 1080p TV. If a different device meets the Floor budget with fewer tradeoffs, it can replace the Pi 5 once on-device results exist. Backwards compatibility is not a goal, so iPad 9th gen and older moved to best effort (this follows the owner's "no need for a lot of backwards compatibility"; confirm if an iPad must stay supported).
+- **Smart-TV built-in browsers:** out as render hosts. A TV remains supported as a display driven over HDMI.
+- **Acceptance criterion 8 gate:** accepted. #360 (sweep) and #362 (phosphor) cannot merge until section 7.1 has a Floor and a Recommended device result.
+
+**Still open:**
+
+1. **Is 30 fps acceptable at Floor** for an ambient display? Rotation is 0.06 rad/s, so 30 fps is visually smooth, and it lowers power and heat.
+2. **Should reduced motion also stop auto-rotation** and allow on-demand rendering (near-zero idle GPU)? `PRODUCT.md` only lists sweep and glow.
+3. **Lite earth material.** Is a visibly simpler earth (no normal map, cheaper shading) acceptable at L5? It is the largest measured fill cost.
+4. **Night-lights texture source and size for #357.** This affects memory (+10.7 to +42.7 MiB) and licensing.
+5. **Should the performance profile (Auto, Full, Lite) appear in the settings panel?** That needs UX (#226 pattern).
+6. **Is a perf regression check in CI wanted?** It would touch `.github/workflows/**`, which is high-risk surface needing architect review. Proposed: start as a non-gating job that posts probe counts.
 
 ---
 
