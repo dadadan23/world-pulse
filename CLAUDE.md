@@ -116,6 +116,18 @@ The Projects v2 status updates require a GitHub classic PAT with `project` scope
 2. Add it as repository secret: **Settings → Secrets → Actions → New** → name: `GH_PROJECT_TOKEN`
 Without this secret, labels still apply but Projects v2 card moves are skipped (logged as warnings).
 
+## Claude Code Setup (`.claude/`)
+
+AgentX content from `.github/` and `.agentx/` is exposed to Claude Code under `.claude/` (see `.claude/README.md`; regenerate with `python3 .claude/sync-agentx.py`).
+
+- **Coordinator:** `/agent-x [issue|ready]` — classifies the issue (fast path vs. full path, risk-surface gate above) and dispatches role subagents.
+- **Role subagents** (`.claude/agents/`): `product-manager`, `ux-designer`, `architect`, `engineer`, `devops-engineer`, `reviewer`, `reviewer-auto`, `customer-coach`. They cannot call each other; each ends with a `NEXT:` line for the coordinator.
+- **Skills** (`.claude/skills/`): the 9 project skills listed above plus general engineering skills. Load `oblivion-component` for any UI change.
+- **Commands:** `/ax-prd`, `/ax-architecture`, `/ax-ux-design`, `/ax-test-gen`, `/ax-refactor`, `/ax-bug-triage`, `/ax-code-review`, `/ax-security-review`, `/ax-devops`.
+- **Rules** (`.claude/rules/`): path-scoped TypeScript, React, server API, workflow/YAML and UX guidance.
+- **AgentX CLI on Linux/macOS/cloud:** use `./.agentx/agentx.sh` (the `.ps1` forms in `AGENTS.md` are the Windows equivalents). Hook phases: `start`, `complete`, `failed`.
+- If `AGENTS.md`/agent files disagree with this file, this file wins (e.g. coverage target >70%).
+
 ## Agent Coordination
 
 Two agents are active: **Claude Code** and **GitHub Copilot SWE**. Collisions are a real risk.
@@ -124,7 +136,7 @@ Two agents are active: **Claude Code** and **GitHub Copilot SWE**. Collisions ar
 
 1. Check `.agentx/state/agent-status.json` for agents with `"status": "active"` on the same issue or branch.
 2. If Copilot is active on the same issue, wait or post a coordination comment on the GitHub issue.
-3. When starting: `./agentx/agentx.sh hook start <role> <issue-number>`
+3. When starting: `./.agentx/agentx.sh hook start <role> <issue-number>`
 4. When done: `./.agentx/agentx.sh hook complete <role> <issue-number>`
 5. On error: `./.agentx/agentx.sh hook failed <role> <issue-number> "<error message>"`
 
