@@ -1,7 +1,7 @@
 # Technical Specification: Display Targets and Frame Budget (Spike)
 
 **Issue**: #384 (spike) | **Parent Feature**: #356 Performance and accessibility guardrails | **Epic**: #348 Living Globe
-**Status**: Draft (needs owner decision on hardware tiers, see section 9)
+**Status**: In review, revision 2 (owner decisions of 2026-10-18 recorded in section 9; items 1 to 6 there are still open; review fixes from `docs/reviews/REVIEW-384.md` applied)
 **Author**: Architect agent | **Date**: 2026-10-18
 **Location note**: this lives at `docs/specs/SPEC-384.md`, matching the existing `docs/specs/SPEC-{issue}.md` naming. There is no `docs/performance/` folder, and this spike doesn't create one.
 **Tooling**: `scripts/perf/` (probe, mock backend, runners, on-device procedure in `scripts/perf/README.md`). Nothing in `src/` was changed.
@@ -12,13 +12,13 @@
 
 ## 1. Summary
 
-| Question                         | Answer                                                                                                                                                                                                                                                                                                                      |
-| -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Lowest supported display         | **Decided (owner, 2026-10-18):** Raspberry Pi 5 driving a 1080p TV. A different floor device may replace it if it needs fewer tradeoffs. Broad backwards compatibility is not required. Built-in smart-TV browsers are not a supported render host.                                                                         |
-| Frame budget                     | Floor tier: 30 fps (33.3 ms), p95 50 ms or less. Recommended and Showpiece tiers: 60 fps (16.7 ms), p95 20 ms or less.                                                                                                                                                                                                      |
-| What the current globe costs     | 265 draw calls, 42.6k triangles, 58.2 MiB of textures at 50 markers (exact). The marker system is **76% of draw calls** and adds about **4 ms/frame of main-thread JS** on the container CPU. Fill cost is led by the earth sphere, then the atmosphere shells and the wireframe overlay. Device pixel ratio is not capped. |
-| Effects that need a lite path    | Phosphor bloom, sweep and ping, pulse-ring expansion, and fire-marker animation and count. Terminator, callout and alert dim stay cheap if built as specified, so they need no lite variant (section 6).                                                                                                                    |
-| Prerequisites before new effects | Explicit DPR cap, instanced markers and rings, a quality profile with a frame-time governor, and a draw-call/texture regression check (section 8).                                                                                                                                                                          |
+| Question                         | Answer                                                                                                                                                                                                                                                                                                                                         |
+| -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Lowest supported display         | **Decided (owner, 2026-10-18):** Raspberry Pi 5 driving a 1080p TV. A different floor device may replace it if it needs fewer tradeoffs. Broad backwards compatibility is not required. Built-in smart-TV browsers are not a supported render host.                                                                                            |
+| Frame budget                     | Floor tier: 30 fps (33.3 ms), p95 50 ms or less. Recommended and Showpiece tiers: 60 fps (16.7 ms), p95 20 ms or less.                                                                                                                                                                                                                         |
+| What the current globe costs     | 265 draw calls, 42.6k triangles, 58.2 MiB of textures at 50 markers (exact). The marker system is **about 74% of draw calls** (196 of 265) and adds about **4 ms/frame of main-thread JS** on the container CPU. Fill cost is led by the earth sphere, then the atmosphere shells and the wireframe overlay. Device pixel ratio is not capped. |
+| Effects that need a lite path    | Phosphor bloom, sweep and ping, pulse-ring expansion, and fire-marker animation and count. Terminator, callout and alert dim stay cheap if built as specified, so they need no lite variant (section 6).                                                                                                                                       |
+| Prerequisites before new effects | Explicit DPR cap, instanced markers and rings, a quality profile with a frame-time governor, and a draw-call/texture regression check (section 8).                                                                                                                                                                                             |
 
 ---
 
@@ -26,12 +26,12 @@
 
 None of these devices was available to the spike. Device capabilities listed come from public specs and **have not been verified here**.
 
-| Tier                        | Reference devices (assumed)                                                                                                                           | Runtime                                   | Resolution and DPR cap                                                               | Default profile       |
-| --------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------- | ------------------------------------------------------------------------------------ | --------------------- |
-| **Floor** (minimum)         | Raspberry Pi 5 (4 GB or more, VideoCore VII, WebGL2 through Mesa) on a 1080p TV                                                                       | Chromium kiosk or Electron arm64          | 1920x1080, DPR cap **1.0**                                                           | Lite                  |
-| **Recommended**             | Mini PC or laptop with Intel Iris Xe-class iGPU or Apple M1; iPad Air/Pro (M1)                                                                        | Electron (primary), desktop Chrome/Safari | 1080p to 1440p, DPR cap **1.5**                                                      | Full (bloom half-res) |
-| **Showpiece**               | 4K TV or monitor driven by Apple M1 Pro or newer, or a discrete GPU (GTX 1660-class or better)                                                        | Electron                                  | 3840x2160, DPR cap **1.0** at 4K (do not let OS scaling 2x push render size past 4K) | Full                  |
-| **Unsupported render host** | Smart-TV built-in browsers (Tizen, webOS, Android TV WebView), Raspberry Pi 4 and older, iPad 9th gen and older (best effort, not a floor commitment) | Best effort only                          | Lite forced                                                                          | Lite                  |
+| Tier                        | Reference devices (assumed)                                                                                                                           | Runtime                                                                                             | Resolution and DPR cap                                                               | Default profile       |
+| --------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ | --------------------- |
+| **Floor** (minimum)         | Raspberry Pi 5 (4 GB or more, VideoCore VII, WebGL2 through Mesa) on a 1080p TV                                                                       | Chromium kiosk or Electron arm64                                                                    | 1920x1080, DPR cap **1.0**                                                           | Lite                  |
+| **Recommended**             | Mini PC or laptop with Intel Iris Xe-class iGPU or Apple M1; iPad Air/Pro (M1 or newer)                                                               | Electron (primary) or desktop Chrome/Safari on the mini PC or laptop; Safari on iPadOS for the iPad | 1080p to 1440p, DPR cap **1.5**                                                      | Full (bloom half-res) |
+| **Showpiece**               | 4K TV or monitor driven by Apple M1 Pro or newer, or a discrete GPU (GTX 1660-class or better)                                                        | Electron                                                                                            | 3840x2160, DPR cap **1.0** at 4K (do not let OS scaling 2x push render size past 4K) | Full                  |
+| **Unsupported render host** | Smart-TV built-in browsers (Tizen, webOS, Android TV WebView), Raspberry Pi 4 and older, iPad 9th gen and older (best effort, not a floor commitment) | Best effort only                                                                                    | Lite forced                                                                          | Lite                  |
 
 "Unsupported" doesn't mean blocked. It means nobody commits to a budget for those devices. A TV is still supported as a **display**, driven over HDMI by a Floor-or-better device.
 
@@ -41,11 +41,13 @@ None of these devices was available to the spike. Device capabilities listed com
 
 CPU (main thread) and GPU work overlap, so each gets its own budget. About 30% of every frame is held back as headroom for thermals (always-on, often fanless), browser compositing and GC.
 
-| Tier        | Target fps | Frame time | p95 frame     | Max frames over 66 ms  | Main-thread JS per frame | GPU per frame | Texture memory cap | DPR cap |
+| Tier        | Target fps | Frame time | p95 frame     | Frames over 66 ms      | Main-thread JS per frame | GPU per frame | Texture memory cap | DPR cap |
 | ----------- | ---------- | ---------- | ------------- | ---------------------- | ------------------------ | ------------- | ------------------ | ------- |
 | Floor       | 30         | 33.3 ms    | 50 ms or less | 1% or less over 10 min | 16 ms or less            | 23 ms or less | 64 MiB             | 1.0     |
 | Recommended | 60         | 16.7 ms    | 20 ms or less | 0.1% or less           | 8 ms or less             | 11 ms or less | 96 MiB             | 1.5     |
 | Showpiece   | 60         | 16.7 ms    | 20 ms or less | 0.1% or less           | 8 ms or less             | 11 ms or less | 128 MiB            | 1.0 @4K |
+
+Column to probe field mapping (`scripts/perf/probe.js`, `__wpPerf.stop().summary`): p95 frame is `frameMsP95`; frames over 66 ms is `pctFramesOver66ms` (count in `framesOver66ms`); main-thread JS is `rafCallbackMsP95`. The probe also reports `framesOver33ms` and `framesOver50ms`; these are informative only (at a 30 fps Floor almost every frame is about 33.3 ms, so frames over 33 ms is not a budget metric). GPU per frame has no probe field: it needs `EXT_disjoint_timer_query_webgl2` or a platform GPU profiler on the device (section 4.5). Texture memory is the probe's `textureUploadMiB` (cumulative allocations; see AC 6).
 
 Budget split for one frame:
 
@@ -60,14 +62,14 @@ flowchart LR
 
 **Hardware-independent ceilings.** These are exact, measurable in CI with `scripts/perf/probe.js` against the mock backend at 50 markers, and they hold on every tier:
 
-| Metric                                          | Today (measured)             | Ceiling with all default-on effects (Full)                          | Ceiling (Lite) |
-| ----------------------------------------------- | ---------------------------- | ------------------------------------------------------------------- | -------------- |
-| Draw calls per frame                            | 265                          | 300 (effects add 35 or fewer in total); 120 after marker instancing | 80             |
-| Triangles per frame                             | 42,552                       | 100,000                                                             | 60,000         |
-| Distinct shader programs (startup compile cost) | ~9 (estimated from scene)    | 16                                                                  | 12             |
-| Texture memory incl. mipmaps                    | 58.2 MiB                     | 96 MiB                                                              | 64 MiB         |
-| Full-screen post-processing passes              | 0                            | 4 (bloom at half res)                                               | 0              |
-| Per-frame React state updates from `useFrame`   | 1 (`CityLabelsWithTracking`) | 0 new                                                               | 0 new          |
+| Metric                                          | Today (measured)             | Ceiling with all default-on effects (Full)                          | Ceiling (Lite)                              |
+| ----------------------------------------------- | ---------------------------- | ------------------------------------------------------------------- | ------------------------------------------- |
+| Draw calls per frame                            | 265                          | 300 (effects add 35 or fewer in total); 120 after marker instancing | 80 (only reachable after marker instancing) |
+| Triangles per frame                             | 42,552                       | 100,000                                                             | 60,000                                      |
+| Distinct shader programs (startup compile cost) | 10 (probe `programsCreated`) | 16                                                                  | 12                                          |
+| Texture allocations incl. mipmaps               | 58.2 MiB                     | 96 MiB                                                              | 64 MiB                                      |
+| Full-screen post-processing passes              | 0                            | 4 (bloom at half res)                                               | 0                                           |
+| Per-frame React state updates from `useFrame`   | 1 (`CityLabelsWithTracking`) | 0 new                                                               | 0 new                                       |
 
 ---
 
@@ -85,21 +87,22 @@ flowchart LR
   C --> R3[cpu-profile.mjs<br/>CDP sampling, 640x360]
 ```
 
-- The **probe** tags each WebGL program by its shader source (custom-shader uniforms, three.js `SHADER_TYPE` defines) and splits `MeshBasicMaterial` by geometry signature. It counts draw calls and primitives, records `texStorage2D` allocations, times rAF callbacks, and measures frame intervals. The app itself isn't instrumented.
+- The **probe** tags each WebGL program by its shader source (custom-shader uniforms, three.js `SHADER_TYPE` defines) and splits `MeshBasicMaterial` by geometry signature. It counts draw calls and primitives, records `texStorage2D` allocations, times rAF callbacks, and measures frame intervals. Per-element counts are accumulated inside completed frame records only, so they sum exactly to the per-frame total. It also reports the unmasked WebGL renderer string and the shader program count. The app itself isn't instrumented.
 - **Throughput** runs: 4 s warm-up, then 10 s sampled, uncapped. Each runs 3 times interleaved and the median is reported. Mean frame time is 1000 / median fps.
+- The `gl.finish()` attribution scenarios run only with `--attribution` (section 4.5 explains why their output is excluded). Without them, `globe-baseline.mjs --quick` completed in 248 s in the container (6 scenarios, 1 rep).
 - **Ablation** skips one element's draw calls. That removes its raster and submission cost but not its CPU scene-graph cost.
 - **CPU profile** runs at 640x360 so software fill doesn't stall the main thread, then buckets self time by bundle chunk.
 
 ### 4.2 Results: exact scene counts (hardware-independent)
 
-| Item                         | Value                                                                                                                                             | Source               |
-| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------- |
-| Draw calls/frame, 50 markers | 265 (markers ~202, labels ~60, earth 1, wireframe 1, graticule 1, atmosphere 2, stars 1, city lights 1, aurora 2, ISS 2)                          | probe per-tag count  |
-| Draw calls/frame, 0 markers  | 77                                                                                                                                                | probe                |
-| Triangles/frame              | 42,552 (markers ~20.2k, earth ~9.3k, atmosphere ~8.2k, aurora ~4.7k, ISS ~0.8k). Line vertices: 15,424 (wireframe sphere, graticule). Points: 858 | probe                |
-| Texture memory               | 58.2 MiB: earth map 4096x2048 with 13 mip levels (~42.7 MiB), normal map 2048x1024 (~10.7 MiB), 61 label sprites 256x64 (~85 KiB each)            | probe `texStorage2D` |
-| JS heap                      | 14.8 to 15.8 MiB after load                                                                                                                       | `performance.memory` |
-| Bundle                       | vendor-three 1,168.6 kB (324.3 kB gzip), main 601.4 kB (136.1 kB gzip), CSS 44.8 kB (9.3 kB gzip)                                                 | `vite build` output  |
+| Item                         | Value                                                                                                                                                                                    | Source               |
+| ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------- |
+| Draw calls/frame, 50 markers | 265 = markers 196 + labels 58 + earth 1, wireframe 1, graticule 1, atmosphere 2, stars 1, city lights 1, aurora 2, ISS 2 (re-measured after the probe fix)                               | probe per-tag count  |
+| Draw calls/frame, 0 markers  | 77 (includes 8 marker draws for the ISS and aurora events, which also get event markers)                                                                                                 | probe                |
+| Triangles/frame              | 42,552 (markers ~20.2k, earth ~9.3k, atmosphere ~8.2k, aurora ~4.7k, ISS ~0.8k). Line vertices: 15,424 (wireframe sphere, graticule). Points: 858                                        | probe                |
+| Texture memory               | 58.2 MiB: earth map 4096x2048 with 13 mip levels (~42.7 MiB), normal map 2048x1024 (~10.7 MiB), 58 label sprite textures 256x64 (~85 KiB each; one per city, 58 cities in `cityData.ts`) | probe `texStorage2D` |
+| JS heap                      | 14.8 to 15.8 MiB after load                                                                                                                                                              | `performance.memory` |
+| Bundle                       | vendor-three 1,168.6 kB (324.3 kB gzip), main 601.4 kB (136.1 kB gzip), CSS 44.8 kB (9.3 kB gzip)                                                                                        | `vite build` output  |
 
 ### 4.3 Results: relative costs (SwiftShader, container; do not read as device fps)
 
@@ -122,7 +125,7 @@ Ablation, 1080p, DPR 1, 50 markers, median of 3:
 | Atmosphere (2 additive back-face shells)           | 250      | 53              | ~17%  |
 | Wireframe overlay sphere                           | 250      | 53              | ~17%  |
 | Markers (sphere + ring + pulse ring per event)     | 263      | 40              | ~13%  |
-| City labels (61 sprites)                           | 286      | 17              | ~6%   |
+| City labels (58 sprites)                           | 286      | 17              | ~6%   |
 | Stars                                              | 313      | 0 (noise)       | ~0%   |
 
 Main-thread CPU (CDP sampling profile, 640x360, 10 s):
@@ -144,17 +147,17 @@ Startup (CDP profile from navigation to first draw):
 
 ### 4.4 Findings for the existing scene
 
-1. **The marker system drives draw calls and main-thread cost.** Every event is three meshes, each with its own `useFrame`. At 50 markers that is about 202 of 265 draw calls and about +4 ms/frame of main-thread JS on a server-class core. Planned pulse rings and fire markers would make this worse unless they are instanced.
+1. **The marker system drives draw calls and main-thread cost.** In `src/renderer/components/Globe/Globe.tsx`, `EventMarkers` renders `EventMarker`, `EventRing` and `EventPulseRing` for every located event. That is two or three meshes per event: the pulse-ring mesh renders only at severity 5 or more or when featured, but all three `useFrame` callbacks are registered for every event, because `EventPulseRing` calls `useFrame` before its early return. Both rings are transparent and `THREE.DoubleSide`, so three.js draws each one twice (back faces, then front faces). The mock scene has 52 located events (50 synthetic plus ISS and aurora), 20 of them with a pulse ring: 52 x 1 + 52 x 2 + 20 x 2 = 196 of 265 draw calls (about 74%), plus about +4 ms/frame of main-thread JS on a server-class core. Planned pulse rings and fire markers would make this worse unless they are instanced.
 2. **DPR is uncapped.** r3f's default `dpr` is `[1, 2]`. An iPad or a 2x-scaled 4K desktop renders 4x the pixels. DPR 2 was 2.2x slower here, which matters most for fill-bound effects such as bloom and sweep.
 3. **Fill cost sits in a few full-globe layers.** Earth, two atmosphere shells and the wireframe overlay. These are the natural lite levers for existing content. The wireframe's 17% share may be exaggerated by SwiftShader line rasterisation, so check it on a device.
 4. **Reduced motion doesn't reduce work.** It zeroes shader amplitudes, but the scene still renders every frame and auto-rotation continues.
-5. **Labels draw even when hidden.** 61 sprites each have their own texture and draw call. Hidden tiers use opacity 0, so they are still submitted.
+5. **Labels draw even when hidden.** 58 sprites (`CityLabels.tsx`, one per city in `cityData.ts`) each have their own texture and draw call. Hidden tiers use opacity 0, so they are still submitted.
 6. **Startup grows with shader count.** Every new effect program adds compile time to first frame. On Pi-class GPUs this is unknown and needs on-device measurement.
 7. **Minor:** `CityLabelsWithTracking` calls `setState` from `useFrame` every frame. React bails out when the distance is unchanged, so the cost appears only while zooming. Don't copy this pattern in new effects.
 
 ### 4.5 Limitations (what was not measured)
 
-- **No real GPU, Pi, iPad, TV browser or Electron build was measured.** Every absolute fps number above is software rendering. None of the tier fps targets has been validated.
+- **No real GPU, Pi, iPad or Electron build was measured.** Every absolute fps number above is software rendering. None of the tier fps targets has been validated.
 - **No GPU timer data.** `EXT_disjoint_timer_query_webgl2` isn't available under SwiftShader. The probe's `gl.finish()` attribution mode turned out to measure submission overhead, not raster: the earth draw read 0.03 ms. Its numbers are excluded here and the caveat is documented in `probe.js`.
 - **Non-additive and noisy.** The empty-scene run varied 2x between reps. Ablation savings sum to about 84% of frame time. Treat shares as rank order, not precise fractions.
 - **Not measured:** power draw, thermals over hours, memory growth over 24 h, Safari/WebKit behaviour, and the DOM/CSS cost of side columns and ticker on low-end CPUs. On SwiftShader the clear-only floor of 20 ms suggests it is small but not zero.
@@ -166,16 +169,18 @@ Startup (CDP profile from navigation to first draw):
 
 The shares divide the **effects pool** from section 3. The pool is the working budget minus the on-device baseline. Draw-call and texture limits are hard ceilings and don't depend on hardware.
 
-| Effect (feature)                                           | Main cost driver                                    | Hard limits (Full)                                                                                                                                | Pool share | Floor / Lite behaviour                                                                   | Needs lite?            |
-| ---------------------------------------------------------- | --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- | ---------------------------------------------------------------------------------------- | ---------------------- |
-| Solar terminator + shader city lights (#357)               | Fragment math on earth; optional night texture      | +0 draw calls (extend existing materials); sun direction updated at 1 Hz or slower, not per frame; night texture 4096x2048 or smaller (+42.7 MiB) | 10%        | Same shader; night texture 2048x1024 or smaller (+10.7 MiB) or existing city points only | No (texture size only) |
-| Magnitude pulse rings (#359)                               | Draw calls, overdraw of expanding transparent rings | 2 draw calls or fewer total (instanced); 8 or fewer concurrent animated rings; 0.3 ms or less JS per frame                                        | 10%        | 3 or fewer concurrent; static ring (no expansion) when degraded or reduced motion        | **Yes**                |
-| Tactical callout (#358)                                    | Per-frame screen-space projection and DOM layout    | 1 callout; 1 draw call or fewer for leader line; position updated by ref/transform with no React state per frame; 0.5 ms or less                  | 5%         | Position update at 10 Hz or slower                                                       | No                     |
-| Sweep and ping (#360)                                      | Fill: one additive shell or disc over the globe     | 2 draw calls or fewer; ping driven by a uniform on instanced markers, never per-marker meshes                                                     | 15%        | **Off** at Floor; first to auto-disable after bloom                                      | **Yes**                |
-| Phosphor overlay: scanlines, bloom, vignette, drift (#362) | Bloom: offscreen render target + blur passes        | Scanlines, vignette and drift as static CSS layers (0 WebGL draws); bloom at half res, 4 passes or fewer                                          | 35%        | CSS scanlines, vignette and drift only; **no bloom**                                     | **Yes**                |
-| Fire markers with clustering (#367, FIRMS)                 | Instance count, clustering CPU                      | 1 draw call for all fires; 1,000 or fewer cluster instances; clustering only on data arrival (server-side or worker), never per frame             | 15%        | 250 or fewer instances; no per-fire animation                                            | **Yes**                |
-| Alert dim and recenter (#361)                              | CSS opacity transition; existing rotation lerp      | 0 extra draw calls; no material `defines` toggles (avoid shader recompiles mid-alert)                                                             | 5%         | Same; reduced motion: cut instead of animated recenter                                   | No                     |
-| Reserve                                                    |                                                     |                                                                                                                                                   | 5%         |                                                                                          |                        |
+Texture arithmetic (baseline 58.2 MiB, sizes include a full mip chain at 4 bytes per texel): Full adds at most 10.7 MiB for the night texture, giving 68.9 MiB, which leaves about 27 MiB under the 96 MiB Full ceiling for bloom render targets and other effects. Lite adds at most 2.7 MiB, giving 60.9 MiB, under the 64 MiB Floor/Lite cap with about 3 MiB to spare. Lite has no bloom, so no extra render targets.
+
+| Effect (feature)                                           | Main cost driver                                    | Hard limits (Full)                                                                                                                                | Pool share | Floor / Lite behaviour                                                                      | Needs lite?            |
+| ---------------------------------------------------------- | --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- | ------------------------------------------------------------------------------------------- | ---------------------- |
+| Solar terminator + shader city lights (#357)               | Fragment math on earth; optional night texture      | +0 draw calls (extend existing materials); sun direction updated at 1 Hz or slower, not per frame; night texture 2048x1024 or smaller (+10.7 MiB) | 10%        | Same shader; no night texture (existing city points only) or 1024x512 or smaller (+2.7 MiB) | No (texture size only) |
+| Magnitude pulse rings (#359)                               | Draw calls, overdraw of expanding transparent rings | 2 draw calls or fewer total (instanced); 8 or fewer concurrent animated rings; 0.3 ms or less JS per frame                                        | 10%        | 3 or fewer concurrent; static ring (no expansion) when degraded or reduced motion           | **Yes**                |
+| Tactical callout (#358)                                    | Per-frame screen-space projection and DOM layout    | 1 callout; 1 draw call or fewer for leader line; position updated by ref/transform with no React state per frame; 0.5 ms or less                  | 5%         | Position update at 10 Hz or slower                                                          | No                     |
+| Sweep and ping (#360)                                      | Fill: one additive shell or disc over the globe     | 2 draw calls or fewer; ping driven by a uniform on instanced markers, never per-marker meshes                                                     | 15%        | **Off** at Floor; first to auto-disable after bloom                                         | **Yes**                |
+| Phosphor overlay: scanlines, bloom, vignette, drift (#362) | Bloom: offscreen render target + blur passes        | Scanlines, vignette and drift as static CSS layers (0 WebGL draws); bloom at half res, 4 passes or fewer                                          | 35%        | CSS scanlines, vignette and drift only; **no bloom**                                        | **Yes**                |
+| Fire markers with clustering (#367, FIRMS)                 | Instance count, clustering CPU                      | 1 draw call for all fires; 1,000 or fewer cluster instances; clustering only on data arrival (server-side or worker), never per frame             | 15%        | 250 or fewer instances; no per-fire animation                                               | **Yes**                |
+| Alert dim and recenter (#361)                              | CSS opacity transition; existing rotation lerp      | 0 extra draw calls; no material `defines` toggles (avoid shader recompiles mid-alert)                                                             | 5%         | Same; reduced motion: cut instead of animated recenter                                      | No                     |
+| Reserve                                                    |                                                     |                                                                                                                                                   | 5%         |                                                                                             |                        |
 
 ---
 
@@ -193,15 +198,15 @@ The shares divide the **effects pool** from section 3. The pool is the working b
 
 ### 6.2 Degrade ladder (governor steps down in this order, back up in reverse)
 
-| Level | Change                                                                                       | Reason for position                                      |
-| ----- | -------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
-| L0    | Full                                                                                         |                                                          |
-| L1    | Bloom off (phosphor drops to CSS only)                                                       | Biggest planned fill cost, purely decorative             |
-| L2    | Sweep and ping off                                                                           | Opt-in decoration, full-globe fill                       |
-| L3    | Pulse rings static, 3 or fewer concurrent; fire markers no animation, 250 or fewer instances | Keeps information, drops motion                          |
-| L4    | DPR cap 1.0                                                                                  | Largest single fill lever (2.2x measured)                |
-| L5    | 30 fps frame cap; outer atmosphere shell and wireframe overlay off                           | Existing fill-heavy decoration (about 17% each measured) |
-| Never | Event markers, severity colours and labels, alert behaviour, terminator                      | Core information; colour-independence rules from #385    |
+| Level | Change                                                                                       | Reason for position                                                                              |
+| ----- | -------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| L0    | Full                                                                                         |                                                                                                  |
+| L1    | Bloom off (phosphor drops to CSS only)                                                       | Biggest planned fill cost, purely decorative                                                     |
+| L2    | Sweep and ping off                                                                           | Opt-in decoration, full-globe fill                                                               |
+| L3    | Pulse rings static, 3 or fewer concurrent; fire markers no animation, 250 or fewer instances | Keeps information, drops motion                                                                  |
+| L4    | DPR cap 1.0                                                                                  | Largest single fill lever (2.2x, container SwiftShader, relative only)                           |
+| L5    | 30 fps frame cap; outer atmosphere shell and wireframe overlay off                           | Existing fill-heavy decoration (about 17% each, container SwiftShader ablation, rank order only) |
+| Never | Event markers, severity colours and labels, alert behaviour, terminator                      | Core information; colour-independence rules from #385                                            |
 
 ```mermaid
 stateDiagram-v2
@@ -222,15 +227,15 @@ stateDiagram-v2
 The full checklist is in `scripts/perf/README.md`. In short:
 
 1. Run the production build on the device at its deployment resolution and scaling, and let it warm up for 2 minutes.
-2. Paste `scripts/perf/probe.js` into DevTools (Electron devtools, `chrome://inspect` for Pi Chromium, or Safari Web Inspector for iPad), then sample for 60 s.
+2. Paste `scripts/perf/probe.js` into DevTools (Electron devtools, `chrome://inspect` for Pi Chromium, or Safari Web Inspector for a best-effort iPad check), then sample for 60 s. The summary includes the WebGL renderer string.
 3. Repeat with `setSkip(['markers'])`, and with reduced motion on.
-4. Record the results below, plus temperature after 10 minutes (`vcgencmd measure_temp` on Pi).
+4. Record the results below, plus temperature after 10 minutes (`vcgencmd measure_temp` on Pi). The columns map to section 3 and to probe fields: `fpsMean`, `frameMsP95`, `pctFramesOver66ms`, `framesOver50ms`, `rafCallbackMsP95`, `renderer`.
 
 ### 7.1 On-device results (to be filled in by the owner)
 
-| Device | Browser/runtime | Resolution / DPR | WebGL renderer | Median fps | p95 frame ms | Frames over 33 ms | rAF cb p95 | Temp @10 min | Notes |
-| ------ | --------------- | ---------------- | -------------- | ---------- | ------------ | ----------------- | ---------- | ------------ | ----- |
-|        |                 |                  |                |            |              |                   |            |              |       |
+| Device | Browser/runtime | Resolution / DPR | WebGL renderer | Tier | Mean fps | p95 frame ms | % frames over 66 ms | Frames over 50 ms | rAF cb p95 ms | Meets section 3 p95? | Temp @10 min | Notes |
+| ------ | --------------- | ---------------- | -------------- | ---- | -------- | ------------ | ------------------- | ----------------- | ------------- | -------------------- | ------------ | ----- |
+|        |                 |                  |                |      |          |              |                     |                   |               |                      |              |       |
 
 ---
 
@@ -238,14 +243,14 @@ The full checklist is in `scripts/perf/README.md`. In short:
 
 Each one is testable with the tooling in `scripts/perf/` or with unit tests.
 
-1. **DPR cap.** With the profile set to Floor, the canvas backing-store width divided by its CSS width is 1.0 or less on a DPR 2 viewport. With Recommended, it is 1.5 or less. Verified with Playwright `deviceScaleFactor: 2`.
-2. **Draw-call ceiling.** Mock backend, 50 markers, all default-on effects enabled: probe-reported draw calls per frame are 300 or fewer. After the marker-instancing story, 120 or fewer. Lite is 80 or fewer. Any new effect PR includes the before and after probe counts.
+1. **DPR cap.** With the tier forced to Floor, the canvas backing-store width divided by its CSS width is 1.0 or less on a DPR 2 viewport. With Recommended forced, it is 1.5 or less. Verified with Playwright `deviceScaleFactor: 2`. The quality-profile story must provide a test-only tier override that bypasses capability detection (section 6), for example a `?tier=floor|recommended|showpiece` URL parameter or a persisted developer setting read at startup; the test sets it before the canvas mounts. Profiles (Auto, Full, Lite) remain the user-facing setting; the tier only chooses the DPR cap and the Auto default.
+2. **Draw-call ceiling.** Mock backend, 50 markers, all default-on effects enabled: probe-reported draw calls per frame are 300 or fewer. After the marker-instancing story, 120 or fewer. Lite is 80 or fewer, which is only reachable after the marker-instancing story (Lite today would still be about 265, since markers and labels make up 254 of them). Any new effect PR includes the before and after probe counts.
 3. **Instanced markers.** With 50 markers, the marker system (spheres, rings, pulse rings) issues 6 or fewer draw calls per frame. Visual output and click selection are unchanged; existing marker tests pass.
 4. **Effect registry contract.** Every effect registered with the Mode Deck (#351) declares a cost class, its Lite behaviour and its ladder level. A unit test fails if any effect lacks them.
-5. **Governor.** Unit test with injected frame intervals and a fake clock: p95 above budget for two consecutive 10 s windows steps down exactly one level within 21 s. It doesn't step up until 60 s under 70% of budget, and never steps above the user-selected profile.
-6. **Lite excludes decoration.** In Lite, the probe shows no draw calls tagged bloom or sweep, and texture memory is 64 MiB or less.
+5. **Governor.** Unit test with injected frame intervals and a fake clock: p95 above budget for two consecutive 10 s windows steps down exactly one level within 21 s. It steps up one level only when p95 has been under 70% of budget for 60 s **and** at least 5 minutes have passed since the last level change (section 6.2 diagram), and it never steps above the user-selected profile. Samples taken while the document is hidden are discarded.
+6. **Lite excludes decoration.** In Lite, the probe shows no draw calls tagged bloom or sweep, and the probe texture allocation total (`textureUploadMiB`, probe injected before load) is 64 MiB or less; in Full it is 96 MiB or less. The probe counts allocations and does not subtract `deleteTexture`, so the number is an upper bound; the effect stories that rely on it should add deletion tracking if they reallocate textures at runtime.
 7. **No new per-frame React state.** New effect components contain no `setState` or store `set` inside `useFrame`. Enforced in review checklist and spot-checked by the CPU profile: the React + app chunk stays at 0.5 ms/frame or less at 640x360 with 50 markers.
-8. **On-device sign-off.** Before #360 (sweep) or #362 (phosphor) merge, section 7.1 has at least one Floor and one Recommended device row meeting the section 3 p95 budget with the default profile.
+8. **On-device sign-off.** Before #360 (sweep) or #362 (phosphor) merge, section 7.1 has at least one Floor and one Recommended device row that **meets** the section 3 p95 budget with the default profile. A row that was measured but misses the budget does not satisfy this. If the Pi 5 misses it, see section 10: either the owner re-baselines Floor (Lite only, 30 fps cap, and a re-measured row that meets the budget) or picks a different Floor device. Until a Floor device row passes, #360 and #362 stay blocked.
 
 ---
 
@@ -255,14 +260,14 @@ Each one is testable with the tooling in `scripts/perf/` or with unit tests.
 
 - **Floor device:** Raspberry Pi 5 on a 1080p TV. If a different device meets the Floor budget with fewer tradeoffs, it can replace the Pi 5 once on-device results exist. Backwards compatibility is not a goal, so iPad 9th gen and older moved to best effort (this follows the owner's "no need for a lot of backwards compatibility"; confirm if an iPad must stay supported).
 - **Smart-TV built-in browsers:** out as render hosts. A TV remains supported as a display driven over HDMI.
-- **Acceptance criterion 8 gate:** accepted. #360 (sweep) and #362 (phosphor) cannot merge until section 7.1 has a Floor and a Recommended device result.
+- **Acceptance criterion 8 gate:** accepted. #360 (sweep) and #362 (phosphor) cannot merge until section 7.1 has a Floor and a Recommended device row that meets the section 3 p95 budget.
 
 **Still open:**
 
 1. **Is 30 fps acceptable at Floor** for an ambient display? Rotation is 0.06 rad/s, so 30 fps is visually smooth, and it lowers power and heat.
 2. **Should reduced motion also stop auto-rotation** and allow on-demand rendering (near-zero idle GPU)? `PRODUCT.md` only lists sweep and glow.
 3. **Lite earth material.** Is a visibly simpler earth (no normal map, cheaper shading) acceptable at L5? It is the largest measured fill cost.
-4. **Night-lights texture source and size for #357.** This affects memory (+10.7 to +42.7 MiB) and licensing.
+4. **Night-lights texture source and size for #357.** This affects memory (+2.7 to +10.7 MiB within the section 5 limits) and licensing.
 5. **Should the performance profile (Auto, Full, Lite) appear in the settings panel?** That needs UX (#226 pattern).
 6. **Is a perf regression check in CI wanted?** It would touch `.github/workflows/**`, which is high-risk surface needing architect review. Proposed: start as a non-gating job that posts probe counts.
 
@@ -270,10 +275,10 @@ Each one is testable with the tooling in `scripts/perf/` or with unit tests.
 
 ## 10. Risks
 
-| Risk                                                          | Impact | Likelihood | Mitigation                                                                       |
-| ------------------------------------------------------------- | ------ | ---------- | -------------------------------------------------------------------------------- |
-| Tier targets are wrong because nothing was measured on device | High   | Medium     | AC 8 blocks the costly effects until section 7.1 has real rows                   |
-| Pi 5 can't hold 30 fps even for the current globe at 1080p    | High   | Unknown    | Measure first; if it fails, Floor becomes Lite plus 30 fps cap, or move Floor up |
-| Governor oscillation is visible on the display                | Medium | Medium     | Hysteresis (70%, 60 s, 5 min), one step at a time                                |
-| Shader count growth slows cold start on Pi                    | Medium | Medium     | Programs ceiling (16); async compile where three.js supports it                  |
-| SwiftShader shares mislead prioritisation                     | Medium | Medium     | Use them for rank order only; re-run ablation on a real GPU                      |
+| Risk                                                          | Impact | Likelihood | Mitigation                                                                                                                                                                                                                           |
+| ------------------------------------------------------------- | ------ | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Tier targets are wrong because nothing was measured on device | High   | Medium     | AC 8 blocks the costly effects until section 7.1 has device rows that meet the p95 budget                                                                                                                                            |
+| Pi 5 can't hold 30 fps even for the current globe at 1080p    | High   | Unknown    | Measure first. If it fails, the owner either re-baselines Floor to Lite only with a 30 fps cap (and re-measures until a row meets the budget) or picks a different Floor device. #360 and #362 stay blocked until a Floor row passes |
+| Governor oscillation is visible on the display                | Medium | Medium     | Hysteresis (70%, 60 s, 5 min), one step at a time                                                                                                                                                                                    |
+| Shader count growth slows cold start on Pi                    | Medium | Medium     | Programs ceiling (16); async compile where three.js supports it                                                                                                                                                                      |
+| SwiftShader shares mislead prioritisation                     | Medium | Medium     | Use them for rank order only; re-run ablation on a real GPU                                                                                                                                                                          |

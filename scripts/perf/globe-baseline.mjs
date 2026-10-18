@@ -2,7 +2,14 @@
 //
 // Prereqs:  npx vite build      (renderer into dist/renderer, SERVER_URL defaults to :3000)
 // Usage:    node scripts/perf/globe-baseline.mjs [--chrome /path/to/chrome] [--quick]
-//           [--reps 3] [--ablation] [--out file.json] [--headed] [--gpu]
+//           [--reps 3] [--ablation] [--attribution] [--out file.json] [--headed] [--gpu]
+//
+//   default        throughput scenarios (3 reps, median)
+//   --quick        1 rep, shorter warm-up and sample windows
+//   --ablation     skip one scene element's draws at a time
+//   --attribution  also run the gl.finish() attribution scenarios. Off by default:
+//                  very slow under SwiftShader (especially at 4K) and its output is
+//                  excluded from SPEC-384 (see the CAVEAT in probe.js).
 //
 // Starts `vite preview` (port 4173) and scripts/perf/mock-server.mjs (port 3000),
 // then runs each scenario in a fresh browser page with scripts/perf/probe.js
@@ -49,9 +56,10 @@ const ALL_TAGS = [
 ];
 const REPS = Number(opt('reps', QUICK ? 1 : 3));
 
-// Throughput scenarios (repeated REPS times, interleaved, median reported) and
-// attribution scenarios (gl.finish() around every draw -> per-element GPU ms).
+// Throughput scenarios (repeated REPS times, interleaved, median reported) and,
+// with --attribution only, attribution scenarios (gl.finish() around every draw).
 const ABLATION = flag('ablation');
+const ATTRIBUTION = flag('attribution');
 const THROUGHPUT_SCENARIOS = [
   { name: 'empty (0 markers) 1080p dpr1', markers: 0, vp: HD, dpr: 1 },
   { name: 'baseline (50 markers) 1080p dpr1', markers: 50, vp: HD, dpr: 1 },
@@ -59,6 +67,8 @@ const THROUGHPUT_SCENARIOS = [
   { name: 'baseline 4K dpr1', markers: 50, vp: UHD, dpr: 1 },
   { name: 'baseline reduced-motion', markers: 50, vp: HD, dpr: 1, reducedMotion: true },
   { name: 'clear only (all draws skipped)', markers: 50, vp: HD, dpr: 1, skip: ALL_TAGS },
+];
+const ATTRIBUTION_SCENARIOS = [
   { name: 'ATTRIBUTION 1080p dpr1', markers: 50, vp: HD, dpr: 1, attribution: true, once: true },
   { name: 'ATTRIBUTION 4K dpr1', markers: 50, vp: UHD, dpr: 1, attribution: true, once: true },
 ];
@@ -75,19 +85,40 @@ const ABLATION_SCENARIOS = [
     skip: [t],
   })),
 ];
-const SCENARIOS = ABLATION ? ABLATION_SCENARIOS : THROUGHPUT_SCENARIOS;
+const SCENARIOS = ABLATION
+  ? ABLATION_SCENARIOS
+  : [...THROUGHPUT_SCENARIOS, ...(ATTRIBUTION ? ATTRIBUTION_SCENARIOS : [])];
 
+// Spawned in its own process group so stopProc() also kills children
+// (`npx vite preview` runs vite in a child of the npx wrapper).
 function startProc(cmd, args, readyRe) {
   return new Promise((resolve, reject) => {
-    const p = spawn(cmd, args, { cwd: root, stdio: ['ignore', 'pipe', 'pipe'] });
+    const p = spawn(cmd, args, { cwd: root, stdio: ['ignore', 'pipe', 'pipe'], detached: true });
+    const timer = setTimeout(() => {
+      stopProc(p);
+      reject(new Error(`${cmd} not ready`));
+    }, 30000);
     const onData = (d) => {
-      if (readyRe.test(d.toString())) resolve(p);
+      if (readyRe.test(d.toString())) {
+        clearTimeout(timer);
+        resolve(p);
+      }
     };
     p.stdout.on('data', onData);
     p.stderr.on('data', onData);
-    p.on('exit', (c) => reject(new Error(`${cmd} exited ${c}`)));
-    setTimeout(() => reject(new Error(`${cmd} not ready`)), 30000);
+    p.on('exit', (c) => {
+      clearTimeout(timer);
+      reject(new Error(`${cmd} exited ${c}`));
+    });
   });
+}
+
+function stopProc(p) {
+  try {
+    process.kill(-p.pid, 'SIGTERM');
+  } catch {
+    p.kill();
+  }
 }
 
 async function withMock(markers, fn) {
@@ -99,7 +130,7 @@ async function withMock(markers, fn) {
   try {
     return await fn();
   } finally {
-    mock.kill();
+    stopProc(mock);
     await new Promise((r) => setTimeout(r, 300));
   }
 }
@@ -171,7 +202,7 @@ try {
   }
 } finally {
   await browser.close();
-  preview.kill();
+  stopProc(preview);
 }
 
 if (OUT) writeFileSync(OUT, JSON.stringify(results, null, 2));

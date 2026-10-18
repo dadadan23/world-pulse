@@ -28,15 +28,35 @@ const SECONDS = Number(opt('seconds', '10'));
 const STARTUP = argv.includes('--startup');
 const probeSrc = readFileSync(path.join(here, 'probe.js'), 'utf8');
 
+// Own process group so stopProc() also kills the vite child of `npx`.
 function startProc(cmd, args, readyRe) {
   return new Promise((resolve, reject) => {
-    const p = spawn(cmd, args, { cwd: root, stdio: ['ignore', 'pipe', 'pipe'] });
-    const onData = (d) => readyRe.test(d.toString()) && resolve(p);
+    const p = spawn(cmd, args, { cwd: root, stdio: ['ignore', 'pipe', 'pipe'], detached: true });
+    const timer = setTimeout(() => {
+      stopProc(p);
+      reject(new Error(`${cmd} not ready`));
+    }, 30000);
+    const onData = (d) => {
+      if (readyRe.test(d.toString())) {
+        clearTimeout(timer);
+        resolve(p);
+      }
+    };
     p.stdout.on('data', onData);
     p.stderr.on('data', onData);
-    p.on('exit', (c) => reject(new Error(`${cmd} exited ${c}`)));
-    setTimeout(() => reject(new Error(`${cmd} not ready`)), 30000);
+    p.on('exit', (c) => {
+      clearTimeout(timer);
+      reject(new Error(`${cmd} exited ${c}`));
+    });
   });
+}
+
+function stopProc(p) {
+  try {
+    process.kill(-p.pid, 'SIGTERM');
+  } catch {
+    p.kill();
+  }
 }
 
 const preview = await startProc(
@@ -137,6 +157,6 @@ try {
   await ctx.close();
 } finally {
   await browser.close();
-  mock.kill();
-  preview.kill();
+  stopProc(mock);
+  stopProc(preview);
 }

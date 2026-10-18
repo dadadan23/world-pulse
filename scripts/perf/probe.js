@@ -3,9 +3,9 @@
  *
  * Self-contained, dependency-free. Works two ways:
  *   1. Injected before page load by scripts/perf/globe-baseline.mjs (Playwright).
- *   2. Pasted into the DevTools console of ANY browser running the app
- *      (Electron devtools, Safari Web Inspector for iPad, chrome://inspect for
- *      Android TV / Pi Chromium). See scripts/perf/README.md.
+ *   2. Pasted into the DevTools console of a browser running the app
+ *      (Electron devtools, chrome://inspect for Raspberry Pi Chromium, Safari
+ *      Web Inspector for a best-effort iPad check). See scripts/perf/README.md.
  *
  * It does not touch application code. It patches WebGL2RenderingContext
  * prototype draw calls (to count draw calls / primitives per frame and,
@@ -14,7 +14,12 @@
  *
  * API (on window.__wpPerf):
  *   start()            reset counters and begin sampling
- *   stop() -> result   stop sampling, return { summary, perTag, textures }
+ *   stop() -> result   stop sampling, return { summary, perTag, textures }.
+ *                      Per-tag numbers are accumulated inside completed frame
+ *                      records only, so perTag draw calls sum exactly to
+ *                      summary.drawCallsPerFrame. summary also carries the
+ *                      unmasked WebGL renderer string, frames over 33/50/66 ms,
+ *                      and shader program counts.
  *   setAttribution(on) when on, bracket every draw call with gl.finish() and
  *                      accumulate the blocking time per tag (perTag.gpuMsPerFrame).
  *                      This serialises the pipeline, so absolute fps drops.
@@ -41,9 +46,10 @@
     lastTs: null,
     programTags: new WeakMap(),
     currentTag: 'other',
-    perTagCalls: {},
-    perTagPrims: {},
-    perTagGpuMs: {},
+    gl: null,
+    programsCreated: 0,
+    programsUsed: null,
+    programsUsedCount: 0,
     attribution: false,
     textures: [],
     firstDrawAt: null,
@@ -87,14 +93,18 @@
   }
 
   function frameRecord() {
-    return { calls: 0, tris: 0, lineVerts: 0, points: 0 };
+    return { calls: 0, tris: 0, lineVerts: 0, points: 0, tagCalls: {}, tagPrims: {}, tagGpuMs: {} };
   }
 
-  function account(mode, count, instances) {
+  // Only counts while a frame record is open (state.cur), so draws issued
+  // before the first tick or in the final, never-pushed frame are excluded.
+  function account(tag, mode, count, instances) {
     if (state.firstDrawAt === null) state.firstDrawAt = now();
     if (!state.sampling || !state.cur) return;
     var n = count * (instances || 1);
     state.cur.calls++;
+    state.cur.tagCalls[tag] = (state.cur.tagCalls[tag] || 0) + 1;
+    state.cur.tagPrims[tag] = (state.cur.tagPrims[tag] || 0) + (mode === 4 ? n / 3 : n);
     if (mode === 4)
       state.cur.tris += n / 3; // TRIANGLES
     else if (mode === 5 || mode === 6) state.cur.tris += Math.max(0, n - 2);
@@ -106,8 +116,18 @@
     var P = GL.prototype;
     var origUse = P.useProgram;
     P.useProgram = function (program) {
+      state.gl = this;
       state.currentTag = program ? tagFor(this, program) : 'other';
+      if (program && state.sampling && state.programsUsed && !state.programsUsed.has(program)) {
+        state.programsUsed.add(program);
+        state.programsUsedCount++;
+      }
       return origUse.call(this, program);
+    };
+    var origCreateProgram = P.createProgram;
+    P.createProgram = function () {
+      state.programsCreated++;
+      return origCreateProgram.apply(this, arguments);
     };
 
     function wrapDraw(name, countIdx, instIdx) {
@@ -119,17 +139,13 @@
         var tag = state.currentTag;
         if (tag === 'basic') tag = refineBasic(mode, count);
         if (state.skip[tag]) return undefined;
-        if (state.sampling) {
-          state.perTagCalls[tag] = (state.perTagCalls[tag] || 0) + 1;
-          state.perTagPrims[tag] = (state.perTagPrims[tag] || 0) + (mode === 4 ? count / 3 : count);
-        }
-        account(mode, count, instIdx !== undefined ? arguments[instIdx] : 1);
-        if (state.sampling && state.attribution) {
+        account(tag, mode, count, instIdx !== undefined ? arguments[instIdx] : 1);
+        if (state.sampling && state.attribution && state.cur) {
           this.finish();
           var t0 = now();
           var r = orig.apply(this, arguments);
           this.finish();
-          state.perTagGpuMs[tag] = (state.perTagGpuMs[tag] || 0) + (now() - t0);
+          state.cur.tagGpuMs[tag] = (state.cur.tagGpuMs[tag] || 0) + (now() - t0);
           return r;
         }
         return orig.apply(this, arguments);
@@ -203,6 +219,21 @@
     var i = Math.min(s.length - 1, Math.max(0, Math.ceil((p / 100) * s.length) - 1));
     return Math.round(s[i] * 100) / 100;
   }
+  function over(arr, ms) {
+    return arr.filter(function (x) {
+      return x > ms;
+    }).length;
+  }
+  function rendererString() {
+    var gl = state.gl;
+    if (!gl) return null;
+    try {
+      var ext = gl.getExtension('WEBGL_debug_renderer_info');
+      return ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER);
+    } catch (_e) {
+      return null;
+    }
+  }
   function mean(arr) {
     if (!arr.length) return null;
     var t = 0;
@@ -215,9 +246,8 @@
       state.frameIntervals = [];
       state.callbackMs = [];
       state.perFrame = [];
-      state.perTagCalls = {};
-      state.perTagPrims = {};
-      state.perTagGpuMs = {};
+      state.programsUsed = typeof WeakSet === 'function' ? new WeakSet() : null;
+      state.programsUsedCount = 0;
       state.cur = null;
       state.lastTs = null;
       state.sampling = true;
@@ -228,15 +258,24 @@
       state.sampling = false;
       var dur = (now() - state.startedAt) / 1000;
       var fi = state.frameIntervals;
+      state.cur = null;
       var frames = state.perFrame.length || 1;
+      var calls = {};
+      var prims = {};
+      var gpu = {};
+      state.perFrame.forEach(function (f) {
+        Object.keys(f.tagCalls).forEach(function (k) {
+          calls[k] = (calls[k] || 0) + f.tagCalls[k];
+          prims[k] = (prims[k] || 0) + f.tagPrims[k];
+          gpu[k] = (gpu[k] || 0) + (f.tagGpuMs[k] || 0);
+        });
+      });
       var perTag = {};
-      Object.keys(state.perTagCalls).forEach(function (k) {
+      Object.keys(calls).forEach(function (k) {
         perTag[k] = {
-          drawCallsPerFrame: Math.round((state.perTagCalls[k] / frames) * 10) / 10,
-          primitivesPerFrame: Math.round(state.perTagPrims[k] / frames),
-          gpuMsPerFrame: state.attribution
-            ? Math.round(((state.perTagGpuMs[k] || 0) / frames) * 100) / 100
-            : null,
+          drawCallsPerFrame: Math.round((calls[k] / frames) * 10) / 10,
+          primitivesPerFrame: Math.round(prims[k] / frames),
+          gpuMsPerFrame: state.attribution ? Math.round((gpu[k] / frames) * 100) / 100 : null,
         };
       });
       var texBytes = state.textures.reduce(function (t, x) {
@@ -252,9 +291,14 @@
           frameMsP95: pct(fi, 95),
           frameMsP99: pct(fi, 99),
           frameMsMax: pct(fi, 100),
-          framesOver33ms: fi.filter(function (x) {
-            return x > 33.4;
-          }).length,
+          // Thresholds sit just above 1, 1.5 and 2 frames at 30 fps, so
+          // vsync jitter on a 33.3 ms frame is not counted as a miss.
+          framesOver33ms: over(fi, 33.4),
+          framesOver50ms: over(fi, 50),
+          framesOver66ms: over(fi, 66.7),
+          pctFramesOver66ms: fi.length
+            ? Math.round((over(fi, 66.7) / fi.length) * 10000) / 100
+            : null,
           rafCallbackMsP50: pct(state.callbackMs, 50),
           rafCallbackMsP95: pct(state.callbackMs, 95),
           rafCallbackMsMean: mean(state.callbackMs),
@@ -280,10 +324,13 @@
           ),
           textureUploadMiB: Math.round((texBytes / 1048576) * 10) / 10,
           textureCount: state.textures.length,
+          programsCreated: state.programsCreated,
+          programsUsedWhileSampling: state.programsUsedCount,
           jsHeapUsedMiB: mem ? Math.round((mem.usedJSHeapSize / 1048576) * 10) / 10 : null,
           firstDrawMs: state.firstDrawAt === null ? null : Math.round(state.firstDrawAt),
           devicePixelRatio: window.devicePixelRatio,
           viewport: window.innerWidth + 'x' + window.innerHeight,
+          renderer: rendererString(),
         },
         perTag: perTag,
         textures: state.textures.slice(),
