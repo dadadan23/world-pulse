@@ -48,8 +48,9 @@ function toCollectorHealth(collector: BaseCollector): CollectorHealth {
   };
 }
 
-export function createApp(options?: { corsOrigin?: string }) {
+export function createApp(options?: { corsOrigin?: string; rendererDist?: string }) {
   const app = express();
+  const rendererDist = options?.rendererDist ?? RENDERER_DIST;
   const corsOrigin = options?.corsOrigin ?? 'http://localhost:5173';
   const httpServer = createServer(app);
   const io = new Server(httpServer, {
@@ -275,12 +276,19 @@ export function createApp(options?: { corsOrigin?: string }) {
   // Serve the built frontend (single-container deployment). In dev/test the
   // renderer is served by the Vite dev server instead, so this only activates
   // in production, and only if dist/renderer was actually built.
-  if (process.env.NODE_ENV === 'production' && fs.existsSync(RENDERER_DIST)) {
-    app.use(express.static(RENDERER_DIST));
-    app.get('*', (req, res, next) => {
-      if (req.path === '/api' || req.path.startsWith('/api/')) return next();
-      res.sendFile(path.join(RENDERER_DIST, 'index.html'));
-    });
+  if (process.env.NODE_ENV === 'production' && fs.existsSync(rendererDist)) {
+    app.use(express.static(rendererDist));
+    // Read index.html once at startup so the catch-all below serves a cached string and does no
+    // per-request file system access (the built frontend is immutable for a running server).
+    const indexPath = path.join(rendererDist, 'index.html');
+    if (fs.existsSync(indexPath)) {
+      const indexHtml = fs.readFileSync(indexPath, 'utf8');
+      // Express 5 (path-to-regexp 8) rejects a bare '*'; the wildcard must be named.
+      app.get('/{*splat}', (req, res, next) => {
+        if (req.path === '/api' || req.path.startsWith('/api/')) return next();
+        res.type('html').send(indexHtml);
+      });
+    }
   }
 
   // Socket.io connection handling
