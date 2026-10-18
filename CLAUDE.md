@@ -122,9 +122,9 @@ AgentX content from `.github/` and `.agentx/` is exposed to Claude Code under `.
 
 - **Coordinator:** `/agent-x [issue|ready]` — classifies the issue (fast path vs. full path, risk-surface gate above) and dispatches role subagents.
 - **Role subagents** (`.claude/agents/`): `product-manager`, `ux-designer`, `architect`, `engineer`, `devops-engineer`, `reviewer`, `reviewer-auto`, `customer-coach`. They cannot call each other; each ends with a `NEXT:` line for the coordinator.
-- **Skills** (`.claude/skills/`): the 9 project skills listed above plus general engineering skills. Load `oblivion-component` for any UI change.
-- **Commands:** `/ax-prd`, `/ax-architecture`, `/ax-ux-design`, `/ax-test-gen`, `/ax-refactor`, `/ax-bug-triage`, `/ax-code-review`, `/ax-security-review`, `/ax-devops`.
-- **Rules** (`.claude/rules/`): path-scoped TypeScript, React, server API, workflow/YAML and UX guidance.
+- **Skills** (`.claude/skills/`): the 9 project skills listed above plus all 42 general AgentX skills (several, e.g. C#/Go/Rust/Fabric, are outside this stack and only trigger on matching work). Load `oblivion-component` for any UI change.
+- **Commands:** `/ax-prd`, `/ax-architecture`, `/ax-ux-design`, `/ax-test-gen`, `/ax-refactor`, `/ax-bug-triage`, `/ax-code-review`, `/ax-security-review`, `/ax-devops`, `/ax-ai-agent`, `/ax-evaluation`.
+- **Rules** (`.claude/rules/`): path-scoped guidance for TypeScript, React, server API, workflows/YAML, UX and (not used by this stack) C#, Blazor, Python, SQL, Terraform, Bicep, AI.
 - **AgentX CLI on Linux/macOS/cloud:** use `./.agentx/agentx.sh` (the `.ps1` forms in `AGENTS.md` are the Windows equivalents). Hook phases: `start`, `complete`, `failed`.
 - If `AGENTS.md`/agent files disagree with this file, this file wins (e.g. coverage target >70%).
 
