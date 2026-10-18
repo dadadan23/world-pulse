@@ -10,9 +10,13 @@
     "lastActivity": null
   },
   "architect": {
-    "status": "idle",
-    "issue": null,
-    "lastActivity": null
+    "role": "architect",
+    "status": "complete",
+    "issue": "384",
+    "branch": "claude/384-frame-budget-spike",
+    "startedAt": "2026-10-18T03:25:20Z",
+    "completedAt": "2026-10-18T04:25:13Z",
+    "artifacts": []
   },
   "engineer": {
     "role": "engineer",
@@ -21,7 +25,9 @@
     "branch": "claude/next-stories-72lncb",
     "startedAt": "2026-07-05T00:00:00Z",
     "completedAt": "2026-09-24T00:00:00Z",
-    "artifacts": ["issues 232,233,236,237,238,241,242 all closed — stale active flag reset during backlog refinement pass"]
+    "artifacts": [
+      "issues 232,233,236,237,238,241,242 all closed — stale active flag reset during backlog refinement pass"
+    ]
   },
   "reviewer": {
     "status": "idle",
