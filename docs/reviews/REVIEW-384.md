@@ -188,3 +188,87 @@ There is no `src/` change, so there are no unit tests and coverage is unaffected
 ## 10. Next steps
 
 The Architect (spec author) applies B1 and B2, plus S1 to S9 where practical, and then re-requests review. No `src/` changes are needed.
+
+---
+
+## Re-review (revision 2)
+
+**Head**: `df2a424` (on top of 58f9d4a, b2a91b6) | **Reviewer**: Reviewer agent | **Date**: 2026-10-18
+**Scope**: same as above. The diff `b2a91b6..df2a424` covers `docs/specs/SPEC-384.md`, `docs/progress/ISSUE-384-log.md`, `scripts/perf/*`, this file and `.agentx/state/agent-status.json`.
+
+### Verdict
+
+**APPROVE.** Both blocking findings and all nine should-fix findings are resolved. Re-measurement reproduces the corrected numbers exactly. One new optional nit is listed below and does not block merge.
+
+| Severity (new) | Count |
+| -------------- | ----- |
+| Blocking       | 0     |
+| Should-fix     | 0     |
+| Optional       | 1     |
+
+### Correction to the first review
+
+`cityData.ts` defines **58** cities, not 60. `grep -c "{ name:" src/renderer/components/Globe/cityData.ts` returns 58. A plain `grep -c "name:"` returns 59 because it also matches the `name: string` interface field on line 7. That matches the 58 label textures and the 58 `labels` draw calls the probe measured. The architect's correction is right, and B2's suggested "60 cities defined" edit was wrong. The spec now says 58 everywhere (sections 4.2, 4.3 and 4.4).
+
+### Status of previous findings
+
+| ID  | Status       | Evidence                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| --- | ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| B1  | **Resolved** | Option (a) taken; caps unchanged (section 3: 96 MiB Full, 64 MiB Lite). Section 5 adds the arithmetic. Full: 58.2 + 10.7 = 68.9 MiB, under 96. Lite: 58.2 + 2.7 = 60.9 MiB, under 64. The #357 row says 2048x1024 or smaller in Full and none or 1024x512 or smaller in Lite. Section 9 item 4 says +2.7 to +10.7 MiB. AC 6 uses the same 64/96 caps. Mip-chain sizes check out (2048x1024x4x4/3 = 10.67 MiB; 1024x512 = 2.67 MiB). |
+| B2  | **Resolved** | The probe accumulates per-tag counts in completed frame records only (`account()` returns early without `state.cur`; `stop()` sums `perFrame[].tagCalls`). Section 4.2 now reads 196 + 58 + 11 = 265. Re-run: per-tag sum equals `drawCallsPerFrame` in all 6 scenarios (265 x 5, 0 for clear-only; 77 at 0 markers). Section 1 says "about 74% (196 of 265)". Section 4.4 item 1 derivation 52x1 + 52x2 + 20x2 = 196 holds.        |
+| S1  | **Resolved** | `mock-server.mjs` binds `HOST` (default `127.0.0.1`; `--host`/`PERF_MOCK_HOST` to override). Verified: startup log reads `listening on 127.0.0.1:3911`. The README step 1 LAN case is documented with a trusted-network warning.                                                                                                                                                                                                    |
+| S2  | **Resolved** | The probe reports `framesOver50ms`, `framesOver66ms` and `pctFramesOver66ms` (66.7 ms threshold). The section 3 column-to-field mapping is added. The section 7.1 columns are aligned, and `framesOver33ms` is marked informative.                                                                                                                                                                                                  |
+| S3  | **Resolved** | AC 1 requires a test-only tier override (for example `?tier=`) set before canvas mount, and separates tier (DPR cap) from profile (Auto/Full/Lite).                                                                                                                                                                                                                                                                                 |
+| S4  | **Resolved** | AC 2 and the section 3 table say Lite 80 is only reachable after marker instancing (today about 265; markers + labels = 254).                                                                                                                                                                                                                                                                                                       |
+| S5  | **Resolved** | AC 5 includes the 5-minute step-up rule. AC 8, section 9 and section 10 all require rows that **meet** the p95 budget. AC 8 and section 10 state the Pi 5 failure path, and #360/#362 stay blocked until a Floor row passes.                                                                                                                                                                                                        |
+| S6  | **Resolved** | The spec header reads "In review, revision 2" and the log status matches. The owner-decision checklist item is checked. Hand-off routes to the reviewer. No "owner decision needed" text remains. Leftover nit: see N1.                                                                                                                                                                                                             |
+| S7  | **Resolved** | Section 4.4 item 1 now says two or three meshes per event, three `useFrame` callbacks (registered before the early return) and double-sided rings drawn twice.                                                                                                                                                                                                                                                                      |
+| S8  | **Resolved** | The summary includes `renderer` (via `WEBGL_debug_renderer_info`). Re-run shows `ANGLE (Google, Vulkan 1.3.0 (SwiftShader ...))`. README step references point to step 5.                                                                                                                                                                                                                                                           |
+| S9  | **Resolved** | Attribution scenarios are behind `--attribution`. `--quick` completed in **264 s** here (spec and log say 248 s, within run-to-run variation).                                                                                                                                                                                                                                                                                      |
+
+Optional items: O1, O4, O5, O6 and O7 are addressed. O6: `programsCreated` = 10 in all scenarios, matching section 3. O7: process groups and a cleared readiness timer; no leftover `vite preview` or mock processes after the run. O2 is handled by documentation (AC 6 calls the figure an upper bound), which is acceptable for a spike. O3 and O8 remain open, as the log explains; neither blocks merge.
+
+### New finding
+
+- **N1 (optional).** `docs/progress/ISSUE-384-log.md` line 11 still says "revision 2 uncommitted". Revision 2 is now committed as `df2a424`. Update it when the branch is next touched.
+
+### Stale-number sweep
+
+`grep -nE "\b202\b|\b61\b|76%|100\.9|owner decision needed|needs owner decision|uncommitted"` over the spec, log and `scripts/perf/*` found:
+
+- 202: one hit, in the log line explaining that the session 1 figure of about 202 was inflated (intended history).
+- 61: one hit, a PRNG constant in `mock-server.mjs` (not a count).
+- "uncommitted": N1.
+- 76%, 100.9 and "owner decision needed": no hits.
+
+The spec has no stale numbers. Internal consistency also checks out: 265 and 196/58 match across sections 1, 3, 4.2, 4.4 and AC 2; the texture caps match across sections 3 and 5, section 9 item 4 and AC 6; the p95 "meets" wording matches across AC 8 and sections 9 and 10.
+
+### Re-run notes
+
+Single `--quick` rep (SwiftShader, not comparable to the section 4.3 medians of 3):
+
+| Scenario       | fps  | Draw calls |
+| -------------- | ---- | ---------- |
+| 0 markers      | 4.8  | 77         |
+| 50 markers     | 2.3  | 265        |
+| DPR 2          | 1.2  | 265        |
+| 4K             | 1.3  | 265        |
+| Reduced motion | 2.6  | 265        |
+| Clear only     | 36.5 | 0          |
+
+Triangles were 42,552 and textures 58.2 MiB. Exact counts reproduce. The fps values are lower than the spec's medians but in the same rank order (DPR 2 and 4K slowest), which is consistent with the documented noise. The probe reports `textureCount` 68 (58 labels, earth, normal map, plus small three.js/app textures). The spec makes no claim about the total count, so there is no conflict.
+
+### Checks run (revision 2)
+
+| Command                                                                                                                         | Result                                                                         |
+| ------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| `node --check` on `scripts/perf/{probe.js,cpu-profile.mjs,globe-baseline.mjs,mock-server.mjs}`                                  | Pass (4/4)                                                                     |
+| `npx prettier --check docs/specs/SPEC-384.md docs/progress/ISSUE-384-log.md docs/reviews/REVIEW-384.md scripts/perf`            | Pass (before this section was appended; re-checked after)                      |
+| `grep -c "{ name:" src/renderer/components/Globe/cityData.ts`                                                                   | 58                                                                             |
+| `node scripts/perf/globe-baseline.mjs --chrome /opt/pw-browsers/chromium-1194/chrome-linux/chrome --quick --out <scratch>.json` | Completed in 264 s; per-tag sum = total in 6/6 scenarios; `programsCreated` 10 |
+| `node scripts/perf/mock-server.mjs --port 3911 --markers 1`                                                                     | Logs `listening on 127.0.0.1:3911`                                             |
+| `git diff origin/main...HEAD --name-only` filtered for `src/`, `.github/`, `*Contract*`, `*Schema*` and `*Types*`               | No matches; severity gate respected                                            |
+
+### Next steps
+
+Ready for a PR with `Closes #384` when the owner asks for one. N1 can be fixed in that PR. The on-device rows (section 7.1) and section 9 items 1 to 6 remain owner actions and do not block this spike.
