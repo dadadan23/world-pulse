@@ -28,7 +28,7 @@ describe('Production static frontend fallback', () => {
 
   function setup() {
     // Registering the catch-all route must not throw under Express 5 (path-to-regexp 8).
-    app = createApp({ corsOrigin: '*', rendererDist: distDir });
+    app = createApp({ rendererDist: distDir });
     return app.app;
   }
 
@@ -65,6 +65,12 @@ describe('Production static frontend fallback', () => {
     const res = await request(setup()).get('/health');
     expect(res.status).toBe(200);
     expect(res.body.status).toBe('ok');
+  });
+
+  it('starts without a fallback when the renderer dir has no index.html', async () => {
+    fs.rmSync(path.join(distDir, 'index.html'));
+    const res = await request(setup()).get('/some/deep/client/route');
+    expect(res.status).toBe(404);
   });
 
   it('does not register the fallback outside production', async () => {

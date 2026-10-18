@@ -278,11 +278,17 @@ export function createApp(options?: { corsOrigin?: string; rendererDist?: string
   // in production, and only if dist/renderer was actually built.
   if (process.env.NODE_ENV === 'production' && fs.existsSync(rendererDist)) {
     app.use(express.static(rendererDist));
-    // Express 5 (path-to-regexp 8) rejects a bare '*'; the wildcard must be named.
-    app.get('/{*splat}', (req, res, next) => {
-      if (req.path === '/api' || req.path.startsWith('/api/')) return next();
-      res.sendFile(path.join(rendererDist, 'index.html'));
-    });
+    // Read index.html once at startup so the catch-all below serves a cached string and does no
+    // per-request file system access (the built frontend is immutable for a running server).
+    const indexPath = path.join(rendererDist, 'index.html');
+    if (fs.existsSync(indexPath)) {
+      const indexHtml = fs.readFileSync(indexPath, 'utf8');
+      // Express 5 (path-to-regexp 8) rejects a bare '*'; the wildcard must be named.
+      app.get('/{*splat}', (req, res, next) => {
+        if (req.path === '/api' || req.path.startsWith('/api/')) return next();
+        res.type('html').send(indexHtml);
+      });
+    }
   }
 
   // Socket.io connection handling
