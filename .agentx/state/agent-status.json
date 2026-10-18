@@ -1,12 +1,8 @@
 {
   "product-manager": {
-    "role": "product-manager",
-    "status": "complete",
-    "issue": "384",
-    "branch": "claude/384-frame-budget-spike",
-    "startedAt": "2026-10-18T20:17:15Z",
-    "completedAt": "2026-10-18T20:21:06Z",
-    "artifacts": []
+    "status": "idle",
+    "issue": null,
+    "lastActivity": null
   },
   "ux-designer": {
     "status": "idle",
@@ -14,13 +10,9 @@
     "lastActivity": null
   },
   "architect": {
-    "role": "architect",
-    "status": "complete",
-    "issue": "384",
-    "branch": "claude/384-frame-budget-spike",
-    "startedAt": "2026-10-18T20:07:11Z",
-    "completedAt": "2026-10-18T20:15:23Z",
-    "artifacts": []
+    "status": "idle",
+    "issue": null,
+    "lastActivity": null
   },
   "engineer": {
     "role": "engineer",
@@ -29,18 +21,12 @@
     "branch": "claude/next-stories-72lncb",
     "startedAt": "2026-07-05T00:00:00Z",
     "completedAt": "2026-09-24T00:00:00Z",
-    "artifacts": [
-      "issues 232,233,236,237,238,241,242 all closed — stale active flag reset during backlog refinement pass"
-    ]
+    "artifacts": ["issues 232,233,236,237,238,241,242 all closed — stale active flag reset during backlog refinement pass"]
   },
   "reviewer": {
-    "role": "reviewer",
-    "status": "complete",
-    "issue": "384",
-    "branch": "claude/384-frame-budget-spike",
-    "startedAt": "2026-10-18T20:17:15Z",
-    "completedAt": "2026-10-18T20:22:53Z",
-    "artifacts": []
+    "status": "idle",
+    "issue": null,
+    "lastActivity": null
   },
   "devops-engineer": {
     "status": "idle",
