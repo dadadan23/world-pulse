@@ -63,6 +63,7 @@
     attribution: false,
     textures: [],
     firstDrawAt: null,
+    drawContexts: [],
   };
 
   function now() {
@@ -157,7 +158,10 @@
         var count = arguments[countIdx];
         var tag = state.currentTag;
         if (tag === 'basic') tag = refineBasic(mode, count);
-        if (state.sampling && state.cur) state.cur.issued++;
+        if (state.sampling && state.cur) {
+          state.cur.issued++;
+          if (state.drawContexts.indexOf(this) < 0) state.drawContexts.push(this);
+        }
         if (state.skip[tag]) return undefined;
         account(tag, mode, count, instIdx !== undefined ? arguments[instIdx] : 1);
         if (state.sampling && state.attribution && state.cur) {
@@ -249,6 +253,7 @@
     var i = Math.min(s.length - 1, Math.max(0, Math.ceil((p / 100) * s.length) - 1));
     return Math.round(s[i] * 100) / 100;
   }
+  var TOL_MS = 1;
   function over(arr, ms) {
     return arr.filter(function (x) {
       return x > ms;
@@ -282,6 +287,7 @@
       state.programsUsedCount = 0;
       state.cur = null;
       state.lastTs = null;
+      state.drawContexts = [];
       state.sampling = true;
       state.startedAt = now();
       origRaf(tick);
@@ -315,6 +321,14 @@
         return t + x.bytes;
       }, 0);
       var mem = performance.memory;
+      if (state.drawContexts.length > 1 && typeof console !== 'undefined') {
+        console.warn(
+          '[wpPerf] ' +
+            state.drawContexts.length +
+            ' WebGL contexts issued draws while sampling ' +
+            '(is the Sky Map modal open?). Counts and frame rates mix canvases; close it and re-run.'
+        );
+      }
       return {
         summary: {
           seconds: Math.round(dur * 10) / 10,
@@ -333,14 +347,20 @@
           frameMsP95: pct(fi, 95),
           frameMsP99: pct(fi, 99),
           frameMsMax: pct(fi, 100),
-          // Thresholds sit just above 1, 1.5 and 2 frames at 30 fps, so
-          // vsync jitter on a 33.3 ms frame is not counted as a miss.
-          framesOver33ms: over(fi, 33.4),
-          framesOver50ms: over(fi, 50),
-          framesOver66ms: over(fi, 66.7),
+          // Counts intervals strictly greater than threshold + 1 ms (33 -> 34,
+          // 50 -> 51, 66 -> 67). 50 ms is exactly three 60 Hz ticks and 33.3 and
+          // 66.7 are two and four ticks, so the 1 ms tolerance keeps vsync
+          // jitter on an on-time frame from counting as a miss.
+          framesOver33ms: over(fi, 33 + TOL_MS),
+          framesOver50ms: over(fi, 50 + TOL_MS),
+          framesOver66ms: over(fi, 66 + TOL_MS),
           pctFramesOver66ms: fi.length
-            ? Math.round((over(fi, 66.7) / fi.length) * 10000) / 100
+            ? Math.round((over(fi, 66 + TOL_MS) / fi.length) * 10000) / 100
             : null,
+          // Distinct WebGL contexts that issued draws while sampling. More than
+          // one (for example the Sky Map modal open) mixes canvases in every
+          // count above; keep the modal closed.
+          contextsDrawing: state.drawContexts.length,
           rafCallbackMsP50: pct(state.callbackMs, 50),
           rafCallbackMsP95: pct(state.callbackMs, 95),
           rafCallbackMsMean: mean(state.callbackMs),
