@@ -13,7 +13,7 @@ World Pulse is a real-time information radiator that visualizes global events on
 | Area | Status | Notes |
 |---|---|---|
 | Phase 1, Phase 2, news/tickers, ambient settings, adaptive layout, severity alerting, Electron auto-update | Done | Epics #142/#143, #208, #226–#229 and all child stories closed. `DESIGN.md`/`PRODUCT.md` are the canonical design references. |
-| Next phase (#347–#350) | **Not started** | 0 of 70 issues closed, none assigned, no open feature PRs. See "Next Phase". |
+| Next phase (#347–#350) | **Started** | Frame-budget spike #384 is done (PR #438, `docs/specs/SPEC-384.md`, tooling in `scripts/perf/`); 7 follow-up stories #431–#437 added under #356. Everything else is open. See "Next Phase". |
 | Dependency upgrades (#417) | Mostly done | Merged: vitest 5 (#423), dotenv 18 (#426), three 0.186 (#430). **Open Dependabot PRs: 3** — #333 vite 8 (blocked: needs electron-vite 6; `manualChunks` fails under rolldown), #335 electron 44 (needs desktop smoke test), #336 TypeScript 7 (blocked: typescript-eslint peer range). Not yet PR'd: eslint 10, @vitejs/plugin-react 6, @testing-library/jest-dom 7. Use npm 11 for lockfiles. |
 | CI/CD | Green on main | Last main commits are dependency/build fixes (#421, #423, #426, #428 Express 5 SPA fallback, #430). |
 | AgentX state | Idle | `.agentx/state/agent-status.json` shows all agents idle. Always run `hook complete` when finishing work. |
@@ -29,7 +29,7 @@ World Pulse is a real-time information radiator that visualizes global events on
 | #350 New Data Layers wave 1 | P2 | #367–#369 | NASA FIRMS wildfires, NOAA SWPC space weather, GDACS/EONET disaster alerts (spike first). |
 
 **Suggested sequence** (derived from epic text and titles; story-level blocked-by links were not verified):
-1. Foundation (P1): #384 frame-budget spike, #385 reduced-motion utility, #370 → #371 mode registry/persistence.
+1. Foundation (P1): ~~#384 frame-budget spike~~ (done), #434 on-device Pi 5 baseline (owner), #433 guardrails doc, #431 quality profile, #432 instanced markers, #385 reduced-motion utility, #370 → #371 mode registry/persistence.
 2. In parallel: Deck UX #372 → #373 → #374; lineage #405 → #406; sun #386 → #387; start baseline server job #400–#402 early so history accumulates.
 3. P2 layers: fires #409–#411, space weather #412–#414, gauges #403–#404, callouts/rings #389–#392, alert state machine/drill #395–#397, remaining deck stories.
 4. P3 after spikes: sweep #393–#394, phosphor #398–#399, sound #377, ISS #407/#408, GDACS #415/#369.
@@ -67,7 +67,7 @@ This is enforced in `.agentx/workflows/story.toml`, `bug.toml`, and `docs.toml` 
 
 ## Critical Path
 
-The original critical path (CI green → Globe GeoJSON → Oblivion design system → Degraded UX → Release readiness) is complete. The active path for the next phase is: frame-budget spike (#384) → mode registry (#370/#371) → Mode Deck UI and mode-producing features. See "Next Phase".
+The original critical path (CI green → Globe GeoJSON → Oblivion design system → Degraded UX → Release readiness) is complete. The active path for the next phase is: on-device baseline (#434) and quality profile/instancing (#431/#432) alongside mode registry (#370/#371) → Mode Deck UI and mode-producing features. Sweep (#360) and phosphor (#362) stay blocked until on-device sign-off (#437). Performance budgets and the degrade ladder are in `docs/specs/SPEC-384.md`. See "Next Phase".
 
 ## Issue Lifecycle (REQUIRED — automated via `.github/workflows/pr-issue-link.yml`)
 
