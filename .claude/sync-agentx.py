@@ -4,7 +4,7 @@
 Sources (.github/agents, .github/skills, .github/prompts, .github/instructions,
 .agentx/knowledge/skills) stay the single source of truth for Copilot/AgentX;
 this script only produces the Claude Code view of them. Re-run after
-`agentx upgrade`. Add a skill with:  python3 .claude/sync-agentx.py --include csharp
+`agentx upgrade`. Add a skill with:  python3 .claude/sync-agentx.py
 """
 import argparse, re, shutil, sys
 from pathlib import Path
@@ -47,6 +47,8 @@ PROMPTS = {
     "refactor": ("ax-refactor", "engineer"),
     "security-review": ("ax-security-review", "reviewer"),
     "test-gen": ("ax-test-gen", "engineer"),
+    "ai-agent": ("ax-ai-agent", "engineer"),
+    "evaluation": ("ax-evaluation", "engineer"),
     "ux-design": ("ax-ux-design", "ux-designer"),
 }
 # instruction stem -> paths
@@ -56,6 +58,8 @@ RULES = {
     "api": ["src/server/**"],
     "devops": [".github/workflows/**", "Dockerfile", ".dockerignore"],
     "yaml": ["**/*.yml", "**/*.yaml"],
+    # Copilot glob `**/*ai*` would match nearly every file (e.g. main.tsx); narrowed to avoid loading this on unrelated edits
+    "ai": ["**/*agent*", "**/*llm*", "**/agents/**"],
     "ux-methodology": ["docs/ux/**", "**/UX-*", "**/prototypes/**", "**/wireframe*"],
 }
 
@@ -170,7 +174,7 @@ def build_skills(extra):
     d = OUT / "skills"; d.mkdir(exist_ok=True)
     for old in d.iterdir():  # agent-x is hand-written (Claude-native coordinator); keep it
         if old.name != "agent-x": shutil.rmtree(old)
-    wanted = SKILLS | set(extra)
+    wanted = {sk.parent.name for sk in (GH / "skills").glob("*/*/SKILL.md")}  # all skills
     found = set()
     for sk in sorted((GH / "skills").glob("*/*/SKILL.md")):
         name = sk.parent.name
@@ -207,10 +211,20 @@ def build_commands():
     return sorted(p.stem for p in d.iterdir())
 
 # --- rules -------------------------------------------------------------------
+def apply_to(fm):
+    raw = fm_get(fm, "applyTo")
+    out = []
+    for g in [x.strip() for x in raw.split(",") if x.strip()]:
+        g = re.sub(r"^\*\*(\.\w+)$", r"**/*\1", g)  # **.cs -> **/*.cs
+        out.append(g)
+    return out
+
 def build_rules():
     d = OUT / "rules"; reset(d)
-    for stem, paths in RULES.items():
-        fm, body = split_fm((GH / "instructions" / f"{stem}.instructions.md").read_text())
+    for f in sorted((GH / "instructions").glob("*.instructions.md")):
+        stem = f.name.replace(".instructions.md", "")
+        fm, body = split_fm(f.read_text())
+        paths = RULES.get(stem) or apply_to(fm)
         pl = "\n".join(f'  - "{p}"' for p in paths)
         (d / f"{stem}.md").write_text(f"---\ndescription: \"{esc(fm_get(fm, 'description'))}\"\npaths:\n{pl}\n---\n{body}")
     return sorted(p.stem for p in d.iterdir())
