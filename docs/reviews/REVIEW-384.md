@@ -400,3 +400,227 @@ Add: "The L5 cap renders on a tick when the time since the last render is at lea
 ### Next steps
 
 The architect fixes B1 and S1 to S6 in SPEC-384 (section 6.2, AC 5, and the section 3 tolerance note) on a follow-up branch, and the engineer fixes S7 to S9 in `scripts/perf/`. The owner then updates story #435 from the corrected AC 5 before anyone implements the governor. None of this touches `src/`, `.github/` or contract files.
+
+---
+
+## Final review of PR #440 (corrections)
+
+**Scope**: `git diff origin/main...HEAD` on `claude/384-followups` at `ebb5e34`, against `origin/main` `99fa237`. That covers SPEC-384 (sections 3, 4.1, 6.2, 7, 8, 9, 10 and the header), the progress log, this review doc, and `scripts/perf/` (`probe.js`, `cpu-profile.mjs`, `globe-baseline.mjs`, `README.md`). Stories #435, #431, #448 and the #385 comments were read on GitHub for cross-reference only. Date: 2026-10-20.
+
+### Verdict
+
+**REQUEST CHANGES (spec only; the `scripts/perf/` part is approved as is).** The runner and probe fixes work: I ran the port, signal and syntax checks again myself. The spec fixes resolve S3 to S6, the spec part of S9 and O1 to O8. Two problems remain in the governor, and #435 copies both of them word for word:
+
+- **The AC 5 flap bound fails under the spec's own rules.** I built an independent model. On the architect's coarse grid it reproduces the architect's numbers exactly (4 per hour after 2 h, 7 in any hour, 96 in 24 h). Between the grid points, load that overloads only L0 reaches **7 changes per hour after 2 h and 125 in 24 h**. A correct implementation therefore fails the AC 5 "Flap bound" test.
+- **The `R` calibration can still go wrong in both directions.** If `R` comes out too high, the B1 failure returns: steady overload is hidden. If it stays too low on a 24, 25 or 30 Hz display, the governor is stuck at L5 for good. The section 10 risk row says neither can happen.
+
+Five should-fix items cover a wrong timing number in AC 5, the on-demand rendering consequence, and three places where the new simplified-earth L5 lever conflicts with other text.
+
+| Severity   | Count |
+| ---------- | ----- |
+| Blocking   | 2     |
+| Should-fix | 5     |
+| Optional   | 9     |
+
+### Status of the revision 3 findings
+
+Line numbers are `docs/specs/SPEC-384.md` at `ebb5e34` unless a script is named.
+
+| Finding | Status                                     | Evidence                                                                                                                                                                                                                                                                                                                                                                                     |
+| ------- | ------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| B1      | **Partly**                                 | `R` is a calibrated input and is never taken from rendered windows (lines 226, 233 and 235; AC 5 lines 305 to 307; risk row line 350). The stated overload cases now step down (simulated below). However, the calibration rule itself can produce a wrong-high `R` from a busy startup, which is B1's own mechanism, and its fallback cannot calibrate displays at 30 Hz or below. See N-B2 |
+| S1      | **Partly**                                 | The rule is changed (line 240; AC 5 line 313). The bound claimed at line 247, in AC 5 line 314 and in risk row line 349 does not hold. See N-B1                                                                                                                                                                                                                                              |
+| S2      | **Partly**                                 | Settle periods, counter resets and precompile are covered (lines 238, 239 and 243; AC 5 lines 304 and 308). The derived number "L0 to L5 takes at least 150 s" is wrong. See N-S1                                                                                                                                                                                                            |
+| S3      | Resolved                                   | `W` = max, not sum (line 234). The 40% threshold applies when GPU time is unknown (line 237). AC 5 line 310                                                                                                                                                                                                                                                                                  |
+| S4      | Resolved                                   | The section 3 tolerance (line 52), `I > B + 1 ms` (line 235) and `probe.js` lines 354 to 358 (`TOL_MS`) all agree, and README lines 70 to 73 document it. The 66 ms margin is tight (N-O1)                                                                                                                                                                                                   |
+| S5      | Resolved                                   | Cap rule plus whole-frame skip via `frameloop="never"` and `advance()` (line 241); AC 5 line 312. My frame-interval model agrees: with calibrated `R` it gives 30 fps at 60 and 120 Hz and is a no-op at 30 and 24 Hz                                                                                                                                                                        |
+| S6      | Resolved                                   | Profile ceilings are in the table at lines 214 to 222 and AC 5 line 315. The Lite ceiling is L4 rather than the L3 I suggested; that matches the #431 AC ("Lite maps to ladder levels L1-L4")                                                                                                                                                                                                |
+| S7      | Resolved                                   | Readiness regex `/localhost:4173/` and `FAILED_RE` in both runners (`cpu-profile.mjs` lines 37 and 49 to 58; `globe-baseline.mjs` lines 95 and 107 to 116). Re-tested: with port 4173 held, the runner exits 1 with `Port 4173 is already in use` before any browser launches                                                                                                                |
+| S8      | Resolved                                   | A `started` set plus SIGINT/SIGTERM handlers in both runners, and `p.on('error')`. Re-tested: SIGINT to the runner's process group mid-run gives exit 130, ports 3000 and 4173 free, and no vite, mock or Chromium processes left                                                                                                                                                            |
+| S9      | Resolved (detection rather than filtering) | Spec section 7 step 2 (line 283) and README step 4. `probe.js` records each context that draws while sampling (`contextsDrawing`, with a console warning when there is more than one). README step 8 says it must be 1. #448 fails its probe step if it is not 1                                                                                                                             |
+| O1      | Resolved                                   | Line 236                                                                                                                                                                                                                                                                                                                                                                                     |
+| O2      | Resolved                                   | Line 251                                                                                                                                                                                                                                                                                                                                                                                     |
+| O3      | Resolved in the spec; partly in the README | Lines 228, 239 and 240; diagram lines 257 to 259; AC 5 line 316. The README still lacks "keep the page visible while sampling" (N-O3)                                                                                                                                                                                                                                                        |
+| O4      | Resolved                                   | Line 97                                                                                                                                                                                                                                                                                                                                                                                      |
+| O5      | Resolved, but the new header is stale      | Line 4 now reads "Accepted". It also says "items 1 to 6 there are still open", but section 9 has only one open item (N-S5)                                                                                                                                                                                                                                                                   |
+| O6      | Resolved                                   | AC 2 line 300                                                                                                                                                                                                                                                                                                                                                                                |
+| O7      | Resolved                                   | Line 50                                                                                                                                                                                                                                                                                                                                                                                      |
+| O8      | Resolved                                   | Line 271                                                                                                                                                                                                                                                                                                                                                                                     |
+
+### Independent governor simulation
+
+I wrote a new window-level model from the final text of section 6.2 and AC 5 and did not reuse `gov2.mjs`. It was not committed; the files are `gov3.mjs`, `gov3-cases.mjs`, `gov3-flap.mjs` and `gov3-grid.mjs` in the session scratchpad. It models:
+
+- 10 s windows and a 30 s startup settle;
+- a 10 s settle after every level change, with counters reset;
+- `B` = max(tier or L5 budget, 1.2 x `R`), and over budget means `I > B + 1`;
+- headroom at 50% or 40% of `T(next)` held for 60 s;
+- the back-off rules, the trial, and hidden-tab abandonment.
+
+`I` is the render time rounded up to whole display ticks. The L5 cap is applied as in line 241. `R` is an input that is updated only from ticks the cap skipped.
+
+| Case                                                                                                       | Result                                                                                                                                                                                                     | Matches spec?                           |
+| ---------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------- |
+| Recommended 60 Hz, unloaded at L1, `W` 4 ms, GPU time known or unknown                                     | Trial at 5.0 min, kept 30 s later                                                                                                                                                                          | Yes                                     |
+| Recommended 60 Hz, steady 30 fps at L0 to L3, `W` 14 ms                                                    | Steps down at 50, 80, 110 and 140 s from startup and holds L4. With `W` 4 ms and GPU time unknown, failed L3 trials come at 7.3, 17.7, 38, 78 and 139 min                                                  | Yes                                     |
+| Floor, steady 15 fps                                                                                       | From L4 (Auto): L5 at 50 s. From L0 (Full): L5 at 170 s                                                                                                                                                    | Yes                                     |
+| Overload starting mid-run at a window boundary                                                             | Step-downs 20, 50, 80, 110 and 140 s after onset                                                                                                                                                           | **No**: AC 5 says at least 150 s (N-S1) |
+| Genuine 30 Hz display, `R` 33.3 ms, Recommended                                                            | From L0: no change in 60 min. From L1: trial at 5 min, kept                                                                                                                                                | Yes                                     |
+| Recommended at L5, capable device                                                                          | Trials at 5, 10, 15, 20 and 25 min, all kept; L0 at 25.5 min                                                                                                                                               | Yes                                     |
+| 30 Hz display, `R` 16.7 ms until the startup-settle pause, which calibrates it                             | No change                                                                                                                                                                                                  | Yes                                     |
+| **30 Hz or 24 Hz display, `R` left at 16.7 ms** (the pause got fewer than 30 intervals; see N-B2)          | Down to L5 by 170 s. At L5 the cap never skips (threshold 25 ms, ticks 33.3 or 41.7 ms), so source (b) never corrects `R`. Failed L4 trials at 7.8, 18, 38, 79, 139 and 200 min, then hourly, **for good** | No (risk row line 350)                  |
+| **60 Hz panel, `R` over-estimated at 33 ms** (busy startup), steady 30 fps overload                        | **No step-down in 60 min** (`B` 40 ms, `I` 33.3 ms): B1 again                                                                                                                                              | No (risk row line 350)                  |
+| **Floor Pi on 60 Hz, `R` over-estimated at 45 ms**, steady 20 fps                                          | No step-down (`B` = max(50, 54)); p95 50 ms holds, but any 51 to 54 ms p95 is hidden                                                                                                                       | No                                      |
+| GPU-bound, no timer, L0 always misses                                                                      | Trials at 5, 15.3, 35.7, 76, 136.3 and 196.7 min, each reverted 20 s later                                                                                                                                 | Yes                                     |
+| Hidden 300 to 400 s during a trial                                                                         | Trial abandoned and reverted at 5.2 min, back-off unchanged; next trial at 10.2 min                                                                                                                        | Yes                                     |
+| Flap: 1 min on, 5 min off, L0 only, 24 h                                                                   | 51 changes; at most 2 per hour after 2 h; 7 in the first hours                                                                                                                                             | Yes                                     |
+| Flap, architect's grid (on 0.5 to 10 min; 17 periods from 3 to 120 min; 4 phases; L0 only)                 | 4 per hour after 2 h, 7 in any hour, 96 in 24 h: **identical to the architect's result**                                                                                                                   | Yes, on the grid                        |
+| **Flap, fine grid** (on 0.5 to 10 min in 0.5 min steps; every period from 3 to 120 min; 4 phases; L0 only) | **7 per hour after 2 h** (6 min on every 46 min), **125 in 24 h**, 7 in any hour                                                                                                                           | **No** (N-B1)                           |
+| Flap, bursts that overload L0 to L(k-1), fine grid                                                         | k = 2: 9 per hour after 2 h, 154 per day. k = 3: 11 and 186. k = 5: 16 and 250. 200 random burst schedules (k from 1 to 3): 14 per hour after 2 h                                                          | Not covered by the claim (N-B1)         |
+
+### Blocking
+
+**N-B1. The flap bound is false, so the AC 5 "Flap bound" test can't pass** (line 247; AC 5 line 314; risk row line 349; #435 AC "flap bound (at most 4 level changes per hour after the first 2 hours, at most 100 per 24 h)").
+
+The failing cycle is 6 min of load every 46 min, at L0 only. In this trace the back-off is 5 min at the start of each burst:
+
+- **Step-down:** 20 s into the burst. The kept level has already been held for 30 min, so this does not count as a failed trial.
+- **Trial:** 5 min later. The burst is still running, so the trial fails and the back-off doubles to 10 min.
+- **Revert:** at once.
+- **Kept trial:** 10 min later.
+
+That is 4 changes per 46 min, and a rolling hour catches 7. The text at line 247 says the "shortest repeating cycle" has two changes. It misses that a burst longer than the 5 min back-off also adds a failed trial to every cycle. The architect's sweep stepped over this case: its on-durations were {0.5, 1, 2, 3, 5, 10} min and its periods included 45 and 60 min but nothing between. On that grid my model gives the same numbers as the architect's.
+
+Bursts that overload more than one level add k step-downs and k trials per cycle, so the bound also depends on k. Line 247 excludes "step-downs under sustained overload", but these are step-downs inside bursts.
+
+Suggested edits. Choose one.
+
+1. **Rule change (recommended).** Add to the back-off row: "A level the governor left by a step-down or a failed trial is not trialled again until 30 min after it was left."
+   - In my model, for single-level load on the fine grid, this gives at most 4 changes per hour, both after 2 h and in any hour, and at most 64 in 24 h.
+   - L5-to-L0 recovery on a capable device is unchanged (25.5 min).
+   - The cost: a single 1 min burst keeps L1 for 30 min instead of 5.
+   - Then restate line 247 and AC 5 line 314 as: "load that overloads only L0: at most 4 level changes in any 60 min window and at most 64 in 24 h. Load that overloads k levels adds up to 2k changes per burst (measured: up to 10 per hour for k = 3)."
+   - Copy the numbers into the section 10 risk row and #435.
+2. **Text only.** Keep the rules and state the measured worst case: "at L0 only: at most 7 changes in any 60 min window and at most 125 in 24 h, worst at about 6 min of load every 46 min; bursts that overload k levels add up to 2k changes per burst". Change AC 5 line 314 and #435 to the same numbers, and in the risk row replace "at most 4 level changes per hour" with these numbers. The owner should then confirm that 7 changes an hour is acceptable on an ambient display.
+
+Either way, the AC must specify the sweep: on-time 0.5 to 10 min in 0.5 min steps, every whole-minute period from 3 to 120 min, at least 2 phases.
+
+**N-B2. `R` calibration can still hide overload, or pin a slow display at L5** (line 233; diagram line 251; risk row line 350; AC 5 line 307; #435 AC "Separate, unit-tested `R` calibration").
+
+1. **Wrong-high `R`.** Source (a) takes the median rAF interval "before the globe canvas first renders" and ignores only intervals over 100 ms. That is the busiest phase of startup: bundle evaluation, React mount, `generateHeightCanvas` and texture decode. On a Pi, many intervals of 20 to 99 ms are likely, and if they are more than half of the sample, `R` is too high. This is B1's mechanism: main-thread work stretches rAF intervals. In the model, `R` 33 ms on a 60 Hz panel hides steady 30 fps overload completely. Nothing corrects it afterwards: source (b) runs only at L5, and source (c) only on a screen change.
+2. **Wrong-low `R` that never recovers.** Source (a) and the fallback pause need at least 30 intervals. The pause lasts "up to 1 s", which gives at most 30 intervals at 30 Hz (29 with any phase offset), 25 at 25 Hz and 24 at 24 Hz. On exactly the displays `R` exists to protect, the fallback can't calibrate. The spec doesn't say what happens then, and the literal reading is that `R` stays 16.7 ms.
+   - The governor then steps to L5.
+   - At L5 the cap threshold is 33.3 - 8.3 = 25 ms, below one tick, so no tick is skipped and source (b) never fires.
+   - The device stays at L5 for good, with a failed trial every hour.
+   - The risk row's claim that this "can only cause an extra step-down" is false.
+3. **The diagram contradicts the table.** The diagram says "`R` calibrated before first render", but the table allows rendering with an uncalibrated `R` for 30 s. It also never says whether the implementation should hold back the first render to collect (a). With r3f, the canvas normally renders on the first tick after mount, so (a) would almost always fall back.
+
+Suggested edit for the `R` row. Replace the (a) and fallback sentences with:
+
+> "(a) at startup, the first render is held until 30 rAF intervals have been collected or 1.5 s has passed. `R` is the **10th percentile** of intervals of 100 ms or less. It is accepted only if at least 20 intervals were collected and the median is within 15% of the 10th percentile. Otherwise `R` is uncalibrated. In Electron, `screen.getDisplayMatching(...).displayFrequency` is used when it is non-zero, and the rAF value only cross-checks it. (c) the calibration pause skips renders until 30 intervals have been collected or 2 s has passed, with the same acceptance test. If the pause fails, it is retried at the next step-down. While `R` is uncalibrated, `B` uses the tier budget only, and a step-down to L5 triggers a calibration pause first."
+
+Then:
+
+- Change the diagram start label to "first render held up to 1.5 s for `R` calibration".
+- Rewrite the risk row: "`R` too high hides overload, and `R` too low can pin a slow display at L5. Mitigated by the low-percentile and spread test, the Electron `displayFrequency` and retrying the pause."
+- Add AC 5 `R` calibration cases:
+  - "startup intervals 60% at 30 to 60 ms and 40% at 16.7 ms give `R` 16.7 ms, or uncalibrated, never above 20 ms";
+  - "a 24 Hz display whose startup sample is too short is calibrated by the pause, and does not stay at L5".
+
+### Should-fix
+
+**N-S1. "L0 to L5 takes at least 150 s" contradicts the first step-down at 20 s** (line 243; AC 5 line 304). The first step-down comes 20 s after the overload starts (two windows, AC 5 line 304). The next four come 30 s apart. That is 20 + 4 x 30 = **140 s**, which my model confirms (20, 50, 80, 110, 140 s). From startup it is 170 s, because of the 30 s startup settle. A test that asserts at least 150 s fails against a correct implementation. Edit both places to "L0 to L5 takes at least 140 s after the overload starts (20 s, then 30 s per further level)".
+
+**N-S2. The on-demand rendering consequence is flagged only in section 9** (line 331).
+
+- The note is honest, but section 6.2, "What story #435 needs" (line 274) and AC 5 say nothing about it, and #435 does not mention it.
+- With reduced motion on and `frameloop="demand"` (#385), rendered intervals become seconds long. So `I` is far over `B`, and the governor as specified steps down every 30 s to L5 whenever reduced motion is on.
+- The L5 cap's `frameloop="never"` plus `advance()` and #385's `frameloop="demand"` also need a single owner of the frame loop.
+
+The README already handles the probe side (lines 82 and 83: use `rafCallbackMs*` for render cost). Add after the signals intro at line 228:
+
+> "**On-demand rendering (reduced motion, #385) is not yet specified.** Until it is, the governor treats on-demand mode as `Paused`: no samples, no trials, level held. The frame loop has one owner, which drives both the L5 cap and on-demand invalidation."
+
+Add the same to line 274 and as an AC 5 "Visibility" sub-bullet. Add a "Blocked by / coordinate with #435" note to #385.
+
+**N-S3. The simplified-earth L5 lever conflicts with "Never: terminator"** (lines 211 and 212; section 5 line 179).
+
+- The terminator and shader city lights (#357) are built by extending the existing earth material ("+0 draw calls (extend existing materials)").
+- A "cheaper shading" earth at L5 drops them unless it carries them too.
+- #435 says "the 'never degraded' items are untouched at L5", and its description still lists L5 without the simplified earth. Its UI/UX line says "the Lite earth material is pending an owner decision", which the owner has since decided.
+
+Edit the L5 cell to: "simplified earth material (normal map off, cheaper lighting; **keeps the terminator and night lights from #357**)". Add "earth about 31%" to the L5 reason cell. The owner should update #435's description and UI/UX line.
+
+**N-S4. Bundling the simplified earth into L5 changes the AC 8 / section 10 Floor fallback** (AC 8 line 319; risk row line 348).
+
+- If the Pi 5 misses the budget, the fallback is "re-baseline Floor to Lite only with a 30 fps cap".
+- The 30 fps cap only exists as L5, and L5 now includes the simplified earth. So the fallback would ship the simplified earth as Floor's permanent look.
+- The 2026-10-20 decision says the simplified earth is "not the default Lite look".
+
+Two possible edits:
+
+1. **Preferred.** Split the level: L5 = cap plus outer atmosphere and wireframe off; **L6** = simplified earth. Then update the dependent text:
+   - AC 5: L0 to L6 is 6 step-downs (at least 170 s after onset), and recovery takes 6 trials (about 30.5 min);
+   - line 247: "at most 6 of them";
+   - AC 5 "Caps": no profile starts at L5 or L6.
+2. **Text only.** Say in AC 8 and the risk row that a Floor row passing only at L5 means the simplified earth is shown permanently, which needs explicit owner sign-off.
+
+In either case, add a "Ladder level" column to the 7.1 table (line 289). #435 exposes the level through a debug getter, so device rows record it.
+
+**N-S5. The status header and cross-references are stale** (line 4; section 9 lines 325 to 339; #448).
+
+- Line 4 says "Owner decisions of 2026-10-18 are in section 9; items 1 to 6 there are still open". Only one item is open, and four decisions are dated 2026-10-20.
+- #448 cites "SPEC-384 section 9 item 6", which no longer exists after the renumbering.
+
+Edit line 4 to "... Owner decisions (2026-10-18 and 2026-10-20) are in section 9; one item (night-lights texture source and licence) is still open." Tag each decided bullet with its former number, for example "**CI perf check (was item 6; decided 2026-10-20)**", so #448 and #385 ("section 9 item 2") still resolve.
+
+### Optional
+
+- **N-O1.** `framesOver66ms` uses `66 + TOL_MS` = 67 ms (`probe.js` lines 356 and 358). A four-tick frame (66.67 ms) therefore has only 0.33 ms of margin, compared with 0.67 ms at 34 ms and 1.0 ms at 51 ms. Use `66.7 + TOL_MS` and `33.3 + TOL_MS`, and update README lines 70 to 73. This is harmless in Chromium today, because rAF timestamps are vsync-aligned.
+- **N-O2.** In both runners, `onData` keeps testing `FAILED_RE` after the process is ready. Later output that matches (for example a mock log line containing "EADDRINUSE") would call `stopProc` on a running preview or mock, and `reject` would be a silent no-op. Remove the data listeners, or set a `ready` flag, once the process resolves.
+- **N-O3.** The README does not tell the person sampling to keep the page visible (the O3 README part). Add "Keep the page visible (no tab switch or screen blank) while sampling" to step 4.
+- **N-O4.** A calibration pause is not listed as a settle trigger (line 238). Add "and after a calibration pause", so the 1 s gap it leaves is never counted.
+- **N-O5.** Back-off row (line 240): say whether _each_ step-down within 30 min of a kept trial doubles the back-off, or only the first. Under sustained heavy overload just after a kept trial, five step-downs would take it from 5 min to 60 min. Suggested wording: "only the first step-down after a kept trial counts".
+- **N-O6.** Night-lights texture: section 9 (line 339) takes 1024x512 or smaller as the size for every tier. Section 5 (lines 175 and 179) still budgets 2048x1024 (+10.7 MiB) for Full. Either align section 5 to 1024x512 (+2.7 MiB) or say that 2048x1024 stays an allowed ceiling.
+- **N-O7.** The simplified earth is an extra shader program. State whether it is compiled when the governor steps down (the 10 s settle absorbs the hitch) or at startup on Floor (it then counts against the Lite ceiling of 12 programs).
+- **N-O8.** Section 9 formatting: a blank line at line 333 splits the decided list in two, and the heading "Decided 2026-10-18 (owner)" now covers 2026-10-20 items. Line 52 still says the probe tolerance is owned by "the parallel `scripts/perf/` fix"; it has landed in this PR.
+- **N-O9.** #448 cites "REVIEW-384 O2 and O3". This doc now has three O-series, so write "first review O2 and O3 (texture deletion tracking, perf-script linting)". #431's UI/UX line refers to a "settings-panel question" that has since been decided (later UX story).
+
+### What would mislead the implementers
+
+- **#435:**
+  - its flap-bound AC copies the false numbers (N-B1);
+  - its `R` calibration AC copies the weak rule (N-B2);
+  - its description and UI/UX line omit the simplified earth and call it pending (N-S3);
+  - nothing in it covers on-demand rendering (N-S2).
+
+  The issue says "the spec wins", so fixing the spec and then re-pasting AC 5 is enough.
+
+- **#385:** the comment asks for the "interaction with the governor's L5 cap" to be specified. The spec defers it, so the #385 implementer must not enable on-demand rendering before #435 enters `Paused` for it (N-S2).
+- **#431:** consistent with the Lite = L4 ceiling. Only the UI/UX note is stale (N-O9).
+- **#448:** the "section 9 item 6" reference (N-S5). Its `contextsDrawing` requirement matches the probe.
+
+### Scope
+
+`git diff origin/main...HEAD --name-only` lists 7 files: the spec, the progress log, this review and 4 files in `scripts/perf/`. `git diff --quiet origin/main...HEAD -- src .github` exits 0. No `*Types*`, `*Contract*` or `*Schema*` file is touched. The Severity Gate does not apply.
+
+### Checks run (final review)
+
+| Command                                                                                                                                 | Result                                                                                                                                                                                                                                                                                                               |
+| --------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `./.agentx/agentx.sh hook start reviewer 384`                                                                                           | reviewer active on #384                                                                                                                                                                                                                                                                                              |
+| `node --check` on `scripts/perf/{cpu-profile,globe-baseline,mock-server}.mjs` and `probe.js`                                            | Pass (4/4)                                                                                                                                                                                                                                                                                                           |
+| `npx prettier --check docs/specs/SPEC-384.md docs/reviews/REVIEW-384.md docs/progress/ISSUE-384-log.md scripts/perf`                    | Pass (re-checked after this section was appended)                                                                                                                                                                                                                                                                    |
+| Dummy HTTP server on 4173, then `node scripts/perf/cpu-profile.mjs --chrome /opt/pw-browsers/chromium-1194/chrome-linux/chrome --quick` | Exit 1, `npx failed to start: Error: Port 4173 is already in use`, no browser launched; afterwards ports 3000 and 4173 free and no stray processes                                                                                                                                                                   |
+| `globe-baseline.mjs --quick` in its own session, SIGINT to its process group mid-run (mock, preview and Chromium all up)                | Runner exit 130; ports 3000 and 4173 free; no vite, mock or Chromium processes left                                                                                                                                                                                                                                  |
+| `git diff --quiet origin/main...HEAD -- src .github`; name filter for Types, Contract and Schema                                        | Exit 0; no match                                                                                                                                                                                                                                                                                                     |
+| Scratch governor model `gov3*.mjs` (independent of `gov2.mjs`)                                                                          | See the simulation table; the architect's grid reproduces 4/7/96; the fine grid gives 7 per hour and 125 per day                                                                                                                                                                                                     |
+| Rule-variant check: per-level 30 min re-trial lock                                                                                      | L0-only load: at most 4 per hour, 64 per day; L5 recovery unchanged at 25.5 min                                                                                                                                                                                                                                      |
+| Full `node scripts/perf/globe-baseline.mjs --chrome ... --quick` (6 scenarios, 1 rep)                                                   | Exit 0. Draw calls 265 at 50 markers and 77 at 0; 42,552 triangles; 58.2 MiB of texture allocations; ports free and no stray processes afterwards. The per-tag sum was not re-printed (no `--out`), but this PR does not change the per-tag accounting in `probe.js`: it adds only `drawContexts` and the thresholds |
+
+### Next steps
+
+1. The architect fixes N-B1 (choose the rule change or the restated bound) and N-B2 in SPEC-384 sections 6.2, 8 (AC 5) and 10, plus N-S1 to N-S5. The owner chooses between the L5/L6 split and the text-only option in N-S4.
+2. The owner re-pastes AC 5 into #435 and updates #435's description (simplified earth, on-demand `Paused`) and #448's section reference.
+3. No `scripts/perf/` changes are required. N-O1 to N-O3 can ride along with #448, which already edits the probe.
+4. A short re-review of the spec diff only is enough. The scripts don't need another pass.
