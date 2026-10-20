@@ -272,3 +272,552 @@ Triangles were 42,552 and textures 58.2 MiB. Exact counts reproduce. The fps val
 ### Next steps
 
 Ready for a PR with `Closes #384` when the owner asks for one. N1 can be fixed in that PR. The on-device rows (section 7.1) and section 9 items 1 to 6 remain owner actions and do not block this spike.
+
+---
+
+## Re-review (revision 3, post-merge): governor redesign and probe changes
+
+**Scope**: what changed after revision 2 and merged in PR #438 (`99fa237`): SPEC-384 sections 3, 4.1 to 4.4, 6.2, 7, 8 (AC 3, AC 5) and 10; `scripts/perf/probe.js`, `cpu-profile.mjs`, `globe-baseline.mjs`, `README.md`. Reviewed on `claude/384-followups` (at `origin/main` `99fa237`). Date: 2026-10-19.
+
+### Verdict
+
+**REQUEST CHANGES (spec only; fix before story #435 starts).** The probe change, the marker derivation and the runner `finally` blocks are correct. The governor fixes the "can never step up" defect, but the new `1.2 x R` budget floor brings in a worse one. `R` is taken from the browser's rAF ticks, and when the app renders on every tick those ticks slow down with the render. So a device under steady overload looks the same as a slow display, and the governor **never steps down**. That includes the Pi 5 case the governor exists for. AC 5's "Slow display" test locks this behaviour in. Five governor rules are also underspecified or flap-prone, and two runner and probe defects mislead measurements.
+
+| Severity   | Count |
+| ---------- | ----- |
+| Blocking   | 1     |
+| Should-fix | 9     |
+| Optional   | 8     |
+
+### Simulation
+
+I wrote a throwaway model of the section 6.2 rules as written. It was not committed. It uses 10 s windows with inputs `I`, `R` and `W` per window. Step-down needs 2 consecutive windows over `B`. Step-up needs 60 s of `W <= 50% T(next)` plus the back-off, then a 2-window trial. The script was `gov.mjs` in the session scratchpad.
+
+| Case                                                                         | Spec's stated behaviour                  | Simulated result                                                                                                                                                                                 |
+| ---------------------------------------------------------------------------- | ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| (i) Recommended, 60 Hz, unloaded, at L1, `W` 4 ms                            | Trials L0 and keeps it                   | Holds: trial at 300 s, kept at 320 s. `B` = max(20, 1.2 x 16.67) = 20.0 ms                                                                                                                       |
+| (ii) Recommended at L5 (rAF 16.7 ms, rendered 33.3 ms), capable device       | Trials L4 and keeps it                   | Holds. L5 to L0 takes 5 trials, 26.7 min. `B(L5)` = max(50, 20) = 50 ms, consistent. `T(L5)` is never evaluated, because `T` is only read for the next _better_ level (O1)                       |
+| (iii) Floor on a 30 Hz display, L0 to L4                                     | No step-down                             | Holds: `B` = max(50, 40) = 50, `I` = 33.3. At **L5**, a tick-parity cap gives 15 fps (`I` 66.7 > 50). The governor can't step lower or become eligible to step up, so it is stuck at 15 fps (S5) |
+| Overload: Recommended, 60 Hz, steady 30 fps at L0 to L3 (rAF follows render) | Step down                                | **Never steps down** in 10 min. `R` = 33.3, so `B` = 40 and `I` = 33.4 (B1)                                                                                                                      |
+| Overload: Floor Pi at steady 15 fps                                          | Step down                                | **Never steps down.** `R` = 66.7, so `B` = 80 and `I` = 68 (B1)                                                                                                                                  |
+| (iv) Load bursts of 1 min every 6 min, fine at L1                            | Bounded by back-off (5 to 60 min)        | **720 level changes in 24 h** (L0 to L1 to L0 every ~6 min, forever). A successful trial resets the back-off, and a step-down soon after a successful trial is not counted as a failure (S1)     |
+| (vi) GPU-bound without a timer query, L0 always misses                       | At most 20 s of misses every 5 to 60 min | Holds. Trials at 5, 15, 35 and 75 min, then every 60 min, each failing in 10 s (one window)                                                                                                      |
+
+(v) **Variable refresh / noise.** On a 59.94 Hz display, `R` 16.68 gives `B` 20.02. That is harmless. 24 Hz and 50 Hz TV modes are fine (`B` 50.0 and 24 ms). The real `R` problem is B1, not noise. (vi) **No GPU timer.** `W` is defined without it ("where the extension exists"), and the worked cases state the optimistic eligibility, so that part is stated. (vii) **Hidden tab.** It is covered in the diagram, but the details are open (O3).
+
+### Blocking
+
+**B1. The `1.2 x R` floor hides steady overload, and AC 5 "Slow display" requires that.** (SPEC-384 section 6.2 `R` and `B(level)` rows, AC 5.)
+
+- Browsers run one rAF callback per main-thread frame. If the frame's work takes 25 ms, or the GPU pipeline is full, the next tick is late too.
+- So with r3f's `frameloop="always"` (every level except L5), the rAF tick interval equals the rendered-frame interval. `R` = median rAF interval is the achieved frame time, not the display refresh.
+- A device stuck at a steady 30 fps on a 60 Hz panel produces exactly the AC 5 "Slow display" inputs: rAF 33.3 ms, rendered 33.3 ms. The AC says that must not step down.
+- `B` grows with the slowdown, so step-down only happens when `I`'s p95 exceeds 1.2 x its own median. In other words, only jitter triggers it, never uniform slowness. A fanless Pi that throttles to a steady 15 fps is never degraded.
+
+Suggested edits:
+
+1. Replace the `R` row with: "`R`: the display refresh interval, **measured while the app is not render-bound**. It is the median rAF interval over (a) about 1 s of ticks at startup before the globe canvas first renders, and (b) any window in which the app skipped renders (the L5 cap), which leaves the rAF cadence free. Re-measure (a) when the window changes screen (`window.screen` / `devicePixelRatio` change, Electron `display-metrics-changed`). Never derive `R` from a window in which every tick rendered: there the rAF interval is the render time."
+2. Add to "What story #435 needs": "a calibrated refresh interval `R` as an injected input, with the calibration rule above".
+3. Rewrite AC 5 "Slow display": "**Slow display:** calibrated `R` 33.3 ms (30 Hz display), and rAF and rendered intervals at 33.3 ms on Recommended, cause no step-down."
+4. Add an AC 5 bullet: "**Overload is not a slow display:** calibrated `R` 16.7 ms, and rAF and rendered intervals both at a steady 33.3 ms with work p95 14 ms, step down one level within 21 s."
+
+### Should-fix
+
+**S1. The anti-flap rule can't stop periodic flapping** (section 6.2 `back-off` row, diagram, AC 5 "Failed trial", section 10 risk row). A successful trial resets the back-off to 5 min, and a step-down shortly after a trial passes doesn't count against it. With intermittent load the ladder oscillates every ~5 to 6 min indefinitely (simulated: 720 changes a day). This is the "visible quality oscillation" that section 6.1 and the section 10 risk row say hysteresis prevents. Edit the `back-off` row to: "...reset to 5 min only after the trial level has been held for 30 min. A step-down within 30 min of a successful trial counts as a failed trial (back-off doubles)." Add an AC 5 bullet: "**Flap bound:** with load alternating 1 min on, 5 min off at L0 only, the governor makes no more than 6 level changes per hour after the first hour."
+
+**S2. Step-down cadence and the settle period are unspecified** (diagram `StepDown --> Steady`, AC 5 "Step-down").
+
+- The spec doesn't say that the consecutive-window counter and the 60 s headroom counter reset on a level change. Without the reset, sustained overload drops a level every 10 s instead of every 20 s.
+- Two kinds of transition hitch are not excluded. The first is the startup shader compile, which section 4.3 measured at ~6 s on SwiftShader and is unknown on the Pi. The second is a level change: re-enabling bloom compiles new programs, and L4 resizes the canvas.
+- A first-time trial of a level that needs a new program can therefore fail on its compile hitch alone.
+
+Edit section 6.2: "All window counters reset on any level change. The window in which a level change, startup, or visibility return happens is discarded. Before a trial switches level, the effect's programs are precompiled (for example three.js `compileAsync`), or the trial's first window is discarded." Add to AC 5 "Step-down": "...and with overload sustained, consecutive step-downs are at least 20 s apart (L0 to L5 takes at least 100 s); at L5 a further step-down is a no-op."
+
+**S3. `W` adds CPU and GPU time, but section 3 says they overlap** (section 6.2 `W` row). On a device with the timer extension, CPU 5 ms plus GPU 5 ms gives `W` = 10 ms, which is over 8.35 ms. That device is never eligible to step up, even though each part fits the section 3 per-part budgets (8 and 11 ms). Edit: "`W`: the larger of (p95 main-thread render-loop time) and (p95 GPU time from `EXT_disjoint_timer_query_webgl2`, where available; results arrive a few frames late and disjoint results are discarded)."
+
+**S4. The 50 ms budget sits exactly on a vsync multiple** (sections 3 and 6.2, AC 8, probe `framesOver50ms`).
+
+- On 60 Hz, 50 ms is three ticks. At a 30 fps Floor or the L5 cap, every slipped frame lands at 50.0 ms plus or minus timestamp jitter.
+- So `I > B` (and "p95 50 ms or less" in a 7.1 row) passes or fails at random once more than 5% of frames slip once.
+- The probe's comment says its thresholds "sit just above" 1, 1.5 and 2 frames, but `over(fi, 50)` sits exactly at 1.5 frames, unlike 33.4 and 66.7.
+
+Edit section 3 under the field mapping: "Budget comparisons allow 1 ms for timestamp jitter: a p95 of 50.9 ms meets a 50 ms budget." Use `I > B + 1 ms` in the step-down rule. In `probe.js`, use `framesOver50ms: over(fi, 50.1)` (or fix the comment).
+
+**S5. The L5 cap implementation is unspecified, and the obvious ones break on slow displays** (section 6.2 "What story #435 needs", ladder L5).
+
+- Skipping every other tick gives 15 fps on a 30 Hz display.
+- A strict "render when elapsed time is at least 33.3 ms" skips ticks that arrive at 33.2 ms, giving 15 fps on 30 Hz and intermittent 50 ms on 60 Hz.
+- Either way `I > B(L5)` blocks eligibility, so the governor is stuck at L5.
+
+Add: "The L5 cap renders on a tick when the time since the last render is at least 33.3 ms minus `R`/2, and is a no-op when `R` is 30 ms or more." Add an AC 5 bullet: "**Cap on slow displays:** at L5 with `R` 33.3 ms, rendered intervals stay at about 33.3 ms." Also state whether `useFrame` callbacks skip with the render. The power argument for the cap needs them to, which means r3f `frameloop="never"` plus `advance()` rather than a priority `useFrame` that only skips `gl.render`.
+
+**S6. The mapping from profile to ladder level is missing**, but the "within user cap" test depends on it (sections 2, 5, 6.1, 6.2, AC 5 "Caps"). Neither "Full" nor "Lite" is mapped to an L-level, and no initial level is given per tier for Auto. Add a row under the ladder: "Profiles: Full = ceiling L0; Lite = ceiling L3 (bloom, sweep off; static rings). Auto starts at L0 on Recommended and Showpiece and at L3 on Floor. The 30 fps cap (L5) is reached only by the governor." The architect should confirm the actual values.
+
+**S7. The runners treat "port in use" as ready** (`globe-baseline.mjs` line 178, `cpu-profile.mjs` line 71). The readiness regex `/4173/` also matches vite's stderr `Error: Port 4173 is already in use`. I checked by holding 4173 with a dummy server: `cpu-profile.mjs` went on, started the mock and reached the browser launch. With a valid `--chrome` it would have profiled **whatever is already on 4173**, for example a stale preview of another build. The README line "stop every process ... if any setup step fails, for example a taken port" is untrue for 4173. The session 3 log tested only port 3000 being taken. Edit both runners to use `startProc('npx', [...], /localhost:4173/)`. In `onData`, reject when `/already in use|EADDRINUSE/` matches.
+
+**S8. Ctrl+C orphans `vite preview`.** The children are spawned `detached: true` (their own process group), so a terminal SIGINT doesn't reach them, and `finally` doesn't run on a signal. I sent SIGINT to the runner's group 12 s into `globe-baseline.mjs --quick`, and `npm exec vite preview` (3 processes) kept port 4173. Port 3000 was free afterwards. This predates revision 3. Add to both runners, after `startProc` is defined: `for (const s of ['SIGINT', 'SIGTERM']) process.once(s, () => { [mock, preview].forEach((p) => p && stopProc(p)); process.exit(130); });`. In `globe-baseline.mjs`, hoist the current mock into a module variable so the handler can reach it. Also add `p.on('error', reject)` in `startProc`: a missing `npx` is otherwise an unhandled `error` event.
+
+**S9. The probe counts draws from every WebGL2 context.** The rendered-frame rule and the per-tag counts use draws from any context on the page. The app has a second r3f `<Canvas>`: the Sky Map modal (`SkyMap.tsx`). Its `meshBasicMaterial` draws fall through `refineBasic` into **`markers`**, its sprites into `labels` and its lines into `graticule`. I checked with a synthetic page (one context capped to every second tick, plus a second context drawing every tick). The probe reported 59.6 rendered fps instead of 29.6, and 3 draws per frame. If the modal is open on a device, the 7.1 numbers and the AC 2 and AC 3 counts are wrong without any warning. The minimum fix is in README step 4 and SPEC section 7 step 2: "Keep the Sky Map modal closed while sampling." The better fix is to count only draws on the context of the largest canvas, or the first context that uses a `MeshStandardMaterial` program, and add `contexts` to the summary.
+
+### Optional
+
+- **O1.** `T(level)` "33.3 ms at L5" is never evaluated. Delete it, or say `T` applies to the next better level only.
+- **O2.** In the diagram, `Initial: capability detection (B)` reads as the budget `B`. Write "(option B, section 6.1)".
+- **O3.** Hidden tab. Say that the interval spanning a hidden period is discarded and that counters reset on `Paused`. Say whether an abandoned trial doubles the back-off (suggest: no, the back-off restarts). Add "keep the page visible while sampling" to the README, because the probe has no visibility handling.
+- **O4.** Provenance wording (section 4.1). `12bec81` includes `903d71c` (three 0.186.1), so the counts describe "`src/` of `7dbd9d5` built with three 0.186.1", not "the app as of `7dbd9d5`". `12bec81` is also a pre-squash branch commit. Citing `99fa237` is safer: its `src/` is identical (`git diff --quiet 7dbd9d5 99fa237 -- src` exit 0), and a fresh `vite build` reproduces the section 4.2 bundle sizes exactly.
+- **O5.** The header still says "In review, revision 2", but the spec is merged with the revision 3 governor.
+- **O6.** On-device runs with geolocation granted add home-beacon draws to `markers`. Note this next to AC 2 and AC 3 so a device run isn't read as a regression.
+- **O7.** `rafCallbackMsP95` is per callback, not per frame. That is fine today (one r3f loop, no other rAF users in `src/`), but say so in section 3's field mapping.
+- **O8.** The step-up rule's 50% of `T` equals the section 3 main-thread budget (8 ms at Recommended). The section 4.3 container p95 at 50 markers is 10.8 ms, so on a CPU like that a Recommended device never steps back up from L1 until marker instancing lands. That is consistent, but worth one sentence in the worked cases.
+
+### Verified correct
+
+- **Marker derivation.** I re-ran the mock's seed through the `Globe.tsx` selection: featured-first sort, `deduplicateNearbyEvents` with 5 degrees, `MAX_MARKERS` 50, pulse at severity 5 or more or featured, and `FEATURED_WINDOW_MS` 30 min for the auto-featured pick. Result: featured `perf-1` (severity 9); 0 dropped by dedup; `perf-10` (0.1) and `perf-41` (0) dropped by the cap; 50 mounted; 23 pulse rings, with no severities at exactly 5. That gives 50 + 100 + 46 = **196**.
+- **Totals.** 196 + 58 + 11 = 265. 0 markers: 2 spheres + 4 ring passes + 2 aurora pulse passes + 69 = 77. `EventPulseRing` calls `useFrame` (line 347) before its early return (line 357).
+- **Unchanged `src/`.** `git diff --quiet 7dbd9d5 HEAD -- src` exits 0, and `git log 7dbd9d5..HEAD -- src` is empty.
+- **Rendered-frame definition.** With a single context it counts correctly. Every tick: 180 rendered / 180 rAF, p95 16.7. Every second tick: 89 rendered / 179 rAF, p95 33.4, `rafIntervalMsP95` 16.7. First tick: the start tick is the reference, and `renderedFrames` equals the number of rendered intervals. `setSkip` draws still count as issued. Context loss stops three.js rendering, so the result is a gap, not a miscount. DPR is read at `stop()` only, which is acceptable.
+- **Field names.** `renderedFrames`, `rafTicks`, `rafFpsMean`, `rafIntervalMsP50/P95`, `frameMs*`, `framesOver*` and `rafCallbackMs*` are used consistently in `probe.js`, the README, SPEC sections 3, 7 and 7.1, and both runners. `cpu-profile.mjs` divides by `renderedFrames`. No stale `frames` field remains.
+- **The old 70% rule.** "70%" appears only in the section 3 budget diagram (working budget) and in the two passages that explain why the old rule was removed. There is no live use.
+- **Consistency of governor text.** Section 6.2 (table, diagram, worked cases, what #435 needs), AC 5 and the section 10 risk row agree with each other: 2-window step-down, 60 s / 50% headroom, 20 s trial, 5 to 60 min back-off, `B(L5)` 50 ms. AC 8 and the section 3 budgets agree. Issue #435 was not readable here; the AC 5 text is the reference. B1, S1, S2 and S5 change AC 5, so #435 must be updated from the corrected text.
+- **Runner cleanup on a failed launch.** With `--chrome /nonexistent/chrome`, both runners exit 1 with ports 3000 and 4173 free and no vite or mock processes left. Timers are cleared on ready, exit and timeout. `stopProc` kills the process group.
+
+### Checks run (revision 3)
+
+| Command                                                                                                              | Result                                                                                             |
+| -------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| `node --check` on the 4 `scripts/perf` files                                                                         | Pass (4/4)                                                                                         |
+| `npx prettier --check docs/specs/SPEC-384.md docs/reviews/REVIEW-384.md docs/progress/ISSUE-384-log.md scripts/perf` | Pass (re-checked after this section was appended)                                                  |
+| `git diff --quiet 7dbd9d5 HEAD -- src`                                                                               | Exit 0                                                                                             |
+| `npx vite build`                                                                                                     | vendor-three 1,168.61 kB, main 601.39 kB, CSS 44.81 kB: matches section 4.2                        |
+| Scratch marker selection model (mock seed plus `Globe.tsx` rules)                                                    | 50 mounted, 23 pulse, 196 draws                                                                    |
+| Scratch governor model (section 6.2 as written)                                                                      | Cases (i), (ii) and (vi) hold; overload never steps down (B1); 720 changes a day under bursts (S1) |
+| `node scripts/perf/{globe-baseline,cpu-profile}.mjs --chrome /nonexistent/chrome`                                    | Exit 1; ports free; no stray processes                                                             |
+| Same `cpu-profile.mjs` run with port 4173 held by a dummy server                                                     | Went past the preview step into browser launch (S7); ports free afterwards                         |
+| SIGINT to the `globe-baseline.mjs --quick` process group after 12 s                                                  | `vite preview` orphaned on 4173 (S8); killed by hand                                               |
+| Playwright synthetic page plus pasted `probe.js` (every tick, capped, capped plus second context)                    | 180/180, 89/179, 179/179 rendered/rAF (S9)                                                         |
+| `grep -n "70%"` on the spec, scripts and review                                                                      | No live use of the removed rule                                                                    |
+
+### Next steps
+
+The architect fixes B1 and S1 to S6 in SPEC-384 (section 6.2, AC 5, and the section 3 tolerance note) on a follow-up branch, and the engineer fixes S7 to S9 in `scripts/perf/`. The owner then updates story #435 from the corrected AC 5 before anyone implements the governor. None of this touches `src/`, `.github/` or contract files.
+
+---
+
+## Final review of PR #440 (corrections)
+
+**Scope**: `git diff origin/main...HEAD` on `claude/384-followups` at `ebb5e34`, against `origin/main` `99fa237`. That covers SPEC-384 (sections 3, 4.1, 6.2, 7, 8, 9, 10 and the header), the progress log, this review doc, and `scripts/perf/` (`probe.js`, `cpu-profile.mjs`, `globe-baseline.mjs`, `README.md`). Stories #435, #431, #448 and the #385 comments were read on GitHub for cross-reference only. Date: 2026-10-20.
+
+### Verdict
+
+**REQUEST CHANGES (spec only; the `scripts/perf/` part is approved as is).** The runner and probe fixes work: I ran the port, signal and syntax checks again myself. The spec fixes resolve S3 to S6, the spec part of S9 and O1 to O8. Two problems remain in the governor, and #435 copies both of them word for word:
+
+- **The AC 5 flap bound fails under the spec's own rules.** I built an independent model. On the architect's coarse grid it reproduces the architect's numbers exactly (4 per hour after 2 h, 7 in any hour, 96 in 24 h). Between the grid points, load that overloads only L0 reaches **7 changes per hour after 2 h and 125 in 24 h**. A correct implementation therefore fails the AC 5 "Flap bound" test.
+- **The `R` calibration can still go wrong in both directions.** If `R` comes out too high, the B1 failure returns: steady overload is hidden. If it stays too low on a 24, 25 or 30 Hz display, the governor is stuck at L5 for good. The section 10 risk row says neither can happen.
+
+Five should-fix items cover a wrong timing number in AC 5, the on-demand rendering consequence, and three places where the new simplified-earth L5 lever conflicts with other text.
+
+| Severity   | Count |
+| ---------- | ----- |
+| Blocking   | 2     |
+| Should-fix | 5     |
+| Optional   | 9     |
+
+### Status of the revision 3 findings
+
+Line numbers are `docs/specs/SPEC-384.md` at `ebb5e34` unless a script is named.
+
+| Finding | Status                                     | Evidence                                                                                                                                                                                                                                                                                                                                                                                     |
+| ------- | ------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| B1      | **Partly**                                 | `R` is a calibrated input and is never taken from rendered windows (lines 226, 233 and 235; AC 5 lines 305 to 307; risk row line 350). The stated overload cases now step down (simulated below). However, the calibration rule itself can produce a wrong-high `R` from a busy startup, which is B1's own mechanism, and its fallback cannot calibrate displays at 30 Hz or below. See N-B2 |
+| S1      | **Partly**                                 | The rule is changed (line 240; AC 5 line 313). The bound claimed at line 247, in AC 5 line 314 and in risk row line 349 does not hold. See N-B1                                                                                                                                                                                                                                              |
+| S2      | **Partly**                                 | Settle periods, counter resets and precompile are covered (lines 238, 239 and 243; AC 5 lines 304 and 308). The derived number "L0 to L5 takes at least 150 s" is wrong. See N-S1                                                                                                                                                                                                            |
+| S3      | Resolved                                   | `W` = max, not sum (line 234). The 40% threshold applies when GPU time is unknown (line 237). AC 5 line 310                                                                                                                                                                                                                                                                                  |
+| S4      | Resolved                                   | The section 3 tolerance (line 52), `I > B + 1 ms` (line 235) and `probe.js` lines 354 to 358 (`TOL_MS`) all agree, and README lines 70 to 73 document it. The 66 ms margin is tight (N-O1)                                                                                                                                                                                                   |
+| S5      | Resolved                                   | Cap rule plus whole-frame skip via `frameloop="never"` and `advance()` (line 241); AC 5 line 312. My frame-interval model agrees: with calibrated `R` it gives 30 fps at 60 and 120 Hz and is a no-op at 30 and 24 Hz                                                                                                                                                                        |
+| S6      | Resolved                                   | Profile ceilings are in the table at lines 214 to 222 and AC 5 line 315. The Lite ceiling is L4 rather than the L3 I suggested; that matches the #431 AC ("Lite maps to ladder levels L1-L4")                                                                                                                                                                                                |
+| S7      | Resolved                                   | Readiness regex `/localhost:4173/` and `FAILED_RE` in both runners (`cpu-profile.mjs` lines 37 and 49 to 58; `globe-baseline.mjs` lines 95 and 107 to 116). Re-tested: with port 4173 held, the runner exits 1 with `Port 4173 is already in use` before any browser launches                                                                                                                |
+| S8      | Resolved                                   | A `started` set plus SIGINT/SIGTERM handlers in both runners, and `p.on('error')`. Re-tested: SIGINT to the runner's process group mid-run gives exit 130, ports 3000 and 4173 free, and no vite, mock or Chromium processes left                                                                                                                                                            |
+| S9      | Resolved (detection rather than filtering) | Spec section 7 step 2 (line 283) and README step 4. `probe.js` records each context that draws while sampling (`contextsDrawing`, with a console warning when there is more than one). README step 8 says it must be 1. #448 fails its probe step if it is not 1                                                                                                                             |
+| O1      | Resolved                                   | Line 236                                                                                                                                                                                                                                                                                                                                                                                     |
+| O2      | Resolved                                   | Line 251                                                                                                                                                                                                                                                                                                                                                                                     |
+| O3      | Resolved in the spec; partly in the README | Lines 228, 239 and 240; diagram lines 257 to 259; AC 5 line 316. The README still lacks "keep the page visible while sampling" (N-O3)                                                                                                                                                                                                                                                        |
+| O4      | Resolved                                   | Line 97                                                                                                                                                                                                                                                                                                                                                                                      |
+| O5      | Resolved, but the new header is stale      | Line 4 now reads "Accepted". It also says "items 1 to 6 there are still open", but section 9 has only one open item (N-S5)                                                                                                                                                                                                                                                                   |
+| O6      | Resolved                                   | AC 2 line 300                                                                                                                                                                                                                                                                                                                                                                                |
+| O7      | Resolved                                   | Line 50                                                                                                                                                                                                                                                                                                                                                                                      |
+| O8      | Resolved                                   | Line 271                                                                                                                                                                                                                                                                                                                                                                                     |
+
+### Independent governor simulation
+
+I wrote a new window-level model from the final text of section 6.2 and AC 5 and did not reuse `gov2.mjs`. It was not committed; the files are `gov3.mjs`, `gov3-cases.mjs`, `gov3-flap.mjs` and `gov3-grid.mjs` in the session scratchpad. It models:
+
+- 10 s windows and a 30 s startup settle;
+- a 10 s settle after every level change, with counters reset;
+- `B` = max(tier or L5 budget, 1.2 x `R`), and over budget means `I > B + 1`;
+- headroom at 50% or 40% of `T(next)` held for 60 s;
+- the back-off rules, the trial, and hidden-tab abandonment.
+
+`I` is the render time rounded up to whole display ticks. The L5 cap is applied as in line 241. `R` is an input that is updated only from ticks the cap skipped.
+
+| Case                                                                                                       | Result                                                                                                                                                                                                     | Matches spec?                           |
+| ---------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------- |
+| Recommended 60 Hz, unloaded at L1, `W` 4 ms, GPU time known or unknown                                     | Trial at 5.0 min, kept 30 s later                                                                                                                                                                          | Yes                                     |
+| Recommended 60 Hz, steady 30 fps at L0 to L3, `W` 14 ms                                                    | Steps down at 50, 80, 110 and 140 s from startup and holds L4. With `W` 4 ms and GPU time unknown, failed L3 trials come at 7.3, 17.7, 38, 78 and 139 min                                                  | Yes                                     |
+| Floor, steady 15 fps                                                                                       | From L4 (Auto): L5 at 50 s. From L0 (Full): L5 at 170 s                                                                                                                                                    | Yes                                     |
+| Overload starting mid-run at a window boundary                                                             | Step-downs 20, 50, 80, 110 and 140 s after onset                                                                                                                                                           | **No**: AC 5 says at least 150 s (N-S1) |
+| Genuine 30 Hz display, `R` 33.3 ms, Recommended                                                            | From L0: no change in 60 min. From L1: trial at 5 min, kept                                                                                                                                                | Yes                                     |
+| Recommended at L5, capable device                                                                          | Trials at 5, 10, 15, 20 and 25 min, all kept; L0 at 25.5 min                                                                                                                                               | Yes                                     |
+| 30 Hz display, `R` 16.7 ms until the startup-settle pause, which calibrates it                             | No change                                                                                                                                                                                                  | Yes                                     |
+| **30 Hz or 24 Hz display, `R` left at 16.7 ms** (the pause got fewer than 30 intervals; see N-B2)          | Down to L5 by 170 s. At L5 the cap never skips (threshold 25 ms, ticks 33.3 or 41.7 ms), so source (b) never corrects `R`. Failed L4 trials at 7.8, 18, 38, 79, 139 and 200 min, then hourly, **for good** | No (risk row line 350)                  |
+| **60 Hz panel, `R` over-estimated at 33 ms** (busy startup), steady 30 fps overload                        | **No step-down in 60 min** (`B` 40 ms, `I` 33.3 ms): B1 again                                                                                                                                              | No (risk row line 350)                  |
+| **Floor Pi on 60 Hz, `R` over-estimated at 45 ms**, steady 20 fps                                          | No step-down (`B` = max(50, 54)); p95 50 ms holds, but any 51 to 54 ms p95 is hidden                                                                                                                       | No                                      |
+| GPU-bound, no timer, L0 always misses                                                                      | Trials at 5, 15.3, 35.7, 76, 136.3 and 196.7 min, each reverted 20 s later                                                                                                                                 | Yes                                     |
+| Hidden 300 to 400 s during a trial                                                                         | Trial abandoned and reverted at 5.2 min, back-off unchanged; next trial at 10.2 min                                                                                                                        | Yes                                     |
+| Flap: 1 min on, 5 min off, L0 only, 24 h                                                                   | 51 changes; at most 2 per hour after 2 h; 7 in the first hours                                                                                                                                             | Yes                                     |
+| Flap, architect's grid (on 0.5 to 10 min; 17 periods from 3 to 120 min; 4 phases; L0 only)                 | 4 per hour after 2 h, 7 in any hour, 96 in 24 h: **identical to the architect's result**                                                                                                                   | Yes, on the grid                        |
+| **Flap, fine grid** (on 0.5 to 10 min in 0.5 min steps; every period from 3 to 120 min; 4 phases; L0 only) | **7 per hour after 2 h** (6 min on every 46 min), **125 in 24 h**, 7 in any hour                                                                                                                           | **No** (N-B1)                           |
+| Flap, bursts that overload L0 to L(k-1), fine grid                                                         | k = 2: 9 per hour after 2 h, 154 per day. k = 3: 11 and 186. k = 5: 16 and 250. 200 random burst schedules (k from 1 to 3): 14 per hour after 2 h                                                          | Not covered by the claim (N-B1)         |
+
+### Blocking
+
+**N-B1. The flap bound is false, so the AC 5 "Flap bound" test can't pass** (line 247; AC 5 line 314; risk row line 349; #435 AC "flap bound (at most 4 level changes per hour after the first 2 hours, at most 100 per 24 h)").
+
+The failing cycle is 6 min of load every 46 min, at L0 only. In this trace the back-off is 5 min at the start of each burst:
+
+- **Step-down:** 20 s into the burst. The kept level has already been held for 30 min, so this does not count as a failed trial.
+- **Trial:** 5 min later. The burst is still running, so the trial fails and the back-off doubles to 10 min.
+- **Revert:** at once.
+- **Kept trial:** 10 min later.
+
+That is 4 changes per 46 min, and a rolling hour catches 7. The text at line 247 says the "shortest repeating cycle" has two changes. It misses that a burst longer than the 5 min back-off also adds a failed trial to every cycle. The architect's sweep stepped over this case: its on-durations were {0.5, 1, 2, 3, 5, 10} min and its periods included 45 and 60 min but nothing between. On that grid my model gives the same numbers as the architect's.
+
+Bursts that overload more than one level add k step-downs and k trials per cycle, so the bound also depends on k. Line 247 excludes "step-downs under sustained overload", but these are step-downs inside bursts.
+
+Suggested edits. Choose one.
+
+1. **Rule change (recommended).** Add to the back-off row: "A level the governor left by a step-down or a failed trial is not trialled again until 30 min after it was left."
+   - In my model, for single-level load on the fine grid, this gives at most 4 changes per hour, both after 2 h and in any hour, and at most 64 in 24 h.
+   - L5-to-L0 recovery on a capable device is unchanged (25.5 min).
+   - The cost: a single 1 min burst keeps L1 for 30 min instead of 5.
+   - Then restate line 247 and AC 5 line 314 as: "load that overloads only L0: at most 4 level changes in any 60 min window and at most 64 in 24 h. Load that overloads k levels adds up to 2k changes per burst (measured: up to 10 per hour for k = 3)."
+   - Copy the numbers into the section 10 risk row and #435.
+2. **Text only.** Keep the rules and state the measured worst case: "at L0 only: at most 7 changes in any 60 min window and at most 125 in 24 h, worst at about 6 min of load every 46 min; bursts that overload k levels add up to 2k changes per burst". Change AC 5 line 314 and #435 to the same numbers, and in the risk row replace "at most 4 level changes per hour" with these numbers. The owner should then confirm that 7 changes an hour is acceptable on an ambient display.
+
+Either way, the AC must specify the sweep: on-time 0.5 to 10 min in 0.5 min steps, every whole-minute period from 3 to 120 min, at least 2 phases.
+
+**N-B2. `R` calibration can still hide overload, or pin a slow display at L5** (line 233; diagram line 251; risk row line 350; AC 5 line 307; #435 AC "Separate, unit-tested `R` calibration").
+
+1. **Wrong-high `R`.** Source (a) takes the median rAF interval "before the globe canvas first renders" and ignores only intervals over 100 ms. That is the busiest phase of startup: bundle evaluation, React mount, `generateHeightCanvas` and texture decode. On a Pi, many intervals of 20 to 99 ms are likely, and if they are more than half of the sample, `R` is too high. This is B1's mechanism: main-thread work stretches rAF intervals. In the model, `R` 33 ms on a 60 Hz panel hides steady 30 fps overload completely. Nothing corrects it afterwards: source (b) runs only at L5, and source (c) only on a screen change.
+2. **Wrong-low `R` that never recovers.** Source (a) and the fallback pause need at least 30 intervals. The pause lasts "up to 1 s", which gives at most 30 intervals at 30 Hz (29 with any phase offset), 25 at 25 Hz and 24 at 24 Hz. On exactly the displays `R` exists to protect, the fallback can't calibrate. The spec doesn't say what happens then, and the literal reading is that `R` stays 16.7 ms.
+   - The governor then steps to L5.
+   - At L5 the cap threshold is 33.3 - 8.3 = 25 ms, below one tick, so no tick is skipped and source (b) never fires.
+   - The device stays at L5 for good, with a failed trial every hour.
+   - The risk row's claim that this "can only cause an extra step-down" is false.
+3. **The diagram contradicts the table.** The diagram says "`R` calibrated before first render", but the table allows rendering with an uncalibrated `R` for 30 s. It also never says whether the implementation should hold back the first render to collect (a). With r3f, the canvas normally renders on the first tick after mount, so (a) would almost always fall back.
+
+Suggested edit for the `R` row. Replace the (a) and fallback sentences with:
+
+> "(a) at startup, the first render is held until 30 rAF intervals have been collected or 1.5 s has passed. `R` is the **10th percentile** of intervals of 100 ms or less. It is accepted only if at least 20 intervals were collected and the median is within 15% of the 10th percentile. Otherwise `R` is uncalibrated. In Electron, `screen.getDisplayMatching(...).displayFrequency` is used when it is non-zero, and the rAF value only cross-checks it. (c) the calibration pause skips renders until 30 intervals have been collected or 2 s has passed, with the same acceptance test. If the pause fails, it is retried at the next step-down. While `R` is uncalibrated, `B` uses the tier budget only, and a step-down to L5 triggers a calibration pause first."
+
+Then:
+
+- Change the diagram start label to "first render held up to 1.5 s for `R` calibration".
+- Rewrite the risk row: "`R` too high hides overload, and `R` too low can pin a slow display at L5. Mitigated by the low-percentile and spread test, the Electron `displayFrequency` and retrying the pause."
+- Add AC 5 `R` calibration cases:
+  - "startup intervals 60% at 30 to 60 ms and 40% at 16.7 ms give `R` 16.7 ms, or uncalibrated, never above 20 ms";
+  - "a 24 Hz display whose startup sample is too short is calibrated by the pause, and does not stay at L5".
+
+### Should-fix
+
+**N-S1. "L0 to L5 takes at least 150 s" contradicts the first step-down at 20 s** (line 243; AC 5 line 304). The first step-down comes 20 s after the overload starts (two windows, AC 5 line 304). The next four come 30 s apart. That is 20 + 4 x 30 = **140 s**, which my model confirms (20, 50, 80, 110, 140 s). From startup it is 170 s, because of the 30 s startup settle. A test that asserts at least 150 s fails against a correct implementation. Edit both places to "L0 to L5 takes at least 140 s after the overload starts (20 s, then 30 s per further level)".
+
+**N-S2. The on-demand rendering consequence is flagged only in section 9** (line 331).
+
+- The note is honest, but section 6.2, "What story #435 needs" (line 274) and AC 5 say nothing about it, and #435 does not mention it.
+- With reduced motion on and `frameloop="demand"` (#385), rendered intervals become seconds long. So `I` is far over `B`, and the governor as specified steps down every 30 s to L5 whenever reduced motion is on.
+- The L5 cap's `frameloop="never"` plus `advance()` and #385's `frameloop="demand"` also need a single owner of the frame loop.
+
+The README already handles the probe side (lines 82 and 83: use `rafCallbackMs*` for render cost). Add after the signals intro at line 228:
+
+> "**On-demand rendering (reduced motion, #385) is not yet specified.** Until it is, the governor treats on-demand mode as `Paused`: no samples, no trials, level held. The frame loop has one owner, which drives both the L5 cap and on-demand invalidation."
+
+Add the same to line 274 and as an AC 5 "Visibility" sub-bullet. Add a "Blocked by / coordinate with #435" note to #385.
+
+**N-S3. The simplified-earth L5 lever conflicts with "Never: terminator"** (lines 211 and 212; section 5 line 179).
+
+- The terminator and shader city lights (#357) are built by extending the existing earth material ("+0 draw calls (extend existing materials)").
+- A "cheaper shading" earth at L5 drops them unless it carries them too.
+- #435 says "the 'never degraded' items are untouched at L5", and its description still lists L5 without the simplified earth. Its UI/UX line says "the Lite earth material is pending an owner decision", which the owner has since decided.
+
+Edit the L5 cell to: "simplified earth material (normal map off, cheaper lighting; **keeps the terminator and night lights from #357**)". Add "earth about 31%" to the L5 reason cell. The owner should update #435's description and UI/UX line.
+
+**N-S4. Bundling the simplified earth into L5 changes the AC 8 / section 10 Floor fallback** (AC 8 line 319; risk row line 348).
+
+- If the Pi 5 misses the budget, the fallback is "re-baseline Floor to Lite only with a 30 fps cap".
+- The 30 fps cap only exists as L5, and L5 now includes the simplified earth. So the fallback would ship the simplified earth as Floor's permanent look.
+- The 2026-10-20 decision says the simplified earth is "not the default Lite look".
+
+Two possible edits:
+
+1. **Preferred.** Split the level: L5 = cap plus outer atmosphere and wireframe off; **L6** = simplified earth. Then update the dependent text:
+   - AC 5: L0 to L6 is 6 step-downs (at least 170 s after onset), and recovery takes 6 trials (about 30.5 min);
+   - line 247: "at most 6 of them";
+   - AC 5 "Caps": no profile starts at L5 or L6.
+2. **Text only.** Say in AC 8 and the risk row that a Floor row passing only at L5 means the simplified earth is shown permanently, which needs explicit owner sign-off.
+
+In either case, add a "Ladder level" column to the 7.1 table (line 289). #435 exposes the level through a debug getter, so device rows record it.
+
+**N-S5. The status header and cross-references are stale** (line 4; section 9 lines 325 to 339; #448).
+
+- Line 4 says "Owner decisions of 2026-10-18 are in section 9; items 1 to 6 there are still open". Only one item is open, and four decisions are dated 2026-10-20.
+- #448 cites "SPEC-384 section 9 item 6", which no longer exists after the renumbering.
+
+Edit line 4 to "... Owner decisions (2026-10-18 and 2026-10-20) are in section 9; one item (night-lights texture source and licence) is still open." Tag each decided bullet with its former number, for example "**CI perf check (was item 6; decided 2026-10-20)**", so #448 and #385 ("section 9 item 2") still resolve.
+
+### Optional
+
+- **N-O1.** `framesOver66ms` uses `66 + TOL_MS` = 67 ms (`probe.js` lines 356 and 358). A four-tick frame (66.67 ms) therefore has only 0.33 ms of margin, compared with 0.67 ms at 34 ms and 1.0 ms at 51 ms. Use `66.7 + TOL_MS` and `33.3 + TOL_MS`, and update README lines 70 to 73. This is harmless in Chromium today, because rAF timestamps are vsync-aligned.
+- **N-O2.** In both runners, `onData` keeps testing `FAILED_RE` after the process is ready. Later output that matches (for example a mock log line containing "EADDRINUSE") would call `stopProc` on a running preview or mock, and `reject` would be a silent no-op. Remove the data listeners, or set a `ready` flag, once the process resolves.
+- **N-O3.** The README does not tell the person sampling to keep the page visible (the O3 README part). Add "Keep the page visible (no tab switch or screen blank) while sampling" to step 4.
+- **N-O4.** A calibration pause is not listed as a settle trigger (line 238). Add "and after a calibration pause", so the 1 s gap it leaves is never counted.
+- **N-O5.** Back-off row (line 240): say whether _each_ step-down within 30 min of a kept trial doubles the back-off, or only the first. Under sustained heavy overload just after a kept trial, five step-downs would take it from 5 min to 60 min. Suggested wording: "only the first step-down after a kept trial counts".
+- **N-O6.** Night-lights texture: section 9 (line 339) takes 1024x512 or smaller as the size for every tier. Section 5 (lines 175 and 179) still budgets 2048x1024 (+10.7 MiB) for Full. Either align section 5 to 1024x512 (+2.7 MiB) or say that 2048x1024 stays an allowed ceiling.
+- **N-O7.** The simplified earth is an extra shader program. State whether it is compiled when the governor steps down (the 10 s settle absorbs the hitch) or at startup on Floor (it then counts against the Lite ceiling of 12 programs).
+- **N-O8.** Section 9 formatting: a blank line at line 333 splits the decided list in two, and the heading "Decided 2026-10-18 (owner)" now covers 2026-10-20 items. Line 52 still says the probe tolerance is owned by "the parallel `scripts/perf/` fix"; it has landed in this PR.
+- **N-O9.** #448 cites "REVIEW-384 O2 and O3". This doc now has three O-series, so write "first review O2 and O3 (texture deletion tracking, perf-script linting)". #431's UI/UX line refers to a "settings-panel question" that has since been decided (later UX story).
+
+### What would mislead the implementers
+
+- **#435:**
+  - its flap-bound AC copies the false numbers (N-B1);
+  - its `R` calibration AC copies the weak rule (N-B2);
+  - its description and UI/UX line omit the simplified earth and call it pending (N-S3);
+  - nothing in it covers on-demand rendering (N-S2).
+
+  The issue says "the spec wins", so fixing the spec and then re-pasting AC 5 is enough.
+
+- **#385:** the comment asks for the "interaction with the governor's L5 cap" to be specified. The spec defers it, so the #385 implementer must not enable on-demand rendering before #435 enters `Paused` for it (N-S2).
+- **#431:** consistent with the Lite = L4 ceiling. Only the UI/UX note is stale (N-O9).
+- **#448:** the "section 9 item 6" reference (N-S5). Its `contextsDrawing` requirement matches the probe.
+
+### Scope
+
+`git diff origin/main...HEAD --name-only` lists 7 files: the spec, the progress log, this review and 4 files in `scripts/perf/`. `git diff --quiet origin/main...HEAD -- src .github` exits 0. No `*Types*`, `*Contract*` or `*Schema*` file is touched. The Severity Gate does not apply.
+
+### Checks run (final review)
+
+| Command                                                                                                                                 | Result                                                                                                                                                                                                                                                                                                               |
+| --------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `./.agentx/agentx.sh hook start reviewer 384`                                                                                           | reviewer active on #384                                                                                                                                                                                                                                                                                              |
+| `node --check` on `scripts/perf/{cpu-profile,globe-baseline,mock-server}.mjs` and `probe.js`                                            | Pass (4/4)                                                                                                                                                                                                                                                                                                           |
+| `npx prettier --check docs/specs/SPEC-384.md docs/reviews/REVIEW-384.md docs/progress/ISSUE-384-log.md scripts/perf`                    | Pass (re-checked after this section was appended)                                                                                                                                                                                                                                                                    |
+| Dummy HTTP server on 4173, then `node scripts/perf/cpu-profile.mjs --chrome /opt/pw-browsers/chromium-1194/chrome-linux/chrome --quick` | Exit 1, `npx failed to start: Error: Port 4173 is already in use`, no browser launched; afterwards ports 3000 and 4173 free and no stray processes                                                                                                                                                                   |
+| `globe-baseline.mjs --quick` in its own session, SIGINT to its process group mid-run (mock, preview and Chromium all up)                | Runner exit 130; ports 3000 and 4173 free; no vite, mock or Chromium processes left                                                                                                                                                                                                                                  |
+| `git diff --quiet origin/main...HEAD -- src .github`; name filter for Types, Contract and Schema                                        | Exit 0; no match                                                                                                                                                                                                                                                                                                     |
+| Scratch governor model `gov3*.mjs` (independent of `gov2.mjs`)                                                                          | See the simulation table; the architect's grid reproduces 4/7/96; the fine grid gives 7 per hour and 125 per day                                                                                                                                                                                                     |
+| Rule-variant check: per-level 30 min re-trial lock                                                                                      | L0-only load: at most 4 per hour, 64 per day; L5 recovery unchanged at 25.5 min                                                                                                                                                                                                                                      |
+| Full `node scripts/perf/globe-baseline.mjs --chrome ... --quick` (6 scenarios, 1 rep)                                                   | Exit 0. Draw calls 265 at 50 markers and 77 at 0; 42,552 triangles; 58.2 MiB of texture allocations; ports free and no stray processes afterwards. The per-tag sum was not re-printed (no `--out`), but this PR does not change the per-tag accounting in `probe.js`: it adds only `drawContexts` and the thresholds |
+
+### Next steps
+
+1. The architect fixes N-B1 (choose the rule change or the restated bound) and N-B2 in SPEC-384 sections 6.2, 8 (AC 5) and 10, plus N-S1 to N-S5. The owner chooses between the L5/L6 split and the text-only option in N-S4.
+2. The owner re-pastes AC 5 into #435 and updates #435's description (simplified earth, on-demand `Paused`) and #448's section reference.
+3. No `scripts/perf/` changes are required. N-O1 to N-O3 can ride along with #448, which already edits the probe.
+4. A short re-review of the spec diff only is enough. The scripts don't need another pass.
+
+---
+
+## Spec-diff review of commit 4b74ca8 (round 3 corrections)
+
+**Scope**: `git diff 35570a6 4b74ca8 -- docs/specs/SPEC-384.md docs/progress/ISSUE-384-log.md` on `claude/384-followups`. Nothing else was reviewed again; the `scripts/perf/` approval in the previous section stands. Line numbers are `docs/specs/SPEC-384.md` at `4b74ca8`. `src/renderer/components/Globe/Globe.tsx` and the installed `@react-three/fiber` 9.8.2 and `@react-three/drei` 10.7.9 were read to check the frame-loop claims. Date: 2026-10-20.
+
+### Verdict
+
+**APPROVE WITH CHANGES.** The trial gate `G` fixes the flap bound for good: the bound is now a counting argument, and my own model (not the architect's) cannot break it. The L5/L6 split, the `Paused` rule and the stale-text fixes are clean. One gap remains, and it is a one-sentence fix. On a 24 to 30 Hz panel, a short busy period (for example the first 3 minutes after startup) can pin a Recommended or Showpiece device at L5 for good. After that, no calibration pause ever runs again (R-B1). Four should-fix items are text: the risk row overstates, the visible cost of a pause is not stated, three r3f facts behind the frame-loop owner need correcting, and the Sky Map modal is not handled.
+
+If R-B1 and the should-fix edits are applied as written below, **another review round is not worth it**. What is left (how often pauses are rejected on real devices, what `R` really is, how visible a 0.33 s freeze is, how r3f behaves in practice) can only be answered by implementing #435 with its debug getter and measuring on a device.
+
+| Severity   | Count |
+| ---------- | ----- |
+| Blocking   | 1     |
+| Should-fix | 4     |
+| Optional   | 7     |
+
+### Status of the previous findings
+
+| Finding      | Status                     | Evidence                                                                                                                                                                                                                                                                                                                       |
+| ------------ | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| N-B1         | Resolved                   | One gate `G` (line 247). The counting argument (lines 254 to 257) is sound: every step-up is a trial start, and trial starts are at least 30 min apart, so at most 2 per hour. Net level change is at most 6. My model is below. The real worst case for any load is 9 per hour (up, 6 downs, up, down), so 10 is a safe bound |
+| N-B2         | **Partly**                 | Wrong-high `R` is resolved and bounded: 61 and 121 min verified, and at most 1.2 x `R` + 1 ms is hidden. Wrong-low `R` is resolved when pauses work. A transient run of rejected pauses still pins L5 for good (R-B1)                                                                                                          |
+| N-S1         | Resolved                   | 140 s to L5 and 170 s to L6 after the onset; first step-down 60 s after the first frame (lines 250 and 327). Verified                                                                                                                                                                                                          |
+| N-S2         | Resolved in the spec       | `Paused` covers on-demand rendering and hidden documents (line 231). There is one frame-loop owner (line 229), but three r3f details are stated wrongly or left out (R-S3)                                                                                                                                                     |
+| N-S3         | Resolved                   | L6 keeps the terminator and night-lights terms (line 212). The "Never" row (line 213), section 5 (line 179) and section 9 (line 357) agree                                                                                                                                                                                     |
+| N-S4         | Resolved                   | L5 and L6 are split. The Floor fallback is ceiling L5, never L6, in the profile paragraph (line 223), AC 5 "Caps" (line 339), AC 8 (line 344) and the risk row (line 373). The 7.1 table and section 7 step 4 have a "Ladder level" column                                                                                     |
+| N-S5         | Resolved                   | Header (line 4); section 9 keeps the "was item N" tags (lines 350 to 364)                                                                                                                                                                                                                                                      |
+| N-O4 to N-O8 | Resolved (N-O5 is moot)    | Settle row (line 244), section 5 (line 175), precompile row (line 245), section 9 formatting, line 52                                                                                                                                                                                                                          |
+| N-O1 to N-O3 | Deferred to #448, accepted | These are `scripts/perf/` changes                                                                                                                                                                                                                                                                                              |
+| N-O9         | Handed to the owner        | These are issue-text changes                                                                                                                                                                                                                                                                                                   |
+
+I found no stale "L0-L5", "at least 150 s" or back-off wording in the spec. "150 s" appears only as the legitimate L3-to-L4 step at line 280. "Simplified earth acceptable at L5 only" survives only in the dated session 4 entry of the log, which is history.
+
+### Independent model (round 3 rules)
+
+I wrote `gov6.mjs`, `gov6-cases.mjs`, `gov6-flap.mjs`, `gov6-grid.mjs`, `gov6-spot.mjs` and `gov6-transient.mjs` in the session scratchpad. They are rewritten from the text at lines 238 to 252 using my `gov3.mjs` structure and do not import `gov5*`. The model uses:
+
+- 10 s windows, a 30 s startup settle, the startup pause and a 10 s settle;
+- a pause before every step-down, then a re-check of the window that just closed with the new `R`;
+- no step-down and no pause at L6;
+- an hourly pause while `R` is 20 ms or more;
+- `G`: 30 min, doubled after each failed trial up to 4 h, reset after a kept trial;
+- a cap that depends on `R`;
+- `Paused` abandonment.
+
+Pauses are instantaneous and either return a scripted value or are rejected. In the burst tests, a window counts as over budget when the burst covers more than 0.5 s of it, which is the p95 cut.
+
+| Case                                                                                  | Result                                                                                                   | Matches spec?                          |
+| ------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- | -------------------------------------- |
+| Recommended 60 Hz, unloaded at L1, GPU time known or unknown                          | Trial at 30.0 min, kept                                                                                  | Yes                                    |
+| Steady 30 fps overload at L0 to L3, `W` 14 ms                                         | Steps down at 60, 90, 120 and 150 s; holds L4                                                            | Yes                                    |
+| Same, `W` 4 ms, GPU time unknown                                                      | Failed L3 trials at 32.5, 92.8, 213.2, 453.5 and 693.8 min                                               | Yes                                    |
+| Overload of all levels starting at 600 s                                              | Steps down 20, 50, 80, 110 and 140 s after the onset (L5 at 140 s)                                       | Yes                                    |
+| Floor, 15 fps, Auto (L4) and Full (L0)                                                | L6 at 90 s and at 210 s                                                                                  | Yes                                    |
+| 30, 25 and 24 Hz, Recommended, accurate pauses, or startup pause rejected             | No level change in 2 to 4 h                                                                              | Yes                                    |
+| 30, 25 and 24 Hz, every pause rejected                                                | L5 at 180 s; failed L4 trials at 33, 93.3, 213.7, 454 and 694 min; never L6                              | Yes (residual as stated)               |
+| 30, 25 and 24 Hz, Floor at L4, every pause rejected                                   | No change                                                                                                | Yes                                    |
+| Recovery from L5 and from L6                                                          | L0 at 150 and 180 min                                                                                    | Yes                                    |
+| 60 Hz, one or two wrong pauses at 33 ms, steady 30 fps overload                       | First step-down at 61 and 121 min                                                                        | Yes                                    |
+| 60 Hz, every pause wrong at 42 ms, steady 20 fps (50 ms) overload                     | Never acted on (`B` 50.4 ms)                                                                             | Yes (residual: up to 1.2 x `R` + 1 ms) |
+| GPU-bound without the timer, L0 always misses, from L1                                | Trials at 30, 90.3, 210.7 and 451 min, then every 4 h; 16 changes a day                                  | Yes                                    |
+| Hidden from 1810 to 1900 s during a trial                                             | Abandoned at 30.33 min, `G` unchanged; next trial at 60.33 min, kept                                     | Yes                                    |
+| **30 or 24 Hz, Recommended, pauses rejected only in the first 200 s, accurate after** | **L5 at 180 s and held for good**: no pause ever runs again; failed L4 trials at 33, 93, 214 and 454 min | **No** (R-B1)                          |
+| Same, with a pause before every trial start (the R-B1 fix)                            | The 33 min trial measures 33.3 ms and is kept; L0 at 153 min. Every other row above is unchanged         | Fix verified                           |
+
+Flap bound, 24 h, half-open 60 min windows. "Min trial gap" is the smallest time between two trial starts.
+
+| Load                                                                                                                                                                                                                                | Worst in any hour | Worst per 24 h         | Min trial gap |
+| ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------- | ---------------------- | ------------- |
+| Fine grid, L0 only (k = 1): on-time 0.5 to 10 min in 0.5 min steps, every period from 3 to 120 min, 8 phases                                                                                                                        | 4                 | 93                     | 30.8 min      |
+| Fine grid, k = 2 / 3 / 4 / 5 / 6                                                                                                                                                                                                    | 5 / 6 / 7 / 8 / 8 | 94 / 95 / 96 / 97 / 97 | 30.0 min      |
+| Short bursts of 1, 2, 3, 5, 7, 9, 10, 15, 20 and 25 s (sub-settle and exactly 20 s), periods 30 s to 60 min, 10 phases, k = 1 and 6                                                                                                 | 4 and 7           | 93 and 97              | 30.8 min      |
+| State-adaptive adversary: load right after a kept trial, at a trial's first window, only at its second window (trial start + 20 s), just before the gate expires, or a random mix of these; durations 5 s to 20 min; k = 1, 2, 3, 6 | 4 / 5 / 6 / 8     | 93 / 94 / 95 / 97      | 30.0 min      |
+| 500 random schedules (bursts of 1 to 930 s), k up to 1 / 3 / 6                                                                                                                                                                      | 4 / 6 / 8         | 68 / 78 / 82           | 30.0 min      |
+| 6 min on every 46 min (the old failing case), k = 1 and 6                                                                                                                                                                           | 4 and 8           | 63 and 67              |               |
+
+All results are within the claimed bounds (4 and 97; 10 and 102). The architect's figure of 9 per hour for k = 6 is reachable in principle (up, six downs, up, down within 35 min), but my grid did not hit it. A 2 s hitch that straddles a window boundary still costs one level for 30 min. That property is not new (the two-window rule) and the bound covers it.
+
+### Blocking
+
+**R-B1. A short run of rejected pauses pins a slow display at L5 for good, not only "every pause"** (pause row line 239; residual bullet line 285; risk row line 375; AC 5 lines 330 and 331).
+
+This happens on a Recommended or Showpiece device driving a 24 to 30 Hz panel when the startup pause and the pause before each of the five step-downs are all rejected. It takes only the first 3 minutes after startup to be busy or jittery, for example the initial event burst or texture decode. The governor then reaches L5 with `R` still at 16.7 ms. At L5:
+
+- `I` is 33.3 ms, under 51 ms, so there is never an over-budget pair, and so never a step-down pause;
+- `R` is under 20 ms, so the hourly pause never runs;
+- trial reverts run no pause.
+
+So no pause ever runs again. Every L4 trial is judged against the wrong `B` of 21 ms and fails, and the device keeps L5's look (no bloom, sweep, ring animation, atmosphere or wireframe; DPR 1) until it restarts. The spec says this needs "every pause unusable". In fact only about 6 pauses inside 3 minutes need to fail. This is the N-B2 case "pin a slow display at L5" again, on a smaller trigger. Floor is not affected, because its 50 ms budget already covers 24 Hz.
+
+Suggested fix: one rule, verified in the model above. It also gives every trial a freshly measured `R`.
+
+- Pause row (line 239): replace "(2) before every step-down (a failed trial reverts without one)" with "(2) before every step-down and before every trial start (a failed trial reverts without one; the trial starts when the pause ends and is judged with the resulting `R`; its 10 s settle covers the pause)".
+- Step-up paragraph (line 252): after "start a trial one level up", add "after a calibration pause".
+- Diagram (line 268): change the `Steady --> Trial` label to "... and next level within C<br/>calibration pause, then move up one level".
+- AC 5 "Calibration pause" (line 330): change "before every step-down" to "before every step-down and every trial start". Add a case to "Wrong `R` corrects itself" (line 331): "Recommended on a 30 Hz panel, `R` 16.7 ms, pauses rejected for the first 200 s and accurate afterwards: reaches L5 by 180 s; the pause before the L4 trial at about 33 min measures 33.3 ms, the trial is kept, and L0 follows at about 153 min."
+- Residual bullet (line 285) and risk row (line 375): the existing "every pause is rejected" text becomes true as written. No other change is needed.
+
+The cost is at most 2 extra pauses an hour, and only while the governor is climbing. The flap bound is unchanged, because a pause is not a level change. The trial times stay as stated.
+
+### Should-fix
+
+**R-S1. The risk row and the residual bullet overstate the case** (line 375; line 285).
+
+- "it hides overload for 60 min at most": the worked case at line 284 shows 121 min when two pauses in a row are wrong, and the residual case shows it can last for good. Suggested wording: "for 60 min per wrong pause (121 min if two in a row are wrong); if every pause is stretched, overload up to 1.2 x `R` + 1 ms is never acted on (section 6.2)".
+- Line 285, "when stepping the ladder down could not help anyway", is true for the stretched-pause case: rendered intervals can't drop below the pause interval. It is beside the point for the rejected-pause case, where the harm is an unneeded step-down. A pause can also be rejected because of timestamp jitter (spread over 15%), not only because the main thread is busy. Suggested wording: "The first residual costs a capable device on a 24 to 30 Hz panel the L5 look, with a failed trial every 4 h (Recommended and Showpiece only; Floor's 50 ms budget covers it). The second hides overload of at most 1.2 x `R` + 1 ms, and there the frame interval can't drop below the pause interval at any level."
+
+**R-S2. The visible cost of a pause is not stated, and neither is its effect on alerts** (pause row line 239; "Never" row line 213).
+
+- A pause freezes the globe image for about 0.33 s at 60 Hz, 0.4 s at 50 Hz, 0.67 to 0.83 s at 30 to 24 Hz, and up to 2 s on a busy main thread.
+- It runs at startup, before each step-down (up to 6 within 170 s during a cascade), before each trial (with R-B1), on a screen change, and **every hour, for good, on 50 Hz and slower displays**. A 1080p50 TV mode is common in Europe.
+- Motion is driven by clock time and `delta` (`Globe.tsx` lines 599 to 614). After a pause, auto-rotation therefore jumps by 0.06 rad/s x the pause: about 1 degree at 0.33 s and 7 degrees at 2 s. A running recenter jumps by up to its 0.25 per-frame clamp.
+- DOM and CSS alert paths keep running during a pause: ticker severity pulse, chime, and the #361 CSS dim. A new alert's WebGL marker and pulse ring, and a #361 recenter, wait for the pause to end. That matters because overload, and with it a pause before a step-down, is likely during the event burst that comes with an alert.
+
+The pause can't trigger the governor's own signals. The interval that spans it falls in the settle window after it, and in any case one long interval can't move a p95 over a window of 300 or more frames. It also can't loop, because a pause is only requested by two over-budget windows, a trial, a screen change or the hourly rule, and a settle never requests one.
+
+Suggested addition to the pause row: "A pause freezes the globe image (about 0.33 s at 60 Hz, 0.67 to 0.83 s at 30 to 24 Hz, 2 s at most). DOM and CSS keep running, including the ticker alert pulse, the chime and the #361 dim. WebGL animation resumes from clock time, so auto-rotation catches up in one step. On displays at 50 Hz or below this happens once an hour." Add to the "Never" row: "a calibration pause can delay the globe part of an alert (marker, ring, recenter) by at most 2 s". If the owner does not accept that, the cheapest safeguard is "no pause starts while a #361 alert recenter runs; a due step-down waits for it". I don't recommend adding it before on-device data exists.
+
+**R-S3. The frame-loop owner is sound but stated with three wrong or missing r3f details** (line 229; line 294). I checked these against the installed `@react-three/fiber` 9.8.2 (`dist/events-*.esm.js`, `update` and `advance`) and `@react-three/drei` 10.7.9 (`core/OrbitControls.js`).
+
+1. With `frameloop="never"`, a numeric `advance(timestamp)` **sets `clock.elapsedTime = timestamp`** and computes `delta` from it, so the timestamp must be in **seconds**. Passing the rAF timestamp in milliseconds makes every `clock.elapsedTime` animation run 1000 times too fast and gives `delta` values of about 16.7 (`RotatingGlobe` would add about 1 rad per frame).
+2. `advance()` without a root state **advances every r3f root**, including the Sky Map modal's own `<Canvas>`. That root still uses `frameloop="always"`, so it would render twice per tick.
+3. With `frameloop="never"`, r3f's **`invalidate()` is a no-op**. drei `OrbitControls` (and any drei helper) requests on-demand frames through `invalidate()`, so under #385 a drag would not render unless the app loop listens to the controls' `change` event itself. drei `OrbitControls` also enables damping by default and calls `controls.update()` once per rendered frame without `delta`. Its inertia is therefore per frame and lasts about twice as long under the L5/L6 cap. "Animations use clock time, so motion speed doesn't change" is true of every `useFrame` in `Globe.tsx`, but not of the controls.
+
+Suggested wording for line 229: "The canvas uses r3f `frameloop="never"`, and a single app rAF loop calls `advance(now / 1000, true, globeRootState)`: in r3f 9 a numeric timestamp replaces `clock.elapsedTime` (seconds), and without a root state `advance` renders every root, including the Sky Map's. With `frameloop="never"`, r3f `invalidate()` does nothing, so in on-demand mode the loop must subscribe to the `OrbitControls` `change` event (and any other invalidation source) itself. `useFrame` callbacks in `Globe.tsx` use clock time or `delta`; drei `OrbitControls` damping is per rendered frame, so drag inertia lasts about twice as long under the cap." Add "renders only the globe root" and "listens to controls `change` in on-demand mode" to the frame-loop bullet at line 294.
+
+**R-S4. The Sky Map modal is not handled** (line 231; line 294). `SkyMapModal` is a full-screen overlay (`SkyMapModal.tsx` line 5) with its own r3f `<Canvas>` and its own rAF loop. The globe keeps rendering underneath it. While the modal is open:
+
+- the governor counts the Sky Map's main-thread cost as globe overload and steps down;
+- a pause taken then measures the Sky Map's frame time, which is a wrong-high `R`.
+
+Section 7 already warns about this for the probe. Suggested edit to line 231: "...while the document is hidden, the Sky Map modal is open, or on-demand rendering is active, the governor is `Paused`". Add "Sky Map open" to the AC 5 "Visibility" case (line 340) and to the inputs at line 292. Stopping the globe render under the modal would save power, but that is a separate story.
+
+### Optional
+
+- **R-O1 (simplification; the owner decides).** Run pauses only before a governor level change (step-down or trial start, given R-B1) and hourly while `R` is 20 ms or more. Drop the startup pause, the screen-change trigger and the Electron `displayFrequency` seed. That removes three rules, the IPC call and the `display-metrics-changed` listener. The seed would otherwise add a preload/shared contract to #435, which falls under the Severity Gate. It also removes the most likely source of a wrong-high `R`: a pause taken during the busy startup.
+  - Cost: a slow panel gets one cancelled-step-down pause about 50 s after startup. After the window moves from a 30 Hz to a 60 Hz display, `R` stays stale for up to 60 min (hourly re-check).
+  - Changed timings: the first step-down from startup is at 50 s, not 60 s (AC 5 line 327).
+  - I modelled only R-B1, not this variant, so the 50 s figure is derived by hand.
+- **R-O2.** Say whether an hourly pause that falls due during a trial is deferred until the trial ends. My model defers it. Otherwise it resets the counters and settle in the middle of a trial. Add the screen-change trigger to the `Steady --> Calibrate` label in the diagram (line 266).
+- **R-O3.** AC 5 "Flap bound" (line 338): say "half-open 60 min windows (s, s + 60 min]". In the model, trial starts land exactly 30.0 min apart, so a closed window can hold 3 trial starts.
+- **R-O4.** The owner's recorded decision (log session 4) was "simplified earth acceptable at L5 only". The spec now reads it as "the governor's last-resort level", which is L6 after the split. The intent is preserved. The owner should confirm it when updating #435.
+- **R-O5.** Make the residual cases observable. The #435 debug getter should report `R`, the result of the last pause (accepted value or rejection reason) and a count of rejected pauses, and section 7 step 4 should record them in the row's Notes. This turns the rejected-pause and stretched-pause residuals into something a device row can show.
+- **R-O6.** During a cascade, the pause before each step-down gives up to 6 freezes in 170 s. One cheap rule would cut that to 1: "skip the pause before a step-down if a pause was accepted in the last 5 min". I don't recommend adding it before device data shows the freezes matter.
+- **R-O7.** Line 288, "41 level changes in 24 h", depends on phase. My model gives 41 to 43, and the log's "41 per day" is one phase. "About 41" would be enough.
+
+### Complexity
+
+The governor now needs these concepts:
+
+1. seven levels (L0 to L6) and a profile ceiling;
+2. signals `I`, `W` (max of CPU and GPU) and `B` (floored at 1.2 x `R`);
+3. `T(next)` and the two headroom thresholds;
+4. the startup settle and a 10 s settle with counter resets;
+5. the two-window step-down;
+6. the trial (settle plus 2 windows) and the gate `G` with doubling;
+7. the calibration pause: an acceptance test with 4 parts and 4 triggers (5 with R-B1);
+8. the cap rule;
+9. `Paused` (3 triggers with R-S4);
+10. precompile of the neighbouring levels;
+11. one frame-loop owner.
+
+That is about 11 concepts. I looked for a materially simpler design that still meets the five required behaviours:
+
+- **Drop `R`.** Not possible. Interval-based step-down is needed because `W` can't see GPU time on the Pi or Safari. Intervals need `R` to tell overload from a 30 Hz panel. B1 showed that `R` can't come from frames the app rendered.
+- **Use the pause only, with no stored `R`.** Every over-budget pair then pauses, so a true 30 Hz panel would freeze every 30 s. Some memory of `R` is needed, and so is the hourly re-check for a wrong-high value.
+- **Drop the doubling of `G`.** This saves one rule, but devices whose `W` misjudges headroom then get a failed trial every 30 min instead of every 4 h.
+- **Drop precompile.** The 10 s settle absorbs a compile on fast GPUs. On the Pi the compile time is unknown, so precompile is cheap insurance.
+
+**None is materially simpler.** The only real trim is R-O1 (three rules and the IPC surface), at the cost of slightly later or staler calibration in two corner cases. The rest of the complexity is required by the five behaviours and by r3f.
+
+### Scope
+
+`git diff --name-only origin/main...HEAD` lists 7 files: the spec, the progress log, this review and 4 files under `scripts/perf/`. `git diff --quiet origin/main...HEAD -- src .github` exits 0. The Severity Gate does not apply to this PR. It will apply to #435 if the Electron `displayFrequency` IPC is kept (a preload/shared contract).
+
+### Checks run (round 3 spec review)
+
+| Command                                                                                                                                         | Result                                                                                                                            |
+| ----------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `./.agentx/agentx.sh hook start reviewer 384`                                                                                                   | reviewer active on #384                                                                                                           |
+| `git diff 35570a6 4b74ca8 -- docs/specs/SPEC-384.md docs/progress/ISSUE-384-log.md`                                                             | Read in full; the working-tree spec is identical to `4b74ca8`                                                                     |
+| `node gov6-cases.mjs` (scratchpad)                                                                                                              | All stated timings and worked cases reproduced (table above)                                                                      |
+| `node gov6-grid.mjs k 8` for k = 1 to 6; `node gov6-flap.mjs short 1,6`, `adaptive 1,2,3,6`, `random 1,3,6`; `node gov6-spot.mjs`               | Within bounds: worst 4 per hour and 93 per 24 h for L0 only, 8 per hour and 97 per 24 h for k up to 6; minimum trial gap 30.0 min |
+| `node gov6-transient.mjs`                                                                                                                       | Without a pause before trials: pinned at L5 for good (R-B1). With one: L0 at 153 min; other cases unchanged                       |
+| Read `@react-three/fiber` 9.8.2 `update`, `advance` and `invalidate`, drei 10.7.9 `OrbitControls`, `Globe.tsx`, `SkyMap.tsx`, `SkyMapModal.tsx` | R-S3 and R-S4 facts                                                                                                               |
+| `npx prettier --check docs/specs/SPEC-384.md docs/progress/ISSUE-384-log.md docs/reviews/REVIEW-384.md`                                         | Pass (re-checked after this section was appended)                                                                                 |
+| `git diff --name-only origin/main...HEAD`; `git diff --quiet origin/main...HEAD -- src .github`                                                 | 7 files, none under `src/` or `.github/`; exit 0                                                                                  |
+
+### Next steps
+
+1. The architect applies R-B1 and R-S1 to R-S4 as worded above. This is text in section 6.2, AC 5 and the risk row, and needs no new mechanism beyond the pause before a trial. The owner decides on R-O1.
+2. No further review round is needed if the edits are applied as written. The coordinator can check the diff against this section.
+3. The owner re-pastes AC 5 into #435, adds the r3f notes (R-S3) and Sky Map `Paused` (R-S4) to its description, and confirms R-O4.
+4. After that, stop iterating on the spec. Settle the remaining questions by implementing #435 and measuring on a device: pause rejection rates, real `R` distributions, how visible the freezes are, and the r3f integration.

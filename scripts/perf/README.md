@@ -50,7 +50,9 @@ Run on each candidate device (see SPEC-384 section 2). Takes about 10 minutes pe
    - iPad Safari (Recommended tier for M1 or newer; older iPads are best effort): enable Web
      Inspector on the iPad (Settings > Safari > Advanced), connect to a Mac, Safari > Develop >
      [iPad] > page.
-4. Let the globe run for 2 minutes after load (warm-up; thermals matter for always-on use).
+4. Let the globe run for 2 minutes after load (warm-up; thermals matter for always-on use). Keep the
+   Sky Map modal closed during measurement: it is a second WebGL canvas and the probe counts draws from
+   every context.
 5. Paste the full contents of `probe.js` into the console, then run:
    `__wpPerf.start(); setTimeout(() => { const r = __wpPerf.stop(); console.table(r.summary); console.table(r.perTag); copy && copy(JSON.stringify(r)); }, 60000);`
    (`copy` exists in Chromium DevTools only; on Safari, expand and copy the logged object.)
@@ -61,9 +63,16 @@ Run on each candidate device (see SPEC-384 section 2). Takes about 10 minutes pe
    macOS; Task Manager GPU tab on Windows).
 8. Record results in the on-device table in SPEC-384 section 7.1. Summary fields to copy:
    `renderer`, `devicePixelRatio`, `fpsMean`, `rafFpsMean`, `frameMsP95`, `pctFramesOver66ms`, `framesOver50ms`,
-   `rafCallbackMsP95`, plus temperature after 10 minutes and whether p95 meets the section 3
+   `rafCallbackMsP95`, `contextsDrawing` (must be 1), plus temperature after 10 minutes and whether p95 meets the section 3
    budget for the tier. `framesOver33ms` is informative only (at 30 fps nearly every frame is
    about 33.3 ms). `programsCreated` is only complete when the probe is injected before load.
+
+Frames-over thresholds: `framesOver33ms`, `framesOver50ms` and `framesOver66ms` count rendered-frame
+intervals strictly greater than 34, 51 and 67 ms (threshold + 1 ms). 33.3, 50 and 66.7 ms are two,
+three and four 60 Hz ticks, so a frame that lands exactly on a tick is not counted as a miss.
+`pctFramesOver66ms` uses the same 67 ms cut. `contextsDrawing` is the number of distinct WebGL
+contexts that issued draws while sampling; it must be 1, and the probe logs a console warning
+otherwise (usually the Sky Map modal is open).
 
 Rendered frames vs browser ticks: a `requestAnimationFrame` tick counts as an application rendered
 frame only if the app issued at least one draw call (including draws hidden by `setSkip`) since the
@@ -77,8 +86,10 @@ the rendered-frame interval includes idle gaps, so use `rafCallbackMs*` for rend
 prints total milliseconds per bucket and function over the profiler's own elapsed time. It does not
 print per-frame or per-second rates, because the probe counts only the last ~1 s of frames and
 `--seconds` does not control the startup capture. Both runners stop every process they started
-(vite preview, mock server, browser) if any setup step fails, for example a taken port or a bad
-`--chrome` path.
+(vite preview, mock server, browser) if any setup step fails, for example a bad `--chrome` path,
+and on Ctrl+C or SIGTERM. A taken port 4173 or 3000 makes the runner exit non-zero before any browser
+launches: readiness is the `localhost:4173` line from vite (`--strictPort`), and "already in use" or
+`EADDRINUSE` output is treated as a failure, so a stale server is never profiled by mistake.
 
 Notes: the probe patches WebGL only after it is pasted, so draw-call counts start from the next
 frame, which is fine. The renderer string is read from the app's own context on the first
