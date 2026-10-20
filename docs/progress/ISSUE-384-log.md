@@ -232,3 +232,79 @@ Window-level model of the simplified rules, written from the new section 6.2 tex
 
 - The owner re-pastes AC 5 into #435 and updates #435's description (ladder L0 to L6, simplified earth at L6, on-demand `Paused`, one frame-loop owner), #448's section reference and the #385 coordination note.
 - NEXT: reviewer, spec diff only.
+
+## Session 6 - final corrections (2026-10-20)
+
+Applied the "Spec-diff review of commit 4b74ca8 (round 3 corrections)" section of `docs/reviews/REVIEW-384.md` to SPEC-384 on `claude/384-followups` (head `0ec4d61`), with the owner decisions made the same day. Spec and this log only; no `src/`, `.github/` or `scripts/perf/` changes. Not committed or pushed in this session.
+
+### Owner decisions (2026-10-20, this round)
+
+- R-O1 adopted: refresh calibration simplified. `R` starts at 16.7 ms and is replaced only by an accepted pause. Pauses run before every step-down, before every trial start and hourly while `R` is 20 ms or more. Dropped: the startup pause, the screen or refresh-rate change trigger and the Electron `displayFrequency` seed (so #435 has no IPC or preload contract). The accept/reject test and the settle after a pause are kept.
+- R-O4 confirmed: the simplified earth is L6, the governor-only last-resort level. The decision wording is now "simplified earth acceptable at the last-resort level (L6) only".
+- The Floor fallback stays ceiling L5 as written; no cap-only level.
+
+| Finding         | Change in SPEC-384                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| R-B1 (blocking) | A calibration pause runs before every trial start; the trial starts when the pause ends only if the closed window still has headroom with the new `R`, and is judged with that `R`. Pause row, step-up paragraph, diagram (`TrialPause` state), AC 5 "Calibration pause", new AC 5 "Trial pause" and "Wrong `R`" case (b), worked cases, risk row. The every-pause-rejected case is now bounded by trial-time pauses                                                  |
+| R-S1            | Risk row: "60 min per wrong pause (121 min if two in a row are wrong)"; residual bullet reworded (L5 look and a failed trial every 4 h on a 24 to 30 Hz panel; stretched pauses hide at most 1.2 x `R` + 1 ms, where the frame interval can't drop below the pause interval); rejection also covers timestamp jitter                                                                                                                                                  |
+| R-S2            | Pause row states the freeze (0.33 s at 60 Hz, 0.4 s at 50 Hz, 0.67 to 0.83 s at 30 to 24 Hz, 2 s at most), hourly for good on 50 Hz and slower once measured, auto-rotation jump (about 1 to 7 degrees), recenter jump, alert globe parts delayed up to 2 s, DOM/CSS unaffected; new rule: an alert arriving during a pause is rendered on the first tick after it. Why a pause can't trigger signals or loop. "Never" row, new risk row, AC 5 "Alert during a pause" |
+| R-S3            | Frame-loop paragraph: `advance(now / 1000, true, globeRootState)`, seconds because it replaces `clock.elapsedTime`, globe root only (not the Sky Map canvas), `invalidate()` is a no-op under `frameloop="never"` so on-demand mode listens to `OrbitControls` `change`, drag inertia about twice as long under the cap. Marked as an assumption to verify in #435. Same in "What #435 needs"                                                                         |
+| R-S4            | Sky Map open is a `Paused` trigger: section 6.2 paragraph, diagram, #435 inputs, AC 5 "Visibility, Sky Map and on-demand rendering"                                                                                                                                                                                                                                                                                                                                   |
+| R-O1            | Applied per the owner decision above: `R` row, pause row, diagram, AC 5, worked cases, risk row, section 9. First step-down from startup is now 50 s (was 60 s)                                                                                                                                                                                                                                                                                                       |
+| R-O2            | An hourly pause due during a trial or a settle period waits until it ends (pause row, diagram note, AC 5). The screen-change label is moot (trigger dropped)                                                                                                                                                                                                                                                                                                          |
+| R-O3            | AC 5 "Flap bound" counts in half-open windows (s, s + 60 min]                                                                                                                                                                                                                                                                                                                                                                                                         |
+| R-O4            | Section 9 wording updated (confirmed by the owner)                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| R-O5            | Debug getter reports level, `R`, last pause result and rejected-pause count ("What #435 needs", AC 5, section 7 step 4)                                                                                                                                                                                                                                                                                                                                               |
+| R-O6            | Not added (owner); recorded in section 9 as "not adopted for now"                                                                                                                                                                                                                                                                                                                                                                                                     |
+| R-O7            | "About 41 (41 to 43 depending on phase)"                                                                                                                                                                                                                                                                                                                                                                                                                              |
+
+### Simulation of the final rules (throwaway, not committed)
+
+`gov7.mjs` in the session scratchpad, adapted from the reviewer's `gov6.mjs`/`gov6b.mjs`: no startup pause, no screen-change trigger, `R` seeded at 16.7 ms, a pause before every trial start with a headroom re-check, hourly pauses deferred during a trial or settle. Drivers `gov7-cases.mjs`, `gov7-transient.mjs`, `gov7-grid.mjs`, `gov7-flap.mjs`, `gov7-spot.mjs`. Pauses are instantaneous in the model.
+
+| Case                                                         | Result                                                                                               |
+| ------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------- |
+| Recommended overload, steady 30 fps at L0 to L3, `W` 14 ms   | Down at 50, 80, 110, 140 s; holds L4                                                                 |
+| Same, `W` 4 ms, GPU unknown                                  | Failed L3 trials at 32.3, 92.7, 213, 453.3, 693.7 min                                                |
+| Overload of all levels from 600 s                            | Down 20, 50, 80, 110, 140 s after onset (L5 at 140 s)                                                |
+| Floor 15 fps, Auto (L4) / Full (L0)                          | L5 at 50 s, L6 at 80 s / L6 at 200 s (6 pauses in 150 s)                                             |
+| True 30, 25, 24 Hz, Recommended, accurate pauses, from L0    | No level change; one cancelled-step-down pause at 50 s, then hourly (24 pauses a day)                |
+| Same, from L1                                                | Trial L0 at 30 min, kept                                                                             |
+| Recovery at 60 Hz from L1 (GPU known / unknown)              | Trial L0 at 30 min, kept                                                                             |
+| Recovery from L5 / L6                                        | L0 at 150 / 180 min                                                                                  |
+| R-B1: 30, 25, 24 Hz, pauses rejected only in the first 200 s | L5 at 170 s; L4 trial at 32.8 min kept; L0 at 152.8 min (was: pinned at L5 for good)                 |
+| 30, 25, 24 Hz, every pause rejected                          | L5 at 170 s; failed L4 trials at 32.8, 93.2, 213.5, 453.8, 694.2 min; never L6                       |
+| 30, 25, 24 Hz, Floor at L4, every pause rejected             | No change                                                                                            |
+| 60 Hz, first pause wrongly 33 ms, 30 fps overload            | First step-down at 61.3 min                                                                          |
+| Same, first two pauses wrong                                 | First step-down at 121.3 min                                                                         |
+| 60 Hz, every pause wrongly 33 / 42 ms                        | Never acted on (residual, at most 1.2 x `R` + 1 ms)                                                  |
+| GPU-bound, no timer, L0 always misses, from L1               | Trials at 30, 90.3, 210.7, 451 min, then every 4 h; 16 changes a day                                 |
+| Hidden 1810 to 1900 s during a trial                         | Abandoned at 30.3 min, `G` unchanged; next trial at 60.3 min, kept                                   |
+| Display 30 Hz to 60 Hz at 120 min, overload L0 to L3         | Hidden until the next hourly pause (120.8 min here; up to 60 min in general), then down at 121.3 min |
+| Display 60 Hz to 30 Hz at 120 min, light load                | One cancelled-step-down pause at 120.2 min; no level change                                          |
+| 60 Hz and 50 Hz unloaded, 24 h                               | 0 pauses (the hourly rule needs an accepted `R` of 20 ms or more)                                    |
+| 1 min on every 6, L0 only, 24 phases                         | 41 to 43 changes a day, at most 4 in any hour                                                        |
+
+Flap bound, 24 h, half-open 60 min windows; minimum gap between trial starts 30.0 min (30.8 min for L0-only load) in every sweep:
+
+| Load                                            | Worst in any hour     | Worst per 24 h              |
+| ----------------------------------------------- | --------------------- | --------------------------- |
+| Fine grid, k = 1 / 2 / 3 / 4 / 5 / 6 (8 phases) | 4 / 5 / 6 / 7 / 8 / 8 | 93 / 94 / 95 / 96 / 97 / 97 |
+| State-adaptive adversary, k = 1 / 2 / 3 / 6     | 4 / 5 / 6 / 8         | 93 / 94 / 95 / 97           |
+| 500 random schedules, k up to 1 / 3 / 6         | 4 / 6 / 8             | 68 / 78 / 82                |
+| Short bursts (1 to 25 s), k = 1 / 6             | 4 / 7                 | 93 / 97                     |
+| 6 min every 46 min, k = 1 / 6                   | 4 / 8                 | 63 / 67                     |
+
+All five required behaviours hold under the simplified rules; the numbers match the reviewer's round 3 model except that every startup-relative time is 10 s earlier (no startup pause).
+
+### Behaviour changes vs the round 3 text
+
+- First step-down from startup at 50 s (was 60 s); L4 reached at 140 s in the 30 fps overload case (was 150 s).
+- A 24 to 30 Hz panel always gets one pause about 50 s after startup that cancels a step-down (Electron used to seed `R`).
+- A refresh-rate change is noticed only at the next pause: moving to a slower display is corrected by the first step-down pause; moving to a faster display can leave a stale high `R` for up to 60 min (hourly re-check), hiding overload of at most 1.2 x `R` + 1 ms.
+- Every trial now costs a pause (about 0.33 s at 60 Hz).
+
+### Hand-off
+
+- The owner re-pastes AC 5 into #435 and updates #435, #431, #448 and #385 as in the architect report.
+- NEXT: owner (merge PR #440 once CI is green).
