@@ -327,15 +327,15 @@ Each one is testable with the tooling in `scripts/perf/` or with unit tests.
 - **Floor device:** Raspberry Pi 5 on a 1080p TV. If a different device meets the Floor budget with fewer tradeoffs, it can replace the Pi 5 once on-device results exist. Backwards compatibility is not a goal, so iPad 9th gen and older moved to best effort (this follows the owner's "no need for a lot of backwards compatibility"; confirm if an iPad must stay supported).
 - **Smart-TV built-in browsers:** out as render hosts. A TV remains supported as a display driven over HDMI.
 - **Acceptance criterion 8 gate:** accepted. #360 (sweep) and #362 (phosphor) cannot merge until section 7.1 has a Floor and a Recommended device row that meets the section 3 p95 budget.
+- **30 fps at Floor (decided 2026-10-20):** acceptable for an ambient display. #431 and #435 proceed on that basis.
+- **Reduced motion stops auto-rotation and allows on-demand rendering (decided 2026-10-20):** added as acceptance criteria on #385. Section 6.2 does not yet cover on-demand rendering: the probe and governor must not read idle, on-demand rendering as a render stall, to be specified when #385 and #435 are implemented.
+- **CI perf check (decided 2026-10-20):** yes, non-gating, filed as #448. It touches `.github/workflows/**`, so architect review is required on that story's PR.
 
 **Still open:**
 
-1. **Is 30 fps acceptable at Floor** for an ambient display? Rotation is 0.06 rad/s, so 30 fps is visually smooth, and it lowers power and heat.
-2. **Should reduced motion also stop auto-rotation** and allow on-demand rendering (near-zero idle GPU)? `PRODUCT.md` only lists sweep and glow.
-3. **Lite earth material.** Is a visibly simpler earth (no normal map, cheaper shading) acceptable at L5? It is the largest measured fill cost.
-4. **Night-lights texture source and size for #357.** This affects memory (+2.7 to +10.7 MiB within the section 5 limits) and licensing.
-5. **Should the performance profile (Auto, Full, Lite) appear in the settings panel?** That needs UX (#226 pattern).
-6. **Is a perf regression check in CI wanted?** It would touch `.github/workflows/**`, which is high-risk surface needing architect review. Proposed: start as a non-gating job that posts probe counts.
+1. **Lite earth material.** Is a visibly simpler earth (no normal map, cheaper shading) acceptable at L5? It is the largest measured fill cost.
+2. **Night-lights texture source and size for #357.** This affects memory (+2.7 to +10.7 MiB within the section 5 limits) and licensing.
+3. **Should the performance profile (Auto, Full, Lite) appear in the settings panel?** That needs UX (#226 pattern).
 
 ---
 
