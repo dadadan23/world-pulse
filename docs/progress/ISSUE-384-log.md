@@ -166,4 +166,5 @@ Window-level model of the corrected section 6.2 rules (10 s windows, calibrated 
 - 30 fps acceptable at Floor.
 - Reduced motion stops auto-rotation and allows on-demand rendering (criteria posted on #385).
 - CI perf check wanted, non-gating (story #448; architect review required).
-- Still open: SPEC-384 section 9 items 1-3 (simpler Lite earth at L5, night-lights texture source and licence, profile control in settings).
+- Simplified earth acceptable at L5 only (lever added to the ladder); profile control in settings approved as a later UX story.
+- Night-lights texture: size taken as <= 1024x512 for every tier; source and licence still open (SPEC-384 section 9, item 1).

@@ -201,15 +201,15 @@ Texture arithmetic (baseline 58.2 MiB, sizes include a full mip chain at 4 bytes
 
 ### 6.2 Degrade ladder (governor steps down in this order, back up in reverse)
 
-| Level | Change                                                                                       | Reason for position                                                                              |
-| ----- | -------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| L0    | Full                                                                                         |                                                                                                  |
-| L1    | Bloom off (phosphor drops to CSS only)                                                       | Biggest planned fill cost, purely decorative                                                     |
-| L2    | Sweep and ping off                                                                           | Opt-in decoration, full-globe fill                                                               |
-| L3    | Pulse rings static, 3 or fewer concurrent; fire markers no animation, 250 or fewer instances | Keeps information, drops motion                                                                  |
-| L4    | DPR cap 1.0                                                                                  | Largest single fill lever (2.2x, container SwiftShader, relative only)                           |
-| L5    | 30 fps frame cap (see the cap rule below); outer atmosphere shell and wireframe overlay off  | Existing fill-heavy decoration (about 17% each, container SwiftShader ablation, rank order only) |
-| Never | Event markers, severity colours and labels, alert behaviour, terminator                      | Core information; colour-independence rules from #385                                            |
+| Level | Change                                                                                                                                                   | Reason for position                                                                              |
+| ----- | -------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| L0    | Full                                                                                                                                                     |                                                                                                  |
+| L1    | Bloom off (phosphor drops to CSS only)                                                                                                                   | Biggest planned fill cost, purely decorative                                                     |
+| L2    | Sweep and ping off                                                                                                                                       | Opt-in decoration, full-globe fill                                                               |
+| L3    | Pulse rings static, 3 or fewer concurrent; fire markers no animation, 250 or fewer instances                                                             | Keeps information, drops motion                                                                  |
+| L4    | DPR cap 1.0                                                                                                                                              | Largest single fill lever (2.2x, container SwiftShader, relative only)                           |
+| L5    | 30 fps frame cap (see the cap rule below); outer atmosphere shell and wireframe overlay off; simplified earth material (normal map off, cheaper shading) | Existing fill-heavy decoration (about 17% each, container SwiftShader ablation, rank order only) |
+| Never | Event markers, severity colours and labels, alert behaviour, terminator                                                                                  | Core information; colour-independence rules from #385                                            |
 
 **Profiles and the ladder.** Each profile sets a ceiling `C`, the best level the governor may reach, and the starting level. The governor works between `C` and L5, and the effective level is the more degraded of `C` and the governor's level (story #431).
 
@@ -331,11 +331,12 @@ Each one is testable with the tooling in `scripts/perf/` or with unit tests.
 - **Reduced motion stops auto-rotation and allows on-demand rendering (decided 2026-10-20):** added as acceptance criteria on #385. Section 6.2 does not yet cover on-demand rendering: the probe and governor must not read idle, on-demand rendering as a render stall, to be specified when #385 and #435 are implemented.
 - **CI perf check (decided 2026-10-20):** yes, non-gating, filed as #448. It touches `.github/workflows/**`, so architect review is required on that story's PR.
 
+- **Simplified earth at L5 (decided 2026-10-20):** acceptable at the governor's last-resort level only (normal map off, cheaper shading; the earth is about 31% of frame time in the container ablation). It is not the default Lite look. Added as an L5 lever in section 6.2.
+- **Performance profile control in settings (decided 2026-10-20):** yes, as a later UX story following the #226 pattern. #431 deliberately ships without the control.
+
 **Still open:**
 
-1. **Lite earth material.** Is a visibly simpler earth (no normal map, cheaper shading) acceptable at L5? It is the largest measured fill cost.
-2. **Night-lights texture source and size for #357.** This affects memory (+2.7 to +10.7 MiB within the section 5 limits) and licensing.
-3. **Should the performance profile (Auto, Full, Lite) appear in the settings panel?** That needs UX (#226 pattern).
+1. **Night-lights texture source and licence for #357/#387.** The owner answered "yes" to the suggestion that a texture of 1024x512 or smaller fits every tier (+2.7 MiB); that sizing is taken as accepted. The source and licence have not been named and are still needed. This affects memory within the section 5 limits (+2.7 to +10.7 MiB).
 
 ---
 
