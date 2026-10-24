@@ -11,16 +11,23 @@ export default defineConfig({
   build: {
     outDir: 'dist/renderer',
     emptyOutDir: true,
-    rollupOptions: {
+    rolldownOptions: {
       input: {
         main: path.resolve(__dirname, 'index.html'),
       },
       output: {
-        manualChunks: {
-          // Split heavy Three.js packages into a separate vendor chunk so the
-          // main application bundle stays smaller and the Three.js chunk can be
-          // cached independently across deploys.
-          'vendor-three': ['three', '@react-three/fiber', '@react-three/drei'],
+        codeSplitting: {
+          groups: [
+            {
+              // Split heavy Three.js packages into a separate vendor chunk so the
+              // main application bundle stays smaller and the Three.js chunk can be
+              // cached independently across deploys.
+              name: 'vendor-three',
+              // Includes the 3D-only transitive dependencies of drei/fiber so the
+              // chunk matches what the previous `manualChunks` object produced.
+              test: /node_modules[\\/](three|@react-three|three-stdlib|three-mesh-bvh|troika-[^\\/]+|maath|meshline|camera-controls|detect-gpu|stats-gl|stats\.js|hls\.js|@monogrid|@mediapipe|@use-gesture|glsl-noise)[\\/]/,
+            },
+          ],
         },
       },
     },
