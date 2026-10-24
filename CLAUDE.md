@@ -8,12 +8,12 @@ World Pulse is a real-time information radiator that visualizes global events on
 
 ---
 
-## Project Status (as of 2026-10-18)
+## Project Status (as of 2026-10-24)
 
 | Area | Status | Notes |
 |---|---|---|
 | Phase 1, Phase 2, news/tickers, ambient settings, adaptive layout, severity alerting, Electron auto-update | Done | Epics #142/#143, #208, #226–#229 and all child stories closed. `DESIGN.md`/`PRODUCT.md` are the canonical design references. |
-| Next phase (#347–#350) | **Started** | Frame-budget spike #384 is done (PR #438, `docs/specs/SPEC-384.md`, tooling in `scripts/perf/`); 7 follow-up stories #431–#437 added under #356. Everything else is open. See "Next Phase". |
+| Next phase (#347–#350) | **Started** | Frame-budget spike #384 is done (PR #438, `docs/specs/SPEC-384.md`, tooling in `scripts/perf/`); 9 follow-up stories under #356: #431–#437, #448 (non-gating CI perf probe, architect review required) and #449 (profile control in settings, UX review). Everything else is open. See "Next Phase". |
 | Dependency upgrades (#417) | Mostly done | Merged: vitest 5 (#423), dotenv 18 (#426), three 0.186 (#430). **Open Dependabot PRs: 3** — #333 vite 8 (blocked: needs electron-vite 6; `manualChunks` fails under rolldown), #335 electron 44 (needs desktop smoke test), #336 TypeScript 7 (blocked: typescript-eslint peer range). Not yet PR'd: eslint 10, @vitejs/plugin-react 6, @testing-library/jest-dom 7. Use npm 11 for lockfiles. |
 | CI/CD | Green on main | Last main commits are dependency/build fixes (#421, #423, #426, #428 Express 5 SPA fallback, #430). |
 | AgentX state | Idle | `.agentx/state/agent-status.json` shows all agents idle. Always run `hook complete` when finishing work. |
@@ -27,6 +27,10 @@ World Pulse is a real-time information radiator that visualizes global events on
 | #348 Living Globe | P2 | #356–#362 | Perf/a11y guardrails, live solar terminator, callouts, pulse rings, sweep/ping, calm/alert modes, phosphor + burn-in drift. |
 | #349 Context at a Glance | P2 | #363–#366 | Rolling-median baselines, now-vs-normal gauges, data-lineage footer, ISS pass prediction (spike first). |
 | #350 New Data Layers wave 1 | P2 | #367–#369 | NASA FIRMS wildfires, NOAA SWPC space weather, GDACS/EONET disaster alerts (spike first). |
+
+**Owner decisions (2026-10-20, details in `docs/specs/SPEC-384.md` section 9):** 30 fps is acceptable at the Floor tier (Raspberry Pi 5); reduced motion also stops auto-rotation and renders on demand (criteria on #385); a non-gating CI perf check is wanted (#448); the simplified earth material is acceptable at the last-resort ladder level (L6) only; a quality-profile control in settings is approved as a later UX story (#449); the night-lights texture is 1024x512 or smaller for every tier, but its **source and licence are still open** (#387).
+
+**Hardware status:** the Raspberry Pi 5 and Recommended-device baseline (#434) is waiting on hardware, which is not available yet. Until a real device exists, perf work uses emulation or mocked tests only. #437 (on-device sign-off) stays blocked, and so do the sweep (#360) and phosphor (#362) features it gates. Budgets in SPEC-384 are assumptions until #434 produces real rows.
 
 **Suggested sequence** (derived from epic text and titles; story-level blocked-by links were not verified):
 1. Foundation (P1): ~~#384 frame-budget spike~~ (done), #434 on-device Pi 5 baseline (owner), #433 guardrails doc, #431 quality profile, #432 instanced markers, #385 reduced-motion utility, #370 → #371 mode registry/persistence.
