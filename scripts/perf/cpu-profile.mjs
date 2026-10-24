@@ -31,35 +31,66 @@ const SECONDS = Number(opt('seconds', '10'));
 const STARTUP = argv.includes('--startup');
 const probeSrc = readFileSync(path.join(here, 'probe.js'), 'utf8');
 
+// Every process group started here, so a signal handler can stop them all.
+const started = new Set();
+// vite prints this when --strictPort finds the port taken; never treat it as ready.
+const FAILED_RE = /already in use|EADDRINUSE|strict ?port/i;
+
 // Own process group so stopProc() also kills the vite child of `npx`.
 function startProc(cmd, args, readyRe) {
   return new Promise((resolve, reject) => {
     const p = spawn(cmd, args, { cwd: root, stdio: ['ignore', 'pipe', 'pipe'], detached: true });
+    started.add(p);
     const timer = setTimeout(() => {
       stopProc(p);
       reject(new Error(`${cmd} not ready`));
     }, 30000);
     const onData = (d) => {
-      if (readyRe.test(d.toString())) {
+      const text = d.toString();
+      if (FAILED_RE.test(text)) {
+        clearTimeout(timer);
+        stopProc(p);
+        reject(
+          new Error(
+            `${cmd} failed to start: ${(text.split('\n').find((l) => FAILED_RE.test(l)) || text).trim()}`
+          )
+        );
+      } else if (readyRe.test(text)) {
         clearTimeout(timer);
         resolve(p);
       }
     };
     p.stdout.on('data', onData);
     p.stderr.on('data', onData);
+    p.on('error', (e) => {
+      clearTimeout(timer);
+      started.delete(p);
+      reject(e);
+    });
     p.on('exit', (c) => {
       clearTimeout(timer);
+      started.delete(p);
       reject(new Error(`${cmd} exited ${c}`));
     });
   });
 }
 
 function stopProc(p) {
+  started.delete(p);
   try {
     process.kill(-p.pid, 'SIGTERM');
   } catch {
     p.kill();
   }
+}
+
+// The children are in their own process groups, so a terminal Ctrl+C does not
+// reach them and `finally` does not run on a signal: stop them explicitly.
+for (const sig of ['SIGINT', 'SIGTERM']) {
+  process.once(sig, () => {
+    for (const p of [...started]) stopProc(p);
+    process.exit(130);
+  });
 }
 
 // Setup runs inside the try so that a failed step (port taken, bad --chrome
@@ -68,7 +99,11 @@ let preview;
 let mock;
 let browser;
 try {
-  preview = await startProc('npx', ['vite', 'preview', '--port', '4173', '--strictPort'], /4173/);
+  preview = await startProc(
+    'npx',
+    ['vite', 'preview', '--port', '4173', '--strictPort'],
+    /localhost:4173/
+  );
   mock = await startProc(
     process.execPath,
     [path.join(here, 'mock-server.mjs'), '--markers', MARKERS],
