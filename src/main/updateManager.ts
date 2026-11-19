@@ -8,7 +8,11 @@
 
 import fs from 'fs';
 import path from 'path';
-import { autoUpdater as defaultAutoUpdater, type AppUpdater } from 'electron-updater';
+import electronUpdater, { type AppUpdater } from 'electron-updater';
+
+// electron-updater is CommonJS and exposes autoUpdater as a lazy getter, which Node's ESM
+// loader cannot detect as a named export, so read it from the default export, and only when
+// needed (reading it constructs the updater).
 
 export type UpdateStatus = 'idle' | 'checking' | 'downloading' | 'ready';
 
@@ -52,7 +56,7 @@ export interface UpdateManager {
 }
 
 export function createUpdateManager(options: UpdateManagerOptions = {}): UpdateManager {
-  const updater = options.updater ?? defaultAutoUpdater;
+  const updater = options.updater ?? electronUpdater.autoUpdater;
   const quietHoursStart = options.quietHoursStart ?? DEFAULT_QUIET_HOURS_START;
   const quietHoursEnd = options.quietHoursEnd ?? DEFAULT_QUIET_HOURS_END;
 
