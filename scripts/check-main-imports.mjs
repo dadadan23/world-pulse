@@ -18,7 +18,12 @@ for (const [, specifiers, pkg] of source.matchAll(pattern)) {
   if (skip.has(pkg)) continue;
   const names = specifiers
     .split(',')
-    .map((part) => part.trim().split(/\s+as\s+/)[0].replace(/^type\s+/, ''))
+    .map((part) =>
+      part
+        .trim()
+        .split(/\s+as\s+/)[0]
+        .replace(/^type\s+/, '')
+    )
     .filter(Boolean);
   let mod;
   try {
