@@ -33,6 +33,12 @@ export default defineConfig({
         input: {
           index: resolve(__dirname, 'src/main/preload.ts'),
         },
+        // Sandboxed renderers can only load a CommonJS preload (package.json is "type": "module",
+        // so electron-vite would otherwise emit an ESM index.mjs that Electron cannot load).
+        output: {
+          format: 'cjs',
+          entryFileNames: '[name].cjs',
+        },
       },
     },
   },

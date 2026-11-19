@@ -71,7 +71,7 @@ function createWindow(): void {
     height: 1080,
     title: 'World Pulse',
     webPreferences: {
-      preload: path.join(__dirname, '../preload/index.js'),
+      preload: path.join(__dirname, '../preload/index.cjs'),
       contextIsolation: true,
       nodeIntegration: false,
     },
