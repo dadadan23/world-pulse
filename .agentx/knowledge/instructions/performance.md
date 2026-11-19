@@ -4,12 +4,42 @@ World Pulse runs 24/7 on dedicated display hardware (TV, iPad, monitor). Perform
 
 ---
 
-## Frame Budget: 60 fps
+## Frame Budget: per display tier
 
-The Three.js render loop must sustain **60 fps** on the target hardware. Budget: **16.6 ms per frame**.
+The budget depends on the display tier, not a single 60 fps target. The Floor device (Raspberry Pi 5 on a 1080p TV) holds **30 fps**; Recommended and Showpiece devices hold **60 fps**. Source of truth: [`docs/specs/SPEC-384.md`](../../../docs/specs/SPEC-384.md) (sections 2, 3, 5, 6). Device capabilities in the spec are assumed until the on-device baseline (#434) is recorded.
 
-Guidelines:
-- `useFrame` callbacks must complete in < 1 ms each.
+| Tier | Target fps | p95 frame | Frames over 66 ms | Main-thread JS per frame | GPU per frame | Texture cap | DPR cap |
+|---|---|---|---|---|---|---|---|
+| Floor (Pi 5) | 30 | <= 50 ms | <= 1% over 10 min | <= 16 ms | <= 23 ms | 64 MiB | 1.0 |
+| Recommended | 60 | <= 20 ms | <= 0.1% | <= 8 ms | <= 11 ms | 96 MiB | 1.5 |
+| Showpiece | 60 | <= 20 ms | <= 0.1% | <= 8 ms | <= 11 ms | 128 MiB | 1.0 at 4K |
+
+About 30% of each frame is held back as headroom for thermals, compositing and GC. Budget checks allow 1 ms of timestamp jitter (SPEC-384 section 3).
+
+### Hard ceilings (hardware-independent, measured with the probe at 50 markers)
+
+| Metric | Full | Lite |
+|---|---|---|
+| Draw calls per frame | <= 300 (<= 120 after the instanced-markers story, #432) | <= 80 |
+| Triangles per frame | <= 100,000 | <= 60,000 |
+| Shader programs | <= 16 | <= 12 |
+| Texture allocations incl. mipmaps | <= 96 MiB | <= 64 MiB |
+| Full-screen post passes | <= 4 (bloom at half res) | 0 |
+| New per-frame React state updates | 0 | 0 |
+
+Per-effect cost limits (draw calls, concurrent rings, Floor/Lite behaviour) are in SPEC-384 section 5; the degrade ladder L0-L5 is in section 6.2. Measure with [`scripts/perf/README.md`](../../../scripts/perf/README.md).
+
+### Effect PR checklist
+
+Every PR that adds or changes a Globe effect must show:
+- [ ] Probe draw-call and triangle counts **before and after** at 50 markers (`scripts/perf/probe.js`), inside the ceilings above
+- [ ] Behaviour on **Full and Lite**, and the degrade-ladder level at which the effect steps down or turns off
+- [ ] No `setState` or store `set` inside `useFrame`
+- [ ] Reduced motion honoured through the shared reduced-motion utility once #385 lands (until then, `prefers-reduced-motion`)
+- [ ] Severity is not carried by colour alone (shape, label or motion as well)
+
+Guidelines for all render-loop code:
+- `useFrame` callbacks must be cheap; the whole app's main-thread JS must stay inside the tier budget above.
 - Do not call `setState` (Zustand) inside `useFrame` — it triggers React re-renders. Read state via `useAppStore.getState()` instead.
 - Mutate `ref.current` properties directly for per-frame animation (scale, opacity, rotation).
 - Use `useMemo` for geometry/texture creation — these are expensive and must only run once.
@@ -25,7 +55,7 @@ Each marker consists of:
 - 1× `ringGeometry` (24 segments)
 - 1× optional `ringGeometry` for pulse
 
-At 30 markers that is 90 draw calls. Any increase must be validated against the 60 fps target.
+At 30 markers that is 90 draw calls. Any increase must be validated against the tier budgets and ceilings above.
 
 ---
 

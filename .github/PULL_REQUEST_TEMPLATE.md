@@ -24,6 +24,12 @@
 - [ ] SQL queries parameterized (no concatenation)
 - [ ] Dependencies scanned for vulnerabilities
 
+### Globe / visual effects (skip if not applicable; see .agentx/knowledge/instructions/performance.md)
+- [ ] Probe draw-call and triangle counts before and after at 50 markers, within the ceilings
+- [ ] Full and Lite behaviour and degrade-ladder level stated
+- [ ] No `setState` or store `set` inside `useFrame`
+- [ ] Reduced motion honoured; severity not conveyed by colour alone
+
 ### Documentation
 - [ ] README updated if needed
 - [ ] API documentation updated
